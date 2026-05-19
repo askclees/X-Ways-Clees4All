@@ -1,8 +1,15 @@
 #include <stdint.h>
 #include "base64.h"
 
+/** @brief Base64 alphabet used for encoding. */
 const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+/**
+ * @brief Calculates the buffer size required to hold a base64-encoded string.
+ *
+ * @param inlen Length of the input data in bytes.
+ * @return Size of the base64 output, not including a null terminator.
+ */
 static size_t b64EncodedSize(size_t inlen)
 {
 	size_t ret;
@@ -16,8 +23,17 @@ static size_t b64EncodedSize(size_t inlen)
 	return ret;
 }
 
-
-
+/**
+ * @brief Encodes binary data as a null-terminated base64 string.
+ *
+ * The returned buffer is allocated with new[] and must be freed by the caller
+ * using delete[].
+ *
+ * @param in  Pointer to the input data to encode.
+ * @param len Length of the input data in bytes.
+ * @return    Newly allocated null-terminated base64 string, or NULL if @p in
+ *            is NULL or @p len is zero.
+ */
 char* b64Encode(unsigned char* in, size_t len)
 {
 	char*    out;

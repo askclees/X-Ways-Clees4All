@@ -10,58 +10,44 @@
 #include "utility.h"
 #include "debugMessage.h"
 
-//defines
-/* Constant: folderDepth
-Depth of folders to be created based on hash values. Currently set to 2*/
+/** @brief Depth of folders created within the archive based on hash values. */
 #define folderDepth 2
 
-//define max read size.
-/* Constant: max_read
-Max size to be read in a single pass. Currently set to 4194304LL*/
+/** @brief Maximum number of bytes read from a file in a single pass. */
 #define max_read 4194304LL
 
-//variables for holding paths for different archives
+/** @brief UTF-8 path to the picture output archive. */
 char* archivePic=nullptr;
+
+/** @brief UTF-8 path to the video output archive. */
 char* archiveVid=nullptr;
 
-//define a global writer
+/** @brief libarchive write object for picture files, or NULL if unused. */
 struct archive* ArchPic=nullptr;
+
+/** @brief libarchive write object for video files, or NULL if unused. */
 struct archive* ArchVid=nullptr;
+
+/** @brief libarchive write object used when picture and video paths are the same. */
 struct archive* ArchAll=nullptr;
 
-/* Variable: hashList
-std::set of std::string that's used to keep a list of files that have been written to an archive.
-*/
+/** @brief Set of MD5 hash strings for files already written to the archive, used for deduplication. */
 std::set<std::string> hashList;
 
-/* Variable: archiveLock
-std::mutex used to stop simultaneous writes to a zip archive.*/
-
+/** @brief Mutex preventing simultaneous writes to a zip archive. */
 std::mutex archiveLock;
 
 
-/*Section: Archive Creation Functions
-    This section contains all the functions required to write to a zip archive.
-
-    Added in version 1.50
-
-*/
-
-
-/*Function: setArchivePath
-    Function that sets the output location in UTF-8 from wide character string.
-
-    Parameters:
-        wchar_t* path   -   Wide string containing Null terminated output path
-        int flags       -   SET_PIC_PATH or SET_VID_PATH are valid flags. Can be both if single archive
-
-    Returns:
-        SUCCESS     -   Always
-
-    See Also:
-        Calls   -   <loadOrCreateOptions>
-*/
-
+/**
+ * @brief Sets the output archive path from a wide character string.
+ *
+ * Appends "JSON export.zip" to the supplied path and stores the result as a
+ * UTF-8 string in @p archivePic, @p archiveVid, or both depending on @p flags.
+ *
+ * @param path  Wide string containing the null-terminated output directory path.
+ * @param flags Combination of SET_PIC_PATH and/or SET_VID_PATH.
+ * @return      SUCCESS always.
+ */
 int setArchivePath(wchar_t* path, int flags)
 {
     wchar_t* tempStr;
@@ -81,21 +67,16 @@ int setArchivePath(wchar_t* path, int flags)
 
 }
 
-/*Function: setupZipArchives
-    Function that sets up object(s) for output archive(s).
-
-    Where the output path for pictures and videos is the same, use a single archive.
-
-    Otherwise create an archive and corresponding object in each location.
-
-    Returns:
-        SUCCESS         -   Function successfully completed
-        ERROR_CREATE    -   Error creating Archive Object
-        ERROR_FORMAT    -   Error setting as zip format
-        ERROR_OPEN      -   Error opening file
-
-*/
-
+/**
+ * @brief Creates and opens archive object(s) for output.
+ *
+ * Where the picture and video paths are the same, a single archive object is
+ * created. Otherwise a separate object is created for each non-null path.
+ *
+ * @return SUCCESS on success, ERROR_CREATE if an archive object could not be
+ *         allocated, ERROR_FORMAT if the zip format could not be set, or
+ *         ERROR_OPEN if the archive file could not be opened.
+ */
 int setupZipArchives()
 {
     if (archivePic != nullptr && archiveVid != nullptr && strcmp(archivePic,archiveVid)==0)
@@ -135,20 +116,21 @@ int setupZipArchives()
     return SUCCESS;
 }
 
-/*Function: createZipArchiveEntry
-    Function that creates a new archive entry header and sets the size,
-    pathname and filemode
-
-    Required prior to writing data for a file.
-
-    Returns:
-        SUCCESS         -   Function successfully completed
-        ERROR_WRITE     -   Error writing archive entry
-
-    See Also:
-        Called from     -   <writeArchiveFile>
-*/
-
+/**
+ * @brief Creates a new entry header in the archive.
+ *
+ * Sets the entry size, pathname and file mode. The entry is freed and set to
+ * nullptr on failure.
+ *
+ * @param archFile  Pointer to the archive write object.
+ * @param entry     Output parameter populated with the new archive entry.
+ * @param filePath  Path for the file within the archive.
+ * @param fileSize  Size of the file in bytes.
+ * @return          SUCCESS on success, or ERROR_WRITE if the header could not
+ *                  be written.
+ *
+ * @see writeArchiveFile, writeJSONFile
+ */
 int createZipArchiveEntry(struct archive** archFile, struct archive_entry** entry, const char* filePath,int64_t fileSize)
 {
     *entry = archive_entry_new();
@@ -164,21 +146,13 @@ int createZipArchiveEntry(struct archive** archFile, struct archive_entry** entr
     return SUCCESS;
 }
 
-/*Section: Archive Closing Functions*/
-
-/*Function: closeZipArchives
-    Function that closes the zip archives.
-
-    Currently does not check for errors or if the archive is in use.
-
-    Returns:
-        SUCCESS         -   Always
-
-    See Also:
-        Calls   -   <closeZipArchiveEntry>
-
-*/
-
+/**
+ * @brief Closes all open zip archives.
+ *
+ * @return SUCCESS always.
+ *
+ * @see closeZipArchive
+ */
 int closeZipArchives()
 {
     closeZipArchive(&ArchPic);
@@ -187,6 +161,11 @@ int closeZipArchives()
     return SUCCESS;
 }
 
+/**
+ * @brief Frees the archive path strings allocated by setArchivePath.
+ *
+ * Should be called at shutdown to avoid leaking archivePic and archiveVid.
+ */
 void cleanupArchivePaths()
 {
     delete[] archivePic;
@@ -195,38 +174,29 @@ void cleanupArchivePaths()
     archiveVid = nullptr;
 }
 
-/*Function: closeZipArchiveEntry
-    Function that closes a zip file entry
-
-    Currently does not check for errors
-
-    Returns:
-        SUCCESS         -   Always
-
-    See Also:
-        Called by       -   <writeJSONFile>
-
-*/
-
+/**
+ * @brief Frees a zip archive entry.
+ *
+ * @param archFile Pointer to the archive write object (unused, retained for API symmetry).
+ * @param entry    The entry to free.
+ * @return         SUCCESS always.
+ *
+ * @see writeJSONFile
+ */
 int closeZipArchiveEntry(struct archive** archFile, struct archive_entry* entry)
 {
     archive_entry_free(entry);
     return SUCCESS;
 }
 
-/*Function: closeZipArchive
-    Function that closes a single zip archive.
-
-    Currently does not check for errors or if the archive is in use.
-
-    Returns:
-        SUCCESS         -   Always
-
-    See Also:
-        Called by       -   <closeZipArchives>
-
-*/
-
+/**
+ * @brief Closes and frees a single zip archive.
+ *
+ * @param archFile Pointer to the archive write object to close.
+ * @return         SUCCESS on success, or ERROR_CLOSE if archive_write_free fails.
+ *
+ * @see closeZipArchives
+ */
 int closeZipArchive(struct archive** archFile)
 {
     if (archive_write_free(*archFile)!=ARCHIVE_OK)
@@ -234,24 +204,20 @@ int closeZipArchive(struct archive** archFile)
     return SUCCESS;
 }
 
-/*Section: Archive Utility Functions*/
-
-/*Function: generateCompressedPath
-    Function that generates the file path for a file in zip based on filename
-
-    Returned buffer needs to be freed by calling function
-
-    Parameters:
-        wchar_t* filename   -   wide character string of the MD5 has filename
-
-    Returns:
-        char*           -   Buffer containing the filename
-
-    See Also:
-        Called by       -   <closeZipArchives>
-
-*/
-
+/**
+ * @brief Generates the in-archive file path for a file based on its MD5 filename.
+ *
+ * Builds a two-level folder hierarchy using the first four characters of the
+ * filename: Files\\<c0><c1>\\<c2><c3>\\<filename>
+ *
+ * The returned buffer is allocated with new[] and must be freed by the caller
+ * using delete[].
+ *
+ * @param fileName Wide character string of the MD5 hash used as the filename.
+ * @return         Newly allocated char buffer containing the in-archive path.
+ *
+ * @see writeArchiveFile
+ */
 char* generateCompressedPath(wchar_t* fileName)
 {
     char* retBuffer = new char[128];
@@ -263,22 +229,17 @@ char* generateCompressedPath(wchar_t* fileName)
     return retBuffer;
 }
 
-/*Function: selectArchiveObject
-    Function that selects the correct Archive object.
-
-    Decision based on whether item is picture or not.
-
-    Parameters:
-        bool picFile   -   Flag for whether
-
-    Returns:
-        struct archive*     -   Buffer containing the filename
-
-    See Also:
-        Called by       -   <closeZipArchives>
-
-*/
-
+/**
+ * @brief Selects the appropriate archive write object based on file type.
+ *
+ * Returns ArchAll if a combined archive is in use, otherwise returns ArchPic
+ * for pictures or ArchVid for all other files.
+ *
+ * @param picFile True if the file is a picture, false for video.
+ * @return        Pointer to the selected archive write object.
+ *
+ * @see writeArchiveFile, writeJSONFile
+ */
 struct archive* selectArchiveObject(bool picFile)
 {
     if (ArchAll != nullptr)
@@ -295,25 +256,17 @@ struct archive* selectArchiveObject(bool picFile)
     }
 }
 
-/*Section: Archive Writing Functions*/
-
-/*Function: writeJSONFile
-    Function that writes an existing JSON file to the zip archive
-
-    In theory, can be used for any live file.
-
-    Parameters:
-        char* inFilePath    -   File path to file on disk
-        char* filename      -   Name of file to be written
-        bool picFile        -   Whether item being written is a picture
-
-    Returns:
-        SUCCESS -   Always
-
-    See Also:
-        Calls - <FileSize>
-*/
-
+/**
+ * @brief Writes an existing file from disk into the zip archive.
+ *
+ * @param inFilePath Path to the source file on disk.
+ * @param filename   Path for the file within the archive.
+ * @param picFile    True if the file is a picture.
+ * @return           SUCCESS on success, or ERROR_OPEN if the file size could
+ *                   not be determined or the file could not be opened.
+ *
+ * @see FileSize, createZipArchiveEntry
+ */
 int writeJSONFile(char* inFilePath, char* filename, bool picFile)
 {
     struct archive *outa = selectArchiveObject(picFile);
@@ -339,32 +292,24 @@ int writeJSONFile(char* inFilePath, char* filename, bool picFile)
     return SUCCESS;
 }
 
-/*Function: writeArchiveFile
-    Function that writes a file from X-Ways to ZIP file.
-
-    The hashList set contains the MD5 hashes of all files that have been
-    written to the zip file already
-
-    Function checks if MD5 already exists and, if so, returns success
-
-    If not already in, attempts to write. Will error if a valid handle is
-    not returned from XWF_OpenItem function
-
-    Parameters:
-        LONG nItemID        -   X-Ways Item ID of file to be written to zip
-        bool picFile        -   Flag to state whether file is a picture or not
-        wchar_t* fileName   -   wide character string of MD5 hash as filename
-        INT64 fileSize      -   Size of file in bytes
-        HANDLE hdlCurrVol   -   Handle to the Current Volume being processed
-
-    Returns:
-        SUCCESS -   If file already exists or is written successfully
-        1       -   On error opening handle to file.
-
-    See Also:
-        Calls - <generateCompressedPath>
-*/
-
+/**
+ * @brief Writes a file from X-Ways into the zip archive, deduplicating by MD5.
+ *
+ * Checks whether the file's MD5 hash has already been written. If so, returns
+ * SUCCESS immediately. Otherwise opens the item via XWF_OpenItem and writes its
+ * contents to the archive.
+ *
+ * @param nItemID    X-Ways item ID of the file to write.
+ * @param picFile    True if the file is a picture, false for video.
+ * @param fileName   Wide character string of the MD5 hash used as the filename.
+ * @param fileSize   Size of the file in bytes.
+ * @param hdlCurrVol Handle to the current volume being processed.
+ * @return           SUCCESS if the file was written or already existed,
+ *                   ERROR_WRITE if the archive entry could not be created, or
+ *                   1 if the item handle could not be opened.
+ *
+ * @see generateCompressedPath, createZipArchiveEntry
+ */
 int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,HANDLE hdlCurrVol)
 {
     archiveLock.lock();

@@ -7,12 +7,27 @@
 #include "X-Tension.h"
 #include "debugMessage.h"
 
-//globals
-std::mutex dbgMessage, errorTotal;
+/** @brief Mutex serialising writes to the debug log and X-Ways output window. */
+std::mutex dbgMessage;
+
+/** @brief Mutex serialising increments to the per-error-type counters. */
+std::mutex errorTotal;
+
+/** @brief Handle to the open debug log file, or NULL if no log is active. */
 FILE* debugLogFile;
 
+/** @brief Per-error-type occurrence counters, indexed by REPORT_* constants. */
 int errorLog[11]={0};
+
+/** @brief Number of report table entries, must match the size of ReportTableList. */
 const int numErrorTables = 11;
+
+/**
+ * @brief Report table name pairs, indexed by REPORT_* constants.
+ *
+ * Each row contains two strings: [0] the full report table name shown in
+ * X-Ways, and [1] a short label used in the end-of-run error summary.
+ */
 wchar_t* ReportTableList[][2] =
 {
     {L"XT_CLEES4ALL Item Type Error",L"Unknown Item Type"},
@@ -31,25 +46,14 @@ wchar_t* ReportTableList[][2] =
     {L"XT_CLEES4ALL Excluded File Format Consistency ",L"Excluded on File Format Consistency"}
 };
 
-//  Section: Debug File Functions
-
-/*Function: startDebugLog
-
-    Function that starts a Debug log
-
-    Parameters:
-
-        char* filePath  -   NULL terminated string with path of desired output file
-
-    Returns:
-        0   -   Success
-        1   -   Error occurred
-
-    See Also:
-        <endDebugLog>
-
-*/
-
+/**
+ * @brief Opens a debug log file for writing.
+ *
+ * @param filePath Null-terminated path for the output log file.
+ * @return         0 on success, 1 if the file could not be opened.
+ *
+ * @see endDebugLog
+ */
 int startDebugLog(char* filePath)
 {
     debugLogFile = fopen(filePath,"w");
@@ -60,23 +64,13 @@ int startDebugLog(char* filePath)
     return 0;
 }
 
-
-/*Function: endDebugLog
-
-    Function that close the Debug log
-
-    Parameters:
-
-        None
-
-    Returns:
-        0   -   Success
-        !0   -   Error occurred
-
-    See Also:
-        <startDebugLog>
-
-*/
+/**
+ * @brief Closes the debug log file.
+ *
+ * @return 0 on success, non-zero if the file could not be closed or was not open.
+ *
+ * @see startDebugLog
+ */
 int endDebugLog()
 {
     if (debugLogFile !=NULL)
@@ -89,27 +83,17 @@ int endDebugLog()
     }
 }
 
-//  Section: Debug log writing functions
-
-/*Function: debugWriteDetails
-
-    Function that writes a NULL terminated character array to the debug file.
-
-    If no debug file is opened (say there was an error opening the debug file), messages are output to the X-Ways window.
-
-    Parameters:
-
-        None
-
-    Returns:
-        0   -   Data written to output window
-        1   -   Message written to X-Ways output Window
-
-    See Also:
-        <startDebugLog>, <endDebugLog>
-
-*/
-
+/**
+ * @brief Writes a message to a debug log file, falling back to the X-Ways output window.
+ *
+ * If @p f is NULL the message is sent to the X-Ways output window instead.
+ *
+ * @param f       File to write to, or NULL to write to the X-Ways output window.
+ * @param message Null-terminated message string.
+ * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ *
+ * @see startDebugLog, endDebugLog
+ */
 int debugWriteDetails(FILE* f, const char* message)
 {
     dbgMessage.lock();
@@ -134,50 +118,31 @@ int debugWriteDetails(FILE* f, const char* message)
     }
 }
 
-/*Function: debugWriteDetails
-
-    Wrapper for just passing a single parameter version of function with same name
-
-    Parameters:
-
-        const char* message -   Message to be written
-
-    Returns:
-        0   -   Data written to output window
-        1   -   Message written to X-Ways output Window
-
-    See Also:
-        <startDebugLog>, <endDebugLog>, <debugWriteDetails>
-
-*/
-
+/**
+ * @brief Writes a message to the default debug log file.
+ *
+ * Convenience overload that uses the global debugLogFile handle.
+ *
+ * @param message Null-terminated message string.
+ * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ *
+ * @see startDebugLog, endDebugLog
+ */
 int debugWriteDetails(const char* message)
 {
     return debugWriteDetails(debugLogFile,message);
 }
 
-
-/*Function: debugWriteDetails
-
-    Function for writing an item ID and module to the error log.
-
-    Provides a wrapper to <debugWriteDetails> function
-
-    Parameters:
-
-        FILE* f                 -   File for message to be written to
-        LONG nItemID            -   ItemID that error message relates to
-        const wchar_t* module   -   Clees4All module that function relates to
-
-    Returns:
-        0   -   Data written to output window
-        1   -   Message written to X-Ways output Window
-
-    See Also:
-        <startDebugLog>, <endDebugLog>, <debugWriteDetails>
-
-*/
-
+/**
+ * @brief Writes item ID, item name and module name to a debug log file.
+ *
+ * @param f       File to write to.
+ * @param nItemID X-Ways item ID the message relates to.
+ * @param module  Name of the Clees4All module generating the message.
+ * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ *
+ * @see startDebugLog, endDebugLog
+ */
 int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module)
 {
     LPWSTR ItemName;
@@ -189,28 +154,17 @@ int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module)
     return result;
 }
 
-
-/*Function: debugWriteDetails
-
-    Function for writing an item ID and module to the error log.
-
-    Provides a wrapper to <debugWriteDetails> function
-
-    Parameters:
-
-        LONG nItemID            -   ItemID that error message relates to
-        const wchar_t* module   -   Clees4All module that function relates to
-
-    Returns:
-        0   -   Data written to output window
-        1   -   Message written to X-Ways output Window
-
-    See Also:
-        <startDebugLog>, <endDebugLog>, <debugWriteDetails>
-
-*/
-
-//when used without a FILE object, use standard
+/**
+ * @brief Writes item ID, item name and module name to the default debug log file.
+ *
+ * Convenience overload that uses the global debugLogFile handle.
+ *
+ * @param nItemID X-Ways item ID the message relates to.
+ * @param module  Name of the Clees4All module generating the message.
+ * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ *
+ * @see startDebugLog, endDebugLog
+ */
 int debugWriteDetails(LONG nItemID, const wchar_t* module)
 {
     if (debugLogFile!=NULL)
@@ -223,32 +177,20 @@ int debugWriteDetails(LONG nItemID, const wchar_t* module)
     }
 }
 
-
-/*Function: debugWriteDetails
-
-    Function for writing an item ID and module to the error log.
-
-    Allows a function to provide a variable length list of details to be written to the log for debug purposes.
-
-    Provides a wrapper to <debugWriteDetails> function
-
-    Parameters:
-
-        LONG nItemID            -   ItemID that error relates to
-        const wchar_t* module   -   Clees4All module that function relates to
-        const wchar_t* message  -   NULL terminated Error message
-        varList varArgs         -   List of arguments to be written to error log
-
-    Returns:
-        0   -   Data written to output window
-        1   -   Message written to X-Ways output Window
-
-    See Also:
-        <startDebugLog>, <endDebugLog>, <debugWriteDetails>
-
-*/
-
-//function to output var list
+/**
+ * @brief Writes item ID, module, message and a variable list to the debug log.
+ *
+ * Formats a header line followed by one line per variable in @p varArgs.
+ * Supported variable types are 'c' (char*), 'i' (int32 or int64) and 'w' (wchar_t*).
+ *
+ * @param nItemID X-Ways item ID the message relates to.
+ * @param module  Name of the Clees4All module generating the message.
+ * @param message Null-terminated descriptive message string.
+ * @param varArgs List of variables to append to the output.
+ * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ *
+ * @see startDebugLog, endDebugLog
+ */
 int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message,varList varArgs)
 {
     char buffer[1024];
@@ -291,21 +233,12 @@ int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message
     }
 }
 
-//  Section: General Error Messages
-
-/*Function: outputErrorMessage
-
-    Function for outputting an error message to the X-Ways Output Window
-
-    Parameters:
-
-        const wchar_t* errMsg   -   Message to be output.
-        LONG nItemID            -   ItemID that error relates to
-
-    Returns:
-        void
-
-*/
+/**
+ * @brief Outputs an error message and item ID to the X-Ways output window.
+ *
+ * @param errMsg  Message to display.
+ * @param nItemID Item ID appended to the message.
+ */
 void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
 {
     wchar_t errorMessage[2048];
@@ -315,18 +248,11 @@ void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
     dbgMessage.unlock();
 }
 
-/*Function: outputErrorMessage
-
-    Function for outputting an error message to the X-Ways Output Window
-
-    Parameters:
-
-        const wchar_t* errMsg   -   Message to be output.
-
-    Returns:
-        void
-
-*/
+/**
+ * @brief Outputs an error message to the X-Ways output window.
+ *
+ * @param errMsg Message to display.
+ */
 void outputErrorMessage(const wchar_t* errMsg)
 {
     dbgMessage.lock();
@@ -334,20 +260,12 @@ void outputErrorMessage(const wchar_t* errMsg)
     dbgMessage.unlock();
 }
 
-/*Function: outputErrorMessage
-
-    Function for outputting an error message to the X-Ways Output Window
-
-    Parameters:
-
-        const wchar_t* errMsg   -   Message to be output.
-        wchar_t* detail         -   Second string with further error details.
-
-    Returns:
-        void
-
-*/
-
+/**
+ * @brief Outputs an error message with additional detail to the X-Ways output window.
+ *
+ * @param errMsg Primary message string.
+ * @param detail Additional detail string appended directly after @p errMsg.
+ */
 void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail)
 {
     wchar_t errorMessage[2048];
@@ -357,27 +275,14 @@ void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail)
     dbgMessage.unlock();
 }
 
-/*  Section: Report Table Error Functions
-
-        This section contains functions that are used to add items to a report table when an error is recorded.
-
-        Also includes functions for subsequent reporting of these errors.
-*/
-
-
-/*Function: errorRaised
-
-    Function for outputting an error message to the X-Ways Output Window
-
-    Parameters:
-
-        LONG nItemID    -   ItemID error relates to
-        int errorCode   -   Error code that corresponds to error codes in header file
-
-    Returns:
-        void
-
-*/
+/**
+ * @brief Records an error by adding the item to an X-Ways report table and
+ *        incrementing the per-error-type counter.
+ *
+ * @param nItemID   X-Ways item ID the error relates to.
+ * @param errorCode Error type, must be one of the REPORT_* constants defined
+ *                  in debugMessage.h.
+ */
 void errorRaised(LONG nItemID,int errorCode)
 {
     //add file to report table for easier finding.
@@ -392,18 +297,12 @@ void errorRaised(LONG nItemID,int errorCode)
     errorTotal.unlock();
 }
 
-
-/*Function: errorReport
-
-    Function for outputting numbers of each type of error encountered.
-
-    Output is to X-Ways Output Window and stamped to X-Ways log
-
-    Returns:
-        void
-
-*/
-
+/**
+ * @brief Outputs a summary of all errors encountered to the X-Ways output window and case log.
+ *
+ * Prints a count for each error type, then a reminder that affected files have
+ * been added to report table associations.
+ */
 void errorReport()
 {
     //output starting line
@@ -419,4 +318,3 @@ void errorReport()
     }
     XWF_OutputMessage(L"All error files added to relevant report table association. Please review these files, as they will not have been extracted",0);
 }
-
