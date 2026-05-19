@@ -165,6 +165,7 @@
 			<Add directory="include" />
 			<Add directory="third_party/sqlite" />
 			<Add directory="third_party/libarchive" />
+			<Add directory="third_party/cjson" />
 		</Compiler>
 		<Unit filename="src/ArchiveWriter.cpp">
 			<Option target="Release" />
@@ -211,6 +212,10 @@
 		</Unit>
 		<Unit filename="src/options.cpp" />
 		<Unit filename="include/options.h" />
+		<Unit filename="third_party/cjson/cJSON.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="third_party/cjson/cJSON.h" />
 		<Unit filename="third_party/sqlite/shell.c">
 			<Option compilerVar="CC" />
 		</Unit>

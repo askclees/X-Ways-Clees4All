@@ -90,10 +90,6 @@ struct VICSMedia
 
 Struct implementing the VICS MEDIAMETADATA entity (v2.0 onwards)
 
-Can be used for any Name Key value and may be used multiple times
-
-Currently used to add screenshot information from X-Ways
-
 Fields:
 	MD5 - Wide character buffer for MD5 hash + NULL terminator (wchar_t[33])
 	Property Name - String with the name of the property (wchar_t*)
@@ -101,7 +97,6 @@ Fields:
 
 */
 
-//1.41 needed for OCR and Device type
 struct VICSMediaMetadata
 {
     wchar_t MD5[33];
@@ -112,9 +107,6 @@ struct VICSMediaMetadata
 /*Struct: VICSMediaFile
 
 Struct implementing the VICS MEDIAFILE entity (v2.0 onwards)
-Can be used for any Name Key value and may be used multiple times
-To be used to add screenshot information from X-Ways
-Where the file is recovered from unallocated space, Clees4All sets both Unallocated and Deleted flags
 
 Fields:
 	MD5 - Wide character buffer for MD5 hash + NULL terminator of file (wchar_t[33])
@@ -126,7 +118,7 @@ Fields:
     unallocated - Flag to state file was recovered from unallocated space (BOOL)
     sourceID - string containing the source id that the file was recovered from (wchar_t*)
     physicalLocation - offset in bytes from beginning of disk where file was located (INT64)
-    deleted - Flag to state that file was deleted and recovered. Usually means via deleted MFT record or similar  as opposed to carved(BOOL)
+    deleted - Flag to state that file was deleted and recovered (BOOL)
     Parent MD5 - Wide character buffer for MD5 hash + NULL terminator of parent file(wchar_t[33])
     parentName - String with parent files name (wchar_t*)
     parentFilePath - String with path of parent file (wchar_t*)
@@ -152,13 +144,7 @@ struct VICSMediaFile
 	long XWFitemID=0;
 };
 
-/*Struct: VICSExif
-
-Struct implementing the VICS EXIF entity
-Currently unused
-
-*/
-
+/*Struct: VICSExif - Currently unused */
 struct VICSExif
 {
 	wchar_t* MD5;
@@ -166,13 +152,7 @@ struct VICSExif
 	wchar_t* propertyValue;
 };
 
-/*Struct: VICSAltHash
-
-Struct implementing the VICS ALTERNATIVEHASH entity
-Currently unused
-
-*/
-
+/*Struct: VICSAltHash - Currently unused */
 struct VICSAltHash
 {
 	wchar_t MD5[33];
@@ -180,13 +160,7 @@ struct VICSAltHash
 	wchar_t* hashValue;
 };
 
-/*Struct: VICSSegment
-
-Struct implementing the VICS SEGMENT entity
-Currently unused
-
-*/
-
+/*Struct: VICSSegment - Currently unused */
 struct VICSSegment
 {
 	wchar_t MD5[33];
@@ -196,13 +170,7 @@ struct VICSSegment
 	int category;
 };
 
-/*Struct: VICSRepository
-
-Struct implementing the VICS REPOSITORY entity
-Currently unused
-
-*/
-
+/*Struct: VICSRepository - Currently unused */
 struct VICSRepository
 {
 	wchar_t MD5[33];
@@ -212,30 +180,22 @@ struct VICSRepository
 /*Struct: VICSRecord
 
 Struct linking all VICS entities
-Contains arrays of each type and corresponding counter
-
 
 Fields:
 	VICSMedia vMedia                    -   <VICSMedia> record
-	VICSMediaFile* vMediaFiles          -   Pointer for <VICSMediaFile> to be set up as an array
-	int noMediaFiles                    -   Current number of valid VICSMediaFile records referenced by pointer
-	int currentMaxMediaFiles            -   Max number of media files in record based on current memory allocation. Linked to vMediaFiles
-	VICSAltHash* vAltHashes             -   Pointer for <VICSAltHash> to be set up as an array
-	int noAltHash                       -   Current number of valid VICSAltHash records referenced by pointer
-	int currentMaxAltHash               -   Max number of media files in record based on current memory allocation. Linked to vAltHashes
-	VICSExif* vExif                     -   Pointer for <VICSExif> to be set up as an array
-	int noExif                          -   Current number of valid VICSExif records referenced by pointer
-	int currentMaxExif                  -   Max number of media files in record based on current memory allocation. Linked to vExif
-	VICSSegment* vSegment               -   Pointer for <VICSSegment> to be set up as an array
-	int noSegments                      -   Current number of valid VICSSegment records referenced by pointer
-	int currentMaxSegments              -   Max number of media files in record based on current memory allocation. Linked to vSegment
-	VICSRepository* vRepository         -   Pointer for <VICSRepository> to be set up as an array
-	int noRepository                    -   Current number of valid VICSRepository records referenced by pointer
-	int currentMaxRepository            -   Max number of media files in record based on current memory allocation. Linked to vRepository
-    VICSMediaMetadata* vMediaMetaData   -   Pointer for <VICSMediaMetadata> to be set up as an array
-	int noMediaMetadata                 -   Current number of valid VICSMediaMetadata records referenced by pointer
-	int currentMaxMediaMetadata         -   Max number of media files in record based on current memory allocation. Linked to vMediaMetaData
-
+	VICSMediaFile* vMediaFiles          -   Pointer for <VICSMediaFile> array
+	int noMediaFiles                    -   Number of valid VICSMediaFile records
+	int currentMaxMediaFiles            -   Allocated capacity for vMediaFiles
+	VICSAltHash* vAltHashes             -   Pointer for <VICSAltHash> array (unused)
+	int noAltHash                       -   Number of valid VICSAltHash records
+	VICSExif* vExif                     -   Pointer for <VICSExif> array (unused)
+	int noExif                          -   Number of valid VICSExif records
+	VICSSegment* vSegment               -   Pointer for <VICSSegment> array (unused)
+	int noSegments                      -   Number of valid VICSSegment records
+	VICSRepository* vRepository         -   Pointer for <VICSRepository> array (unused)
+	int noRepository                    -   Number of valid VICSRepository records
+    VICSMediaMetadata* vMediaMetaData   -   Pointer for <VICSMediaMetadata> array (unused)
+	int noMediaMetadata                 -   Number of valid VICSMediaMetadata records
 */
 
 struct VICSRecord
@@ -256,14 +216,12 @@ struct VICSRecord
 	VICSRepository* vRepository=nullptr;
 	int noRepository=0;
 	int currentMaxRepository=0;
-    //1.41 added
     VICSMediaMetadata* vMediaMetaData=nullptr;
 	int noMediaMetadata=0;
 	int currentMaxMediaMetadata=0;
 };
 
-//extern functions
-//open & close functions
+//open & close file
 FILE* openVICSFile(char* filePath, const wchar_t* progVersion);
 int closeVICSFile(FILE* vFile);
 
@@ -276,56 +234,27 @@ void InitializeRepositoryRecord(VICSRepository& record);
 void InitializeExifRecord(VICSExif& record);
 void InitializeSegmentRecord(VICSSegment& record);
 
-//string generation
-wchar_t* generateVicsMediaString(VICSMedia record);
-wchar_t* generateVicsMediaFileString(VICSMediaFile* record);
-wchar_t* generateVicsAltHashString(VICSAltHash record);
-wchar_t* generateVicsRepositoryString(VICSRepository record);
-wchar_t* generateVicsSegmentString(VICSSegment record);
-wchar_t* generateVicsEXIFString(VICSExif record);
-wchar_t* getAltHashRecordsString(VICSAltHash* records,int number);
-wchar_t* getExifRecordsString(VICSExif* records,int number);
-wchar_t* getMediaRecordString(VICSMediaFile* records, int number);
-wchar_t* getRepositoryRecordString(VICSRepository* records, int number);
-wchar_t* getSegmentRecordString(VICSSegment* records, int number);
-//1.41 added media metadata
-wchar_t* generateVicsMediaMetadataString(VICSMediaMetadata* record);
-
 //deallocation routines
 void deallocateVICSRecord(VICSRecord record);
-void deallocateAltHashRecord(VICSAltHash record);
-void deallocateExifRecord(VICSExif record);
 void deallocateMediaRecord(VICSMedia &record);
 void deallocateMediaFileRecord(VICSMediaFile &record);
-void deallocateRepositoryRecord(VICSRepository record);
-void deallocateSegmentRecord(VICSSegment record);
-//1.41 added media metadata
 void deallocateMediaMetadataRecord(VICSMediaMetadata &record);
+void freeVicsCaseData();
 
-//writing functions
+//writing
 int writeMediaRecord(FILE* vicFile, VICSRecord* record);
 
-//record size functions
+//record size helpers (used by SQL insert functions)
 INT64 getMediaFileRecordSize(VICSMediaFile &record);
 INT64 getMediaRecordSize(VICSMedia &record);
 
-//return string functions
-wchar_t* getAltHashRecordsString(VICSAltHash* records,int number);
-wchar_t* getExifRecordsString(VICSExif* records,int number);
-wchar_t* getMediaRecordString(VICSMediaFile* records, int number);
-wchar_t* getSegmentRecordString(VICSSegment* records, int number);
-wchar_t* getRepositoryRecordString(VICSRepository* records, int number);
-wchar_t* createVICSstring(sqlite3* vicsDB,VICSMedia &record, int picture, int first);
-
 //extraction from SQL
-void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement);
-//1.41 added media files
-void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement);
-//1.41 added media metadata records
-void extractVICSMediaMetadataSQL(VICSMediaMetadata* record,sqlite3_stmt* statement);
+void extractVICSMediaSQL(VICSMedia &recMedia, sqlite3_stmt* statement);
+void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile, sqlite3_stmt* statement);
+void extractVICSMediaMetadataSQL(VICSMediaMetadata* record, sqlite3_stmt* statement);
 
 //validation
-wchar_t* checkJsonText(wchar_t* textIn);
+bool validFiletime(FILETIME timestamp);
 
 //utility functions
 char* convertWideToChar(wchar_t* wString);

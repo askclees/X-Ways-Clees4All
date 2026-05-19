@@ -1,0 +1,13 @@
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+[Full license text — paste from https://www.gnu.org/licenses/gpl-3.0.txt]
+
+Third-party components included in this project and their licenses:
+
+  SQLite         — Public domain (https://www.sqlite.org/copyright.html)
+  cJSON          — MIT License (Copyright (c) 2009-2017 Dave Gamble)
+  libarchive     — BSD 2-Clause License (Copyright (c) 2003-2010 Tim Kientzle)
+  X-Tension.h    — Copyright X-Ways Software Technology AG, used with permission
+  stddefs.h      — MIT License (LIBSEH, Copyright (c) 2008 Tom Bramer)
+  config.h       — MIT License (LIBSEH, Copyright (c) 2011 Tom Bramer)

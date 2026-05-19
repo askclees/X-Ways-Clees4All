@@ -1897,14 +1897,12 @@ int insertMediaFileRecord(sqlite3* vicsDB, VICSMediaFile &record, int picture)
         XWF_OutputMessage(sqlQuery,0);
         return -1;
     }
-    record.fileName = checkJsonText(record.fileName);
     rc = sqlite3_bind_text16(statement,1,record.fileName,(wcslen(record.fileName)+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
         XWF_OutputMessage(L"Error Binding file name",0);
         return -3;
     }
-    record.filePath = checkJsonText(record.filePath);
     rc = sqlite3_bind_text16(statement,2,record.filePath ,(wcslen(record.filePath)+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
