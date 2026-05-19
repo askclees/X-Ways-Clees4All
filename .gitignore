@@ -2,6 +2,7 @@
 bin/
 obj/
 *.map
+mapfile
 
 # CodeBlocks generated files
 *.depend
