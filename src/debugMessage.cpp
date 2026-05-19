@@ -28,7 +28,7 @@ const int numErrorTables = 11;
  * Each row contains two strings: [0] the full report table name shown in
  * X-Ways, and [1] a short label used in the end-of-run error summary.
  */
-wchar_t* ReportTableList[][2] =
+const wchar_t* ReportTableList[][2] =
 {
     {L"XT_CLEES4ALL Item Type Error",L"Unknown Item Type"},
     {L"XT_CLEES4ALL Unknown File Size",L"Unknown File Size"},
@@ -36,12 +36,9 @@ wchar_t* ReportTableList[][2] =
     {L"XT_CLEES4ALL File Write Size Mismatch",L"File Write Size Mismatch"},
     {L"XT_CLEES4ALL Unable to open File",L"Unable to Open File"},
     {L"XT_CLEES4ALL Excluded on parent",L"Excluded based on parent"},
-    //1.50 added duplicate
     {L"XT_CLEES4ALL Excluded as Duplicate",L"Excluded as duplicate"},
-    //1.50 added one for file size exclusion and thumbnail exclusion
     {L"XT_CLEES4ALL Excluded Based on File Size",L"Excluded on Filesize"},
     {L"XT_CLEES4ALL Excluded Thumbnail Embedded in Image",L"Excluded Thumbnail"},
-    //1.51 added ones for file type status and consistency checks
     {L"XT_CLEES4ALL Excluded File Type Status",L"Excluded on File Type Status"},
     {L"XT_CLEES4ALL Excluded File Format Consistency ",L"Excluded on File Format Consistency"}
 };
@@ -54,7 +51,7 @@ wchar_t* ReportTableList[][2] =
  *
  * @see endDebugLog
  */
-int startDebugLog(char* filePath)
+int startDebugLog(const char* filePath)
 {
     debugLogFile = fopen(filePath,"w");
     if (debugLogFile==NULL)
@@ -148,7 +145,7 @@ int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module)
     LPWSTR ItemName;
     ItemName = (LPWSTR)XWF_GetItemName(nItemID);
     char* buffer = new char[1024];
-    sprintf(buffer, "ItemID: %ld ItemName: %ls Module: %ls\r\n",nItemID,ItemName,module);
+    snprintf(buffer, 1024, "ItemID: %ld ItemName: %ls Module: %ls\r\n", nItemID, ItemName, module);
     int result = debugWriteDetails(f,buffer);
     delete[] buffer;
     return result;
@@ -286,8 +283,8 @@ void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail)
 void errorRaised(LONG nItemID,int errorCode)
 {
     //add file to report table for easier finding.
-    wchar_t* messagePtr = ReportTableList[errorCode][0];
-    LONG result = XWF_AddToReportTable(nItemID,messagePtr,1);
+    const wchar_t* messagePtr = ReportTableList[errorCode][0];
+    LONG result = XWF_AddToReportTable(nItemID, const_cast<wchar_t*>(messagePtr), 1);
     if (result == 0)
     {
         outputErrorMessage(L"Unable to set report table for itemID: ",nItemID);

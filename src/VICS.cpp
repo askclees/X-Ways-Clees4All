@@ -313,7 +313,7 @@ static void cjsonAddInt64(cJSON* obj, const char* key, INT64 value)
 static void cjsonAddWide(cJSON* obj, const char* key, const wchar_t* wstr)
 {
     if (wstr == NULL || wstr[0] == L'\0') return;
-    char* utf8 = convertWideToChar((wchar_t*)wstr);
+    char* utf8 = convertWideToChar(wstr);
     cJSON_AddStringToObject(obj, key, utf8);
     delete[] utf8;
 }

@@ -257,7 +257,7 @@ void extractVICSMediaMetadataSQL(VICSMediaMetadata* record, sqlite3_stmt* statem
 bool validFiletime(FILETIME timestamp);
 
 //utility functions
-char* convertWideToChar(wchar_t* wString);
+char* convertWideToChar(const wchar_t* wString);
 
 //extern variables
 extern VICSCaseData vCaseData;
