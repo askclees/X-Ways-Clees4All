@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="X-Ways C4All Tests" />
+		<Option compiler="gcc-mingw32" />
+		<Build>
+			<Target title="Tests">
+				<Option output="../bin/Tests/C4All_Tests" prefix_auto="0" extension_auto="1" />
+				<Option object_output="../obj/Tests/" />
+				<Option type="1" />
+				<Option compiler="gcc-mingw32" />
+				<Compiler>
+					<Add option="-std=c++17" />
+					<Add option="-m64" />
+					<Add option="-g" />
+					<Add option="-Wall" />
+					<Add directory="." />
+					<Add directory="../include" />
+					<Add directory="../third_party/cjson" />
+				</Compiler>
+				<Linker>
+					<Add option="-static-libstdc++" />
+					<Add option="-static-libgcc" />
+					<Add option="-m64" />
+					<Add library="ole32" />
+					<Add library="user32" />
+					<Add library="uuid" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-std=c++17" />
+			<Add directory="." />
+			<Add directory="../include" />
+			<Add directory="../third_party/cjson" />
+		</Compiler>
+		<Unit filename="test_vics_json.cpp" />
+		<Unit filename="testharness.h" />
+		<Unit filename="../src/VICS.cpp" />
+		<Unit filename="../src/utility.cpp" />
+		<Unit filename="../src/X-Tension.cpp" />
+		<Unit filename="../third_party/cjson/cJSON.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Extensions />
+	</Project>
+</CodeBlocks_project_file>
