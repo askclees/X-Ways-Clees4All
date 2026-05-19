@@ -20,7 +20,6 @@
 #include "VICS.h"
 #include "debugMessage.h"
 
-//1.41 added utility function
 #include "utility.h"
 
 
@@ -44,12 +43,8 @@
 #define IDC_TEXT_GRIFFEYEINVEMAIL   117
 #define IDC_TEXT_GRIFFEYEINVTITLE   118
 #define IDC_TEXT_GRIFFEYEINVORG     119
-//1.40 added parent checkbox
 #define IDC_BTN_PARENTCHK           120
-
-//1.50 added zipped VICS file
 #define IDC_BTN_VICSZIP             121
-//1.50 added additional options
 #define IDC_BTN_RPTCHK              122
 #define IDC_BTN_EMBCHK              123
 #define IDC_BTN_EMBMISCHK           124
@@ -60,11 +55,8 @@
 
 //windows form sizes
 #define MainWindowWidth 900
-//1.50 increased to 450 for additional boxes
-//1.51 increased again to 480 to add Griffeye settings option
 #define MainWindowLength 480
 
-//1.50 redefining
 #define outputStart     10
 #define optionsStart    65
 #define optionsLine1    90
@@ -86,49 +78,37 @@
 #define boxMultiplier   25
 
 HWND mainHwnd;
-//1.40 added parentChkBox //1.50 added compChkBox
 HWND PicturePath,VideoPath, btnOK,picChkBox,vidChkBox,parentChkBox,cmdVidSelect,cmdPicSelect,dbgChkBox, compChkBox, vicChkBox, C4PChkBox, GriffeyeCase, GriffeyePath;
 HWND* TxtActualName, *TxtNewName, *lblActual, *lblNew;
 HWND txtPicOutput,txtVidOutput, txtGriffeyeCaseName, txtGriffeyeCaseLocation, cmdGriffeyePath, griffChkBox;
-//griffeye case details
 HWND txtGriffeyeInvName, GriffeyeInvName, txtGriffeyeInvPhone, GriffeyeInvPhone, txtGriffeyeInvEmail, GriffeyeInvEmail, txtGriffeyeInvTitle, GriffeyeInvTitle, txtGriffeyeInvOrg, GriffeyeInvOrg;
-//1.51 Added Griffeye settings file
 HWND txtGriffeyeSettings, GriffeyeSettings;
-
-//1.50 added additional checkboxes
 HWND exEmbChkBox, exMisChkBox, rptTblChkBox, txtAddOptions, txtExtractOpts;
 HWND toolReportChk;
 
 char* CaseDir;
 
 static HBRUSH hBrush = CreateSolidBrush(RGB(240,240,240));
-//1.50 put version number in
 WORD versionNumber;
 //prototyping
 void CreateControls(HWND hwnd);
 BOOL DirectoryExists(LPCTSTR szPath);
 LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam);
-static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARAM lpData);
 LPWSTR GetFolderPath();
 int startProcess();
 void fillCaseDetails();
-BOOL DirExists(LPCTSTR szPath);
 int getGriffeyeDetails();
-BOOL ifFileExists(char* path);
 int saveGriffeyeDetails();
 
-//1.51 String constant for ProgramData folder
-wchar_t* GriffeyeConfigPath = L"C:\\ProgramData\\Griffeye Technologies\\Griffeye Analyze\\Data\\Config\\";
+const wchar_t* GriffeyeConfigPath = L"C:\\ProgramData\\Griffeye Technologies\\Griffeye Analyze\\Data\\Config\\";
 
-// Description:
-//   Creates a tooltip for an item in a dialog box.
-// Parameters:
-//   idTool - identifier of an dialog box item.
-//   nDlg - window handle of the dialog box.
-//   pszText - string to use as the tooltip text.
-// Returns:
-//   The handle to the tooltip.
-//
+/**
+ * @brief Creates a balloon tooltip attached to a dialog control.
+ * @param toolID Identifier of the dialog box item to attach the tooltip to.
+ * @param hDlg Window handle of the parent dialog box.
+ * @param pszText Text to display in the tooltip.
+ * @return Handle to the created tooltip window, or NULL on failure.
+ */
 HWND CreateToolTip(int toolID, HWND hDlg, PTSTR pszText)
 {
     if (!toolID || !hDlg || !pszText)
@@ -164,10 +144,15 @@ HWND CreateToolTip(int toolID, HWND hDlg, PTSTR pszText)
 }
 
 
+/**
+ * @brief Registers the window class and opens the main extraction options dialog.
+ * @param version X-Ways Forensics version number, used to enable version-gated controls.
+ * @return 0 on normal exit.
+ */
 int createWindow(WORD version)
 {
     versionNumber = version;
-    const char CLASS_NAME[] = "CLEES4All 1.60";
+    const char CLASS_NAME[] = C4A_TITLE;
     WNDCLASSEX wc = {};
 
     wc.lpfnWndProc = WindowProc;
@@ -216,6 +201,7 @@ int createWindow(WORD version)
 }
 
 //button click functions
+/** @brief Disables and clears the Griffeye-related controls when the Griffeye checkbox is unchecked. */
 void btn_griffchk_unselect()
 {
     EnableWindow(txtGriffeyeCaseLocation,FALSE);
@@ -226,6 +212,14 @@ void btn_griffchk_unselect()
 
 
 
+/**
+ * @brief Main window procedure handling all messages for the extraction options dialog.
+ * @param hwnd Handle to the window.
+ * @param uMsg Message identifier.
+ * @param wParam Additional message-specific information.
+ * @param lParam Additional message-specific information.
+ * @return Result of the message processing.
+ */
 LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
@@ -243,8 +237,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         MessageBox(NULL,"You have to select at least one type of file to export!!","Error!! ",MB_ICONERROR);
                         break;
                     }
-                    //1.50 add vics compressed as well
-                    if (!extractInfo.C4ALLExport && !extractInfo.VICExport & !extractInfo.VICSCompressed)
+                    if (!extractInfo.C4ALLExport && !extractInfo.VICExport && !extractInfo.VICSCompressed)
                     {
                         MessageBox(NULL,"You have to select at least one output type!!","Error!! ",MB_ICONERROR);
                         break;
@@ -264,10 +257,13 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         DestroyWindow(btnOK);
                         DestroyWindow(picChkBox);
                         DestroyWindow(vidChkBox);
-                        //1.40 added parent check box
                         DestroyWindow(parentChkBox);
                         DestroyWindow(txtPicOutput);
                         DestroyWindow(txtVidOutput);
+                        delete[] TxtActualName; TxtActualName = nullptr;
+                        delete[] TxtNewName;    TxtNewName    = nullptr;
+                        delete[] lblActual;     lblActual     = nullptr;
+                        delete[] lblNew;        lblNew        = nullptr;
                         DestroyWindow(hwnd);
                     }
                 }
@@ -318,13 +314,12 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
                 break;
-            //1.40 added for additional checkbox
             case IDC_BTN_PARENTCHK:
                 {
                     switch (HIWORD(wParam))
                     {
                         case BN_CLICKED:
-                            if (SendDlgItemMessage(hwnd,IDC_BTN_VIDCHK,BM_GETCHECK,0,0))
+                            if (SendDlgItemMessage(hwnd,IDC_BTN_PARENTCHK,BM_GETCHECK,0,0))
                             {
                                 //checked
                                 extractInfo.checkParent = TRUE;
@@ -366,13 +361,11 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             {
                                 //checked
                                 extractInfo.C4ALLExport = TRUE;
-                                //1.50 change compressed to false
                                 extractInfo.VICSCompressed = FALSE;
                                 SendDlgItemMessage(hwnd,IDC_BTN_VICSZIP,BM_SETCHECK,0,0);
                             }
                             else
                             {
-                                //not checked
                                 extractInfo.C4ALLExport = FALSE;
                             }
                         break;
@@ -388,20 +381,17 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             {
                                 //checked
                                 extractInfo.VICExport = TRUE;
-                                //1.50 change compressed to false
                                 extractInfo.VICSCompressed = FALSE;
                                 SendDlgItemMessage(hwnd,IDC_BTN_VICSZIP,BM_SETCHECK,0,0);
                             }
                             else
                             {
-                                //not checked
                                 extractInfo.VICExport = FALSE;
                             }
                         break;
                     }
                 }
                 break;
-            //1.50 added handler
             case IDC_BTN_VICSZIP:
                 {
                     switch (HIWORD(wParam))
@@ -411,7 +401,6 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             {
                                 //checked
                                 extractInfo.VICSCompressed = TRUE;
-                                //1.50 change compressed to false
                                 extractInfo.VICExport = FALSE;
                                 extractInfo.C4ALLExport = FALSE;
                                 SendDlgItemMessage(hwnd,IDC_BTN_VICCHK,BM_SETCHECK,0,0);
@@ -580,10 +569,13 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             DestroyWindow(btnOK);
             DestroyWindow(picChkBox);
             DestroyWindow(vidChkBox);
-            //1.40 added parent check box
             DestroyWindow(parentChkBox);
             DestroyWindow(txtPicOutput);
             DestroyWindow(txtVidOutput);
+            delete[] TxtActualName; TxtActualName = nullptr;
+            delete[] TxtNewName;    TxtNewName    = nullptr;
+            delete[] lblActual;     lblActual     = nullptr;
+            delete[] lblNew;        lblNew        = nullptr;
             DestroyWindow(hwnd);
             PostQuitMessage(0);
             return 0;
@@ -619,6 +611,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hwnd,uMsg,wParam, lParam);
 }
 
+/** @brief Checks whether a supported Griffeye CLI executable exists at the configured path. */
 static bool griffeyeExeAvailable()
 {
     const wchar_t* folder = extractOpt.GriffeyePath;
@@ -627,13 +620,17 @@ static bool griffeyeExeAvailable()
     snprintf(narrowFolder, MAX_PATH, "%ls", folder);
     bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
     char check[MAX_PATH];
-    sprintf(check, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
+    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
     if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
-    sprintf(check, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
+    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
     if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
     return false;
 }
 
+/**
+ * @brief Populates all dialog controls to reflect a previously saved ExtractionDetails record.
+ * @param record Extraction settings to apply to the UI.
+ */
 void setExtractionOptions(ExtractionDetails record)
 {
     if (record.extractVideos){SendMessageA(vidChkBox,BM_SETCHECK,BST_CHECKED,0);}
@@ -674,6 +671,12 @@ void setExtractionOptions(ExtractionDetails record)
 }
 
 
+/**
+ * @brief Creates the picture and video output path controls at the top of the dialog.
+ * @param hwnd Parent window handle.
+ * @param startOffset Vertical pixel offset from the top of the client area.
+ * @return true on success.
+ */
 bool createOuputControls(HWND hwnd, int startOffset)
 {
     CaseDir = new char[512];
@@ -744,6 +747,11 @@ bool createOuputControls(HWND hwnd, int startOffset)
     return true;
 }
 
+/**
+ * @brief Creates the extraction option checkboxes (pictures, videos, parent check, debug, etc.).
+ * @param hwnd Parent window handle.
+ * @return true on success.
+ */
 bool createOptionsControls(HWND hwnd)
 {
     txtExtractOpts = CreateWindowEx(0,"Static","Extraction Options",WS_CHILD|WS_VISIBLE,10,optionsStart,150,20,hwnd,0,GetModuleHandle(NULL),0);
@@ -770,8 +778,6 @@ bool createOptionsControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
     }
-    //1.40 add parent checkbox
-    //1.41 changed wording
     parentChkBox = CreateWindowEx(0,"BUTTON","Ignore media extracted from within live videos?",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,optionsColumn3,optionsLine1,lblCheckWidth+180,20,hwnd,(HMENU)IDC_BTN_PARENTCHK,GetModuleHandle(NULL),NULL);
     if (!parentChkBox)
     {
@@ -780,8 +786,6 @@ bool createOptionsControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
     }
-    //line 2
-    //HWND thmbChkBox, thmbMisChk, rptTblChkBox, txtAddOptions;
     rptTblChkBox = CreateWindowEx(0,"BUTTON","Export RTA as Metadata",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,optionsColumn1,optionsLine2,200,20,hwnd,(HMENU)IDC_BTN_RPTCHK,GetModuleHandle(NULL),NULL);
     if (!rptTblChkBox)
     {
@@ -790,7 +794,6 @@ bool createOptionsControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
-    //HWND thmbChkBox, thmbMisChk, rptTblChkBox, txtAddOptions;
     exEmbChkBox = CreateWindowEx(0,"BUTTON","Exclude embedded thumbnails",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,optionsColumn2,optionsLine2,250,20,hwnd,(HMENU)IDC_BTN_EMBCHK,GetModuleHandle(NULL),NULL);
     if (!exEmbChkBox)
     {
@@ -808,7 +811,6 @@ bool createOptionsControls(HWND hwnd)
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
     if (versionNumber < 2050){ EnableWindow(exMisChkBox, false);}
-    //line 3
     dbgChkBox = CreateWindowEx(0,"BUTTON","Debug Mode",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,10,optionsLine3,120,20,hwnd,(HMENU)IDC_BTN_DBGCHK,GetModuleHandle(NULL),NULL);
     if (!dbgChkBox)
     {
@@ -820,12 +822,13 @@ bool createOptionsControls(HWND hwnd)
     return true;
 }
 
-bool createEvidenceEntries(HWND hwnd, int start)
-{
-    return true;
-}
 
-
+/**
+ * @brief Creates the Griffeye investigator detail controls (name, phone, email, title, org, settings).
+ * @param hwnd Parent window handle.
+ * @param start Vertical pixel offset at which to begin laying out controls.
+ * @return true on success.
+ */
 bool createGriffeyeEntries(HWND hwnd, int start)
 {
     txtGriffeyeCaseName = CreateWindowEx(0,"Static","Griffeye Case Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX,start,140,20,hwnd,0,GetModuleHandle(NULL),0);
@@ -985,6 +988,10 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     return true;
 }
 
+/**
+ * @brief Creates all controls in the main dialog by calling the individual control-group creators.
+ * @param hwnd Parent window handle.
+ */
 void CreateControls(HWND hwnd)
 {
     createOuputControls(hwnd,outputStart);
@@ -1016,7 +1023,7 @@ void CreateControls(HWND hwnd)
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
     C4PChkBox = CreateWindowEx(0,"BUTTON","Export C4P XML",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 140 + (extractInfo.noNames*boxMultiplier),200,40,hwnd,(HMENU)IDC_BTN_C4PCHK,GetModuleHandle(NULL),NULL);
-    if (!dbgChkBox)
+    if (!C4PChkBox)
     {
         int result=GetLastError();
         char message[2048];
@@ -1034,7 +1041,7 @@ void CreateControls(HWND hwnd)
         txtEvCurr[0] = '\0';
         sprintf(txtEvCurr,"%ls",extractInfo.nameList[i].actualName);
         lblActual[i] = CreateWindowEx(0,"Static","Evidence Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX - 10,evidenceStartY + (i*boxMultiplier),140,30,hwnd,0,GetModuleHandle(NULL),0);
-        if (!txtVidOutput)
+        if (!lblActual[i])
         {
             int result=GetLastError();
             char message[2048];
@@ -1050,7 +1057,7 @@ void CreateControls(HWND hwnd)
             MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
         }
         lblNew[i] = CreateWindowEx(0,"Static","Source ID Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,(MainWindowWidth/2) - 20,evidenceStartY + (i*boxMultiplier),130,20,hwnd,0,GetModuleHandle(NULL),0);
-        if (!txtVidOutput)
+        if (!lblNew[i])
         {
             int result=GetLastError();
             char message[2048];
@@ -1058,7 +1065,7 @@ void CreateControls(HWND hwnd)
             MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
         }
         TxtNewName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",txtEvCurr,WS_CHILD|WS_VISIBLE,(MainWindowWidth/2)+120,evidenceStartY + (i*boxMultiplier),190,20,hwnd,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
-        if (!TxtActualName[i])
+        if (!TxtNewName[i])
         {
             int result=GetLastError();
             char message[2048];
@@ -1072,6 +1079,11 @@ void CreateControls(HWND hwnd)
 }
 
 
+/**
+ * @brief Tests whether a path exists and refers to a directory.
+ * @param szPath Null-terminated path string to test.
+ * @return TRUE if the path is an existing directory, FALSE otherwise.
+ */
 BOOL DirectoryExists(LPCTSTR szPath)
 {
     DWORD dwAttrib = GetFileAttributes(szPath);
@@ -1079,15 +1091,11 @@ BOOL DirectoryExists(LPCTSTR szPath)
 }
 
 
-static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARAM lpData)
-{
-    if (uMsg== BFFM_INITIALIZED)
-    {
-        SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
-    }
-    return 0;
-}
-
+/**
+ * @brief Displays the system folder-picker dialog and returns the selected path.
+ * @return Wide-character string allocated by the shell containing the chosen folder path,
+ *         or NULL if the user cancelled. Caller must free with CoTaskMemFree().
+ */
 LPWSTR GetFolderPath()
 {
     // CoCreate the File Open Dialog object.
@@ -1142,6 +1150,11 @@ LPWSTR GetFolderPath()
 }
 
 
+/**
+ * @brief Reads all dialog control values into extractInfo and extractOpt, validates required fields,
+ *        and creates any necessary output directories.
+ * @return 0 on success, non-zero if a required field is missing or a directory could not be created.
+ */
 int startProcess()
 {
     char buffer[1024];
@@ -1163,7 +1176,6 @@ int startProcess()
         extractInfo.GriffeyeCaseLocation = new wchar_t[length + 40];
         swprintf(extractInfo.GriffeyeCaseLocation,L"%s",buffer);
         buffer[0]='\0';
-        //1.51 get settings file
         length = GetWindowTextLength(GriffeyeSettings);
         GetWindowText(GriffeyeSettings,buffer,1024);
         if (length != 0){
@@ -1215,7 +1227,6 @@ int startProcess()
             strcat(buffer,"\\");
         }
         swprintf(extractInfo.C4PPath,L"%s",buffer);
-        //1.50 only create if not just ZIP
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strcat(buffer,"Files");
@@ -1252,7 +1263,6 @@ int startProcess()
             strcat(buffer,"\\");
         }
         swprintf(extractInfo.C4MPath,L"%s",buffer);
-        //1.50 only create if not just ZIP
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strcat(buffer,"Files");
@@ -1275,6 +1285,7 @@ int startProcess()
     return 0;
 }
 
+/** @brief Reads the Griffeye investigator fields from the dialog and stores them in vCaseData. */
 void fillCaseDetails()
 {
     int fieldLength = GetWindowTextLength(GriffeyeInvName);
@@ -1315,6 +1326,10 @@ void fillCaseDetails()
     }
 }
 
+/**
+ * @brief Reads saved Griffeye investigator details from the per-user config file and populates the dialog.
+ * @return 0 always.
+ */
 int getGriffeyeDetails()
 {
     char appdataPath[MAX_PATH];
@@ -1378,19 +1393,24 @@ int getGriffeyeDetails()
                     }
                     SetWindowText(GriffeyeInvOrg,line);
                 }
+                fclose(detailsFile);
             }
         }
     }
     return 0;
 }
 
+/**
+ * @brief Persists the Griffeye investigator details entered in the dialog to the per-user config file.
+ * @return 0 always.
+ */
 int saveGriffeyeDetails()
 {
     char appdataPath[MAX_PATH];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
-        if (!DirExists(appdataPath))
+        if (!DirectoryExists(appdataPath))
         {
             CreateDirectoryA(appdataPath, NULL);
         }
@@ -1416,6 +1436,7 @@ int saveGriffeyeDetails()
     return 0;
 }
 
+/** @brief Frees heap memory allocated during GUI creation. Call when the X-Tension is unloaded. */
 void cleanupGUI()
 {
     if (CaseDir != NULL) {

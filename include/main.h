@@ -17,6 +17,14 @@
     #define DLL_EXPORT __declspec(dllimport)
 #endif*/
 
+#define C4A_NAME      "Clees4All"
+#define C4A_VERSION   "1.60"
+#define C4A_TITLE     C4A_NAME " " C4A_VERSION
+
+#define _C4A_WIDE(s)  L##s
+#define C4A_WIDE(s)   _C4A_WIDE(s)
+#define C4A_VERSION_W C4A_WIDE(C4A_VERSION)
+
 #define ERROR_NO_MD5_HASH 0
 #define ERROR_NO_SHA1_HASH 1
 #define ERROR_CANNOT_READ 2

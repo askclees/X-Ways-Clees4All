@@ -128,7 +128,7 @@ static const char* findGriffeyeExe(const char* folder)
 */
 int createOptionsWindow()
 {
-    const char CLASS_NAME[] = "CLEES4All 1.60 Options";
+    const char CLASS_NAME[] = C4A_TITLE " Options";
     WNDCLASSEX wc = {};
 
     wc.lpfnWndProc = OptionsWindowProc;

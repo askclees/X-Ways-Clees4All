@@ -70,7 +70,7 @@ wchar_t currentEvObject[2048];
 wchar_t XT_PATH[2048];
 LPWSTR txtCurrObj;
 sqlite3 *vicsDB;
-const wchar_t* progVersion = L"1.60";
+const wchar_t* progVersion = C4A_VERSION_W;
 const wchar_t* INFO_DELETION[] =    {L"Existing",
                                     L"Previously existing, possibly recoverable",
                                     L"Previously existing, first cluster overwritten or unknown",
@@ -83,7 +83,6 @@ const int max_deletion = 5;
 INT64 Filetime2Unix(INT64 fTime);
 wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVIC);
 int createC4POutput();
-int writeOutputFile(LONG nItemID,int picFile,wchar_t* fileName,INT64 fileSize, HANDLE hItem);
 void removeInvalidChars(wchar_t* strIn);
 
 int createC4AllRecord(LONG nItemID, int picture, wchar_t MD5Hash[33]);
