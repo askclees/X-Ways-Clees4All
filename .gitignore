@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+*.map
+
+# CodeBlocks generated files
+*.depend
+*.layout
+
+# Compiled output
+*.dll
+*.exe
+*.a
+*.def
+*.o
+
+# Keep the project's own module definition file
+!X-tension.def
+
+# Keep pre-built third-party libraries
+!libs/
+!libs/**
+
+# SQLite amalgamation is large but intentionally included - no rule needed
+
+# Temp / OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+*~
+*.tmp
+*.bak
