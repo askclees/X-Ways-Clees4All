@@ -18,7 +18,6 @@
 
 //windows form sizes
 #define MainWindowWidth 850
-//1.51 changed to 430 from 250
 #define MainWindowLength 430
 #define LeftHandStartX 10
 #define FirstLineY 10
@@ -27,7 +26,6 @@
 #define FourthLineY 100
 #define FifthLineY 130
 #define TypeLineY 160
-//1.51 changed to 360
 #define LastLineY 360
 
 //form controls
@@ -45,21 +43,17 @@
 #define IDC_TEXT_MINVIDSIZE         112
 #define IDC_CBO_MINPIC              113
 #define IDC_CBO_MINVID              114
-//1.51 added filters for filetype
 #define IDC_LBX_TYPESTATUS          115
 #define IDC_LBX_FILEFORMAT          116
 
 HWND optHwnd;
 HWND MaxPicSize, txtMaxPicSize, MaxVidSize, txtMaxVidSize, lstOverwrite, lstTxtOverwrite;
 HWND ReportOutput, cmdReportOutput, txtReportOutput, cmdOK, cmdCancel, txtGriffeyeLocation, GriffeyeLocation, cmdGriffeyeLocation;
-//1.50 HWNDs for dropboxes and min values
 HWND drpMinVid, drpMinPic, drpMaxVid, drpMaxPic;
 HWND MinPicSize, txtMinPicSize, MinVidSize, txtMinVidSize;
-//1.51 added for listboxes
 HWND lstFileStatus, lstFileFormat, txtFileStatus, txtFileFormat;
 
-//1.51 added Type Status and File Format arrays
-char* arrayTypeStatus[] =
+const char* arrayTypeStatus[] =
 {
     "not verified",
     "irrelevant",
@@ -71,7 +65,7 @@ char* arrayTypeStatus[] =
 };
 int numTypeStatus = 7;
 
-char* arrayFileFormat[] =
+const char* arrayFileFormat[] =
 {
     "unknown",
     "OK",
@@ -94,6 +88,12 @@ ExtractOptions loadOrCreateOptions(BOOL* success);
 void createOptions(char path[]);
 
 
+/**
+ * @brief Returns true if the file at the given path can be opened for reading.
+ *
+ * @param filename Null-terminated path to the file.
+ * @return true if the file exists and is accessible, false otherwise.
+ */
 bool file_exists(const char* filename)
 {
     if (FILE* file = fopen(filename,"r"))
@@ -104,28 +104,33 @@ bool file_exists(const char* filename)
     return false;
 }
 
-// Returns the griffeye exe name found in folder, or NULL if neither exists.
-// Caller must not free the returned pointer (it's a string literal).
+/**
+ * @brief Returns the Griffeye CLI executable name found in the given folder.
+ *
+ * Checks for analyze-cli.exe then magnet-griffeye-cli.exe. The returned pointer
+ * is a string literal and must not be freed by the caller.
+ *
+ * @param folder Null-terminated path to the Griffeye installation directory.
+ * @return Executable filename string literal, or NULL if neither is found.
+ */
 static const char* findGriffeyeExe(const char* folder)
 {
     char check[MAX_PATH];
     bool hasSlash = (folder[strlen(folder)-1] == '\\');
-    sprintf(check, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", folder);
+    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", folder);
     if (file_exists(check)) return "analyze-cli.exe";
-    sprintf(check, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", folder);
+    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", folder);
     if (file_exists(check)) return "magnet-griffeye-cli.exe";
     return NULL;
 }
 
-/*Function: createOptionsWindow
-    Creates the options window so that the defaults can be changed
-
-    Returns:
-        0 - Always returns
-
-    See Also:
-        <OptionsWindowProc>
-*/
+/**
+ * @brief Creates and runs the options window so that defaults can be changed.
+ *
+ * @return 0 always.
+ *
+ * @see OptionsWindowProc
+ */
 int createOptionsWindow()
 {
     const char CLASS_NAME[] = C4A_TITLE " Options";
@@ -172,10 +177,17 @@ int createOptionsWindow()
     return 0;
 }
 
+/**
+ * @brief Reads a size value and unit from a combo/edit control pair and returns the size in bytes.
+ *
+ * @param hwnCmbo Handle to the units combo box (0=b, 1=KB, 2=MB, 3=GB).
+ * @param hwndTxt Handle to the edit control containing the numeric value.
+ * @return Size in bytes.
+ */
 INT64 getSizeInBytes(HWND hwnCmbo, HWND hwndTxt)
 {
     char numVal[16];
-    int units = SendMessage(hwnCmbo, CB_GETCURSEL, (WPARAM)units,(LPARAM)0);
+    int units = SendMessage(hwnCmbo, CB_GETCURSEL, 0, 0);
     GetWindowText(hwndTxt,numVal,16);
     INT64 multiplier;
     switch (units){
@@ -197,6 +209,14 @@ INT64 getSizeInBytes(HWND hwnCmbo, HWND hwndTxt)
 }
 
 
+/**
+ * @brief Validates all option fields before saving.
+ *
+ * Checks that the report output path exists, the Griffeye folder (if set) contains
+ * a recognised CLI executable, and that min sizes do not exceed max sizes.
+ *
+ * @return true if all fields are valid, false if any validation fails.
+ */
 bool detailsValid()
 {
     char buffer[1024];
@@ -233,6 +253,11 @@ bool detailsValid()
     return true;
 }
 
+/**
+ * @brief Reads the selected items from the type status list box and returns them as a combined flag.
+ *
+ * @return Bitmask of selected type status flags.
+ */
 int getTypeStatus()
 {
     int retVal =0;
@@ -268,6 +293,11 @@ int getTypeStatus()
     return retVal;
 }
 
+/**
+ * @brief Reads the selected items from the file format list box and returns them as a combined flag.
+ *
+ * @return Bitmask of selected file format flags.
+ */
 int getFileTypeStatus()
 {
     int retVal =0;
@@ -294,6 +324,11 @@ int getFileTypeStatus()
     return retVal;
 }
 
+/**
+ * @brief Handles the OK button click: validates, saves options, and closes the window.
+ *
+ * @param hwnd Handle to the options window.
+ */
 void BTN_OK_CLICK(HWND hwnd)
 {
     ExtractOptions opt = {0};
@@ -329,6 +364,9 @@ void BTN_OK_CLICK(HWND hwnd)
 
 }
 
+/**
+ * @brief Handles the Griffeye folder browse button click.
+ */
 void BTN_GRIFFEYE_CLICK()
 {
     TCHAR path[2048];
@@ -344,6 +382,9 @@ void BTN_GRIFFEYE_CLICK()
     }
 }
 
+/**
+ * @brief Handles the report output folder browse button click.
+ */
 void BTN_REPORTOUTPUT_CLICK()
 {
     TCHAR path[2048];
@@ -359,15 +400,11 @@ void BTN_REPORTOUTPUT_CLICK()
     }
 }
 
-/*Function: OptionsWindowProc
-    Sets up the Message Handler for the Options Window
-
-    Returns:
-        0 - Always returns
-
-    See Also:
-        <CreateOptionsControls>
-*/
+/**
+ * @brief Window procedure for the options window.
+ *
+ * @see CreateOptionsControls
+ */
 
 LRESULT CALLBACK OptionsWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -442,14 +479,13 @@ LRESULT CALLBACK OptionsWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
     return DefWindowProc(hwnd,uMsg,wParam, lParam);
 }
 
-/*Function: determineSizeLimit
-    Returns value to be stored in size limit box (min or max)
-    int pointer has value of unit to be used
-
-    See Also:
-    <createOptionsWindow)
-
-*/
+/**
+ * @brief Converts a byte size into the most appropriate human-readable unit.
+ *
+ * @param sizeInBytes Size in bytes to convert.
+ * @param unit        Output: 0=bytes, 1=KB, 2=MB, 3=GB.
+ * @return The size value expressed in the chosen unit.
+ */
 
 INT64 determineSizeLimit(INT64 sizeInBytes, int* unit)
 {
@@ -483,22 +519,25 @@ INT64 determineSizeLimit(INT64 sizeInBytes, int* unit)
     return sizeInBytes;
 }
 
-/*Function: outputControlOutputError
-    Outputs an error message when a control cannot be created
-    Created to massively reduce size of code as used a lot
-
-    See Also:
-    <createOptionsWindow)
-
-*/
+/**
+ * @brief Displays a MessageBox error when a Win32 control could not be created.
+ *
+ * @param controlName Name of the control that failed, included in the error message.
+ */
 void outputControlOutputError(const char* controlName)
 {
     int result=GetLastError();
     char message[2048];
-    sprintf(message,"Creation Error: %d for control: %s",result,controlName);
+    snprintf(message,sizeof(message),"Creation Error: %d for control: %s",result,controlName);
     MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
 }
 
+/**
+ * @brief Populates a size unit combo box with b/Kb/Mb/Gb entries and sets the current selection.
+ *
+ * @param hwnCmbo Handle to the combo box.
+ * @param units   Index of the unit to select (0=b, 1=Kb, 2=Mb, 3=Gb).
+ */
 void populateSizeCmbo(HWND hwnCmbo, int units)
 {
     SendMessage(hwnCmbo, CB_INSERTSTRING,-1,(LPARAM)"b");
@@ -509,6 +548,12 @@ void populateSizeCmbo(HWND hwnCmbo, int units)
 
 }
 
+/**
+ * @brief Creates the max/min picture size controls on the first row of the options window.
+ *
+ * @param hwnd Handle to the parent options window.
+ * @return 0 always.
+ */
 int drawFirstLine(HWND hwnd)
 {
     char tempnum[16];
@@ -519,15 +564,15 @@ int drawFirstLine(HWND hwnd)
     if (!txtMaxPicSize) { outputControlOutputError("txtMaxPicSize"); }
 
     MaxPicSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + 260, FirstLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXPICSIZE,GetModuleHandle(NULL),NULL);
-    if (!txtMaxPicSize) { outputControlOutputError("MaxPicSize"); }
+    if (!MaxPicSize) { outputControlOutputError("MaxPicSize"); }
 
-    //1.50 added file dropboxes
+
     drpMaxPic = CreateWindowEx(0,"Combobox",NULL,WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|CBS_DROPDOWNLIST|CBS_HASSTRINGS,
                                LeftHandStartX + 320, FirstLineY ,45,20,hwnd,(HMENU)IDC_CBO_MAXPIC,GetModuleHandle(NULL),0);
     if (!drpMaxPic) {outputControlOutputError("drpMaxPic");}
     sizeInUnit=determineSizeLimit(extractOpt.maxPictureSize,&units);
     populateSizeCmbo(drpMaxPic,units);
-    sprintf(tempnum,"%llu",sizeInUnit);
+    snprintf(tempnum,sizeof(tempnum),"%llu",sizeInUnit);
     SetWindowText(MaxPicSize,tempnum);
     tempnum[0]='\0';
 
@@ -535,21 +580,27 @@ int drawFirstLine(HWND hwnd)
     if (!txtMinPicSize) { outputControlOutputError("txtMinPicSize"); }
 
     MinPicSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, FirstLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXPICSIZE,GetModuleHandle(NULL),NULL);
-    if (!txtMinPicSize) { outputControlOutputError("MinPicSize"); }
+    if (!MinPicSize) { outputControlOutputError("MinPicSize"); }
 
-    //1.50 added file dropboxes
+
     drpMinPic = CreateWindowEx(0,"Combobox",NULL,WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|CBS_DROPDOWNLIST|CBS_HASSTRINGS,
                                LeftHandStartX + ((MainWindowWidth-100)/2)+ 320, FirstLineY ,45,20,hwnd,(HMENU)IDC_CBO_MINPIC,GetModuleHandle(NULL),0);
     if (!drpMinPic) {outputControlOutputError("drpMinPic");}
     sizeInUnit=determineSizeLimit(extractOpt.minPictureSize,&units);
     populateSizeCmbo(drpMinPic,units);
-    sprintf(tempnum,"%llu",sizeInUnit);
+    snprintf(tempnum,sizeof(tempnum),"%llu",sizeInUnit);
     SetWindowText(MinPicSize,tempnum);
     tempnum[0]='\0';
     return 0;
 }
 
 
+/**
+ * @brief Creates the max/min video size controls on the second row of the options window.
+ *
+ * @param hwnd Handle to the parent options window.
+ * @return 0 always.
+ */
 int drawSecondLine(HWND hwnd)
 {
     char tempnum[16];
@@ -561,13 +612,13 @@ int drawSecondLine(HWND hwnd)
 
     MaxVidSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + 260, SecondLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXVIDSIZE,GetModuleHandle(NULL),NULL);
     if (!MaxVidSize) {outputControlOutputError("MaxVidSize");}
-    //1.50 added file dropboxes
+
     drpMaxVid = CreateWindowEx(0,"Combobox",NULL,WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|CBS_DROPDOWNLIST|CBS_HASSTRINGS,
                                LeftHandStartX + 320, SecondLineY ,45,20,hwnd,(HMENU)IDC_CBO_MAXVID,GetModuleHandle(NULL),0);
     if (!drpMaxVid) {outputControlOutputError("drpMaxVid");}
     sizeInUnit=determineSizeLimit(extractOpt.maxMovieSize,&units);
     populateSizeCmbo(drpMaxVid,units);
-    sprintf(tempnum,"%llu",sizeInUnit);
+    snprintf(tempnum,sizeof(tempnum),"%llu",sizeInUnit);
     SetWindowText(MaxVidSize,tempnum);
     tempnum[0]='\0';
 
@@ -575,21 +626,27 @@ int drawSecondLine(HWND hwnd)
     if (!txtMinVidSize) { outputControlOutputError("txtMinVidSize"); }
 
     MinVidSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, SecondLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXPICSIZE,GetModuleHandle(NULL),NULL);
-    if (!txtMinVidSize) { outputControlOutputError("MinVidSize"); }
+    if (!MinVidSize) { outputControlOutputError("MinVidSize"); }
 
-    //1.50 added file dropboxes
+
     drpMinVid = CreateWindowEx(0,"Combobox",NULL,WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|CBS_DROPDOWNLIST|CBS_HASSTRINGS,
                                LeftHandStartX + ((MainWindowWidth-100)/2)+ 320, SecondLineY ,45,20,hwnd,(HMENU)IDC_CBO_MINVID,GetModuleHandle(NULL),0);
     if (!drpMinVid) {outputControlOutputError("drpMinVid");}
     sizeInUnit=determineSizeLimit(extractOpt.minMovieSize,&units);
     populateSizeCmbo(drpMinVid,units);
-    sprintf(tempnum,"%llu",sizeInUnit);
+    snprintf(tempnum,sizeof(tempnum),"%llu",sizeInUnit);
     SetWindowText(MinVidSize,tempnum);
     tempnum[0]='\0';
 
     return 0;
 }
 
+/**
+ * @brief Creates the overwrite-files combo box on the third row of the options window.
+ *
+ * @param hwnd Handle to the parent options window.
+ * @return 0 always.
+ */
 int drawThirdLine(HWND hwnd)
 {
     lstTxtOverwrite = CreateWindowEx(0,"Static","Overwrite previously exported files?",WS_CHILD|WS_VISIBLE|SS_RIGHT,LeftHandStartX,ThirdLineY,250,20,hwnd,0,GetModuleHandle(NULL),0);
@@ -607,6 +664,12 @@ int drawThirdLine(HWND hwnd)
     return 0;
 }
 
+/**
+ * @brief Creates the error report output path controls on the fourth row of the options window.
+ *
+ * @param hwnd Handle to the parent options window.
+ * @return 0 always.
+ */
 int drawFourthLine(HWND hwnd)
 {
     txtReportOutput = CreateWindowEx(0,"Static","Error Report Output Path",WS_CHILD|WS_VISIBLE|SS_RIGHT,0,FourthLineY,170,20,hwnd,0,GetModuleHandle(NULL),0);
@@ -616,7 +679,7 @@ int drawFourthLine(HWND hwnd)
     if (!ReportOutput) {outputControlOutputError("ReportOutput");}
 
     char tempPath[MAX_PATH];
-    sprintf(tempPath, "%ls",extractOpt.errorReportPath);
+    snprintf(tempPath, sizeof(tempPath), "%ls",extractOpt.errorReportPath);
     SetWindowText(ReportOutput,tempPath);
     cmdReportOutput = CreateWindowEx(0,"BUTTON","...",WS_CHILD|WS_VISIBLE,MainWindowWidth - 50,FourthLineY,20,20,hwnd,(HMENU)IDC_BTN_REPORTOUTPUT,GetModuleHandle(NULL),0);
     if (!cmdReportOutput) {outputControlOutputError("cmdReportOutput");}
@@ -624,13 +687,19 @@ int drawFourthLine(HWND hwnd)
     return 0;
 }
 
+/**
+ * @brief Creates the Griffeye CLI folder controls on the fifth row of the options window.
+ *
+ * @param hwnd Handle to the parent options window.
+ * @return 0 always.
+ */
 int drawFifthLine(HWND hwnd)
 {
     txtGriffeyeLocation = CreateWindowEx(0,"Static","Griffeye CLI Folder (opt.)",WS_CHILD|WS_VISIBLE|SS_RIGHT,0,FifthLineY,170,20,hwnd,0,GetModuleHandle(NULL),0);
     if (!txtGriffeyeLocation) {outputControlOutputError("txtGriffeyeLocation");}
 
     char path[2048]={0};
-    sprintf(path,"%ls",extractOpt.GriffeyePath);
+    snprintf(path,sizeof(path),"%ls",extractOpt.GriffeyePath);
     GriffeyeLocation = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",path,WS_CHILD|WS_VISIBLE,LeftHandStartX+170, FifthLineY ,MainWindowWidth - 230,20,hwnd,(HMENU)IDC_TEXT_REPORTOUTPUT,GetModuleHandle(NULL),NULL);
     if (!GriffeyeLocation) {outputControlOutputError("GriffeyeLocation");}
 
@@ -641,6 +710,12 @@ int drawFifthLine(HWND hwnd)
 }
 
 
+/**
+ * @brief Pre-selects items in the file format list box based on the saved flag value.
+ *
+ * @param fileTypeFlag Bitmask of file format flags to select.
+ * @return 0 always.
+ */
 int selectFileType(int fileTypeFlag)
 {
     if (fileTypeFlag & UNKNOWN){
@@ -658,6 +733,12 @@ int selectFileType(int fileTypeFlag)
     return 0;
 }
 
+/**
+ * @brief Pre-selects items in the type status list box based on the saved flag value.
+ *
+ * @param typeStatusFlag Bitmask of type status flags to select.
+ * @return 0 always.
+ */
 int selectTypeStatus(int typeStatusFlag)
 {
     if (typeStatusFlag & NOT_VERIFIED){
@@ -684,6 +765,12 @@ int selectTypeStatus(int typeStatusFlag)
     return 0;
 }
 
+/**
+ * @brief Creates the type status and file format list boxes and their labels.
+ *
+ * @param hwnd Handle to the parent options window.
+ * @return 0 always.
+ */
 int drawTypeStatusWindows(HWND hwnd)
 {
     txtFileStatus = CreateWindowEx(0,"Static","Type Status to be exported:",WS_CHILD|WS_VISIBLE|SS_CENTER,LeftHandStartX,TypeLineY,200,40,hwnd,0,GetModuleHandle(NULL),0);
@@ -707,6 +794,12 @@ int drawTypeStatusWindows(HWND hwnd)
     return 0;
 }
 
+/**
+ * @brief Creates the OK and Cancel buttons on the last row of the options window.
+ *
+ * @param hwnd Handle to the parent options window.
+ * @return 0 always.
+ */
 int drawLastLine(HWND hwnd)
 {
     //last line always contains the buttons
@@ -720,15 +813,13 @@ int drawLastLine(HWND hwnd)
 }
 
 
-/*Function: CreateOptionsControls
-    Sets up the Message Handler for the Options Window
-
-    Returns:
-        0 - Always returns
-
-    See Also:
-        <createOptionsWindow>
-*/
+/**
+ * @brief Creates all child controls for the options window.
+ *
+ * @param hwnd Handle to the parent options window.
+ *
+ * @see createOptionsWindow
+ */
 void CreateOptionsControls(HWND hwnd)
 {
     drawFirstLine(hwnd);
@@ -741,6 +832,9 @@ void CreateOptionsControls(HWND hwnd)
 }
 
 
+/**
+ * @brief Folder browser callback that sets the initial selection to the current path.
+ */
 static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARAM lpData)
 {
     if (uMsg== BFFM_INITIALIZED)
@@ -750,8 +844,13 @@ static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARA
     return 0;
 }
 
-//1.50 added these two functions to standardise appdata path creation
-//1.50 this function creates the path if it doesn't exist
+/**
+ * @brief Returns the path to the Clees4All AppData folder, creating it if it does not exist.
+ *
+ * The returned buffer is allocated with new[] and must be freed by the caller using delete[].
+ *
+ * @return Newly allocated path string, or nullptr if SHGetFolderPath fails.
+ */
 char* createOptionsFolderString()
 {
     char* appdataPath = new char[MAX_PATH];
@@ -774,7 +873,13 @@ char* createOptionsFolderString()
     return appdataPath;
 }
 
-//1.50 this function only provides path (does not generate missing)
+/**
+ * @brief Returns the path to the Clees4All AppData folder without creating missing directories.
+ *
+ * The returned buffer is allocated with new[] and must be freed by the caller using delete[].
+ *
+ * @return Newly allocated path string, or nullptr if SHGetFolderPath fails.
+ */
 char* generateOptionsFolderString()
 {
     char* appdataPath = new char[MAX_PATH];
@@ -788,7 +893,12 @@ char* generateOptionsFolderString()
     return appdataPath;
 }
 
-//need to look at this function and streamline the whole process!
+/**
+ * @brief Loads options from the SQLite database, creating it with defaults if it does not exist.
+ *
+ * @param success Output BOOL (unused, reserved for future error reporting).
+ * @return Populated ExtractOptions struct.
+ */
 ExtractOptions loadOrCreateOptions(BOOL* success)
 {
     ExtractOptions retOpt ={0};
@@ -796,7 +906,7 @@ ExtractOptions loadOrCreateOptions(BOOL* success)
     if (path == nullptr) {return retOpt;}
     //folder exists, check if options database does!
     char optPath[MAX_PATH];
-    sprintf(optPath,"%s\\%s",path,"opt.sqlite");
+    snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     strcpy(optionsDatabasePath, optPath);
     if (SQLDatabaseExists(optPath))
     {
@@ -812,6 +922,11 @@ ExtractOptions loadOrCreateOptions(BOOL* success)
     return retOpt;
 }
 
+/**
+ * @brief Creates the options SQLite database at the given path.
+ *
+ * @param path Null-terminated path to the AppData folder where the database will be created.
+ */
 void createOptions(char* path)
 {
     CreateDirectory(path, NULL);
@@ -819,17 +934,23 @@ void createOptions(char* path)
     if (rc !=0)
     {
         wchar_t message[128];
-        swprintf(message,L"Error creating SQL Options: %i",rc);
+        swprintf(message,128,L"Error creating SQL Options: %i",rc);
+        MessageBoxW(NULL,message,L"Error",MB_ICONERROR);
     }
 }
 
-//1.50 - new function for adding last used settings
+/**
+ * @brief Saves the current extraction settings to the options database as the last-used record.
+ *
+ * @param record ExtractionDetails struct containing the settings to persist.
+ * @return SQLite result code; SQLITE_OK (0) on success.
+ */
 int writeExtractionDetails(ExtractionDetails record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
     char optPath[MAX_PATH];
-    sprintf(optPath,"%s\\%s",path,"opt.sqlite");
+    snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);
     if (rc != SQLITE_OK){
         delete[] path;
@@ -845,12 +966,18 @@ int writeExtractionDetails(ExtractionDetails record)
     return rc;
 }
 
+/**
+ * @brief Loads the last-used extraction settings from the options database into @p record.
+ *
+ * @param record Output struct to populate with the stored settings.
+ * @return SQLite result code; SQLITE_OK (0) on success.
+ */
 int loadLastExtractionSettings(ExtractionDetails* record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
     char optPath[MAX_PATH];
-    sprintf(optPath,"%s\\%s",path,"opt.sqlite");
+    snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);
     if (rc != SQLITE_OK){
         delete[] path;
