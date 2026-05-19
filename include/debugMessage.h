@@ -48,13 +48,13 @@ int endDebugLog();
 
 //debug log functions
 int debugWriteDetails(const char* message);
-extern int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module);
-extern int debugWriteDetails(LONG nItemID, const wchar_t* module);
+int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module);
+int debugWriteDetails(LONG nItemID, const wchar_t* module);
 int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message,varList varArgs);
 
 
 //error message functions
-extern void outputErrorMessage(const wchar_t* errMsg, LONG nItemID);
+void outputErrorMessage(const wchar_t* errMsg, LONG nItemID);
 void outputErrorMessage(const wchar_t* errMsg);
 void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail);
 

@@ -11,9 +11,9 @@
 std::mutex dbgMessage, errorTotal;
 FILE* debugLogFile;
 
-int errorLog[10]={0};
+int errorLog[11]={0};
 const int numErrorTables = 11;
-wchar_t* ReportTableList[][30] =
+wchar_t* ReportTableList[][2] =
 {
     {L"XT_CLEES4ALL Item Type Error",L"Unknown Item Type"},
     {L"XT_CLEES4ALL Unknown File Size",L"Unknown File Size"},
@@ -252,32 +252,34 @@ int debugWriteDetails(LONG nItemID, const wchar_t* module)
 int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message,varList varArgs)
 {
     char buffer[1024];
-    snprintf(buffer,1024,"ItemID: %ld, Module: %ls, Message: %ls\r\n",nItemID,module,message);
-    for (int i=0;i<varArgs.noVars;i++)
+    int pos = snprintf(buffer,sizeof(buffer),"ItemID: %ld, Module: %ls, Message: %ls\r\n",nItemID,module,message);
+    if (pos < 0) pos = 0;
+    for (int i=0;i<varArgs.noVars && pos < (int)sizeof(buffer)-1;i++)
     {
         char tempBuffer[256]={0};
         switch(varArgs.entries[i].type)
         {
         case 'c':
             //ascii character
-            snprintf(tempBuffer,256,"Variable: %i, Value: %s \r\n",i,(char*)varArgs.entries[i].varData);
+            snprintf(tempBuffer,sizeof(tempBuffer),"Variable: %i, Value: %s \r\n",i,(char*)varArgs.entries[i].varData);
             break;
         case 'i':
             //integer variable
             if (varArgs.entries[i].varLen==4){
-                snprintf(tempBuffer,256,"Variable: %i, Value: %ld \r\n",i,*(long*)varArgs.entries[i].varData);
+                snprintf(tempBuffer,sizeof(tempBuffer),"Variable: %i, Value: %ld \r\n",i,*(long*)varArgs.entries[i].varData);
             }
             else if (varArgs.entries[i].varLen==8){
-                snprintf(tempBuffer,256,"Variable: %i, Value: %lld\r\n",i,*(long long*)varArgs.entries[i].varData);
+                snprintf(tempBuffer,sizeof(tempBuffer),"Variable: %i, Value: %lld\r\n",i,*(long long*)varArgs.entries[i].varData);
             }
             break;
         case 'w':
-            //deal with wide characters
+            snprintf(tempBuffer,sizeof(tempBuffer),"Variable: %i, Value: %ls \r\n",i,(wchar_t*)varArgs.entries[i].varData);
             break;
         default:
             break;
         }
-        strncat(buffer,tempBuffer,1024);
+        int written = snprintf(buffer+pos, sizeof(buffer)-pos, "%s", tempBuffer);
+        if (written > 0) pos += written;
     }
     if (debugLogFile!=NULL)
     {
@@ -307,7 +309,7 @@ int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message
 void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
 {
     wchar_t errorMessage[2048];
-    snwprintf(errorMessage,2048,L"%ls %lu",errMsg, nItemID);
+    swprintf(errorMessage,2048,L"%ls %lu",errMsg, nItemID);
     dbgMessage.lock();
     XWF_OutputMessage(errorMessage,0);
     dbgMessage.unlock();
@@ -327,10 +329,8 @@ void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
 */
 void outputErrorMessage(const wchar_t* errMsg)
 {
-    wchar_t errorMessage[2048];
-    snwprintf(errorMessage,2048,L"%ls",errMsg);
     dbgMessage.lock();
-    XWF_OutputMessage(errorMessage,0);
+    XWF_OutputMessage((wchar_t*)errMsg,0);
     dbgMessage.unlock();
 }
 
@@ -351,7 +351,7 @@ void outputErrorMessage(const wchar_t* errMsg)
 void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail)
 {
     wchar_t errorMessage[2048];
-    snwprintf(errorMessage,2048,L"%ls%ls",errMsg,detail);
+    swprintf(errorMessage,2048,L"%ls%ls",errMsg,detail);
     dbgMessage.lock();
     XWF_OutputMessage(errorMessage,0);
     dbgMessage.unlock();
