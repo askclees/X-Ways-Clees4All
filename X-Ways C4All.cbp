@@ -310,6 +310,7 @@
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
+			<Option target="Tests" />
 		</Unit>
 		<Unit filename="third_party/sqlite/sqlite3.h" />
 		<Unit filename="third_party/sqlite/sqlite3ext.h" />
