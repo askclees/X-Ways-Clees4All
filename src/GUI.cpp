@@ -435,7 +435,10 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         case BN_CLICKED:
                             {
                                 LPWSTR outputFolder = GetFolderPath();
-                                SetWindowTextW(VideoPath,outputFolder);
+                                if (outputFolder != NULL) {
+                                    SetWindowTextW(VideoPath,outputFolder);
+                                    CoTaskMemFree(outputFolder);
+                                }
                             }
                             break;
                     }
@@ -448,7 +451,10 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         case BN_CLICKED:
                             {
                                 LPWSTR outputFolder = GetFolderPath();
-                                SetWindowTextW(GriffeyePath,outputFolder);
+                                if (outputFolder != NULL) {
+                                    SetWindowTextW(GriffeyePath,outputFolder);
+                                    CoTaskMemFree(outputFolder);
+                                }
                             }
                             break;
                     }
@@ -486,7 +492,10 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         case BN_CLICKED:
                             {
                                 LPWSTR outputFolder = GetFolderPath();
-                                SetWindowTextW(PicturePath,outputFolder);
+                                if (outputFolder != NULL) {
+                                    SetWindowTextW(PicturePath,outputFolder);
+                                    CoTaskMemFree(outputFolder);
+                                }
                                 SetFocus(hwnd);
                             }
                             break;
@@ -1111,6 +1120,7 @@ LPWSTR GetFolderPath()
             }
         }
     }
+    if (pfd != NULL) { pfd->Release(); }
     return pszFilePath;
 }
 
@@ -1389,5 +1399,10 @@ int saveGriffeyeDetails()
     return 0;
 }
 
-
-
+void cleanupGUI()
+{
+    if (CaseDir != NULL) {
+        delete[] CaseDir;
+        CaseDir = NULL;
+    }
+}

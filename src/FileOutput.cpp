@@ -446,6 +446,11 @@ int writeOutputFile(LONG nItemID,int picFile,wchar_t* fileName, INT64 fileSize,H
     }
     outputFile = fopen(outputPath,"wb");
     lockFile.unlock();
+    if (outputFile == NULL)
+    {
+        errorRaised(nItemID,REPORT_FILEOPEN_ERROR);
+        return ERROR_FILE_OPEN;
+    }
     int retVal=0;
     if (fileSize <= max_read){
         retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
@@ -454,17 +459,24 @@ int writeOutputFile(LONG nItemID,int picFile,wchar_t* fileName, INT64 fileSize,H
         retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID);
     }
     int closeValue = fclose(outputFile);
+    outputFile = NULL;
     if (retVal !=0 || closeValue !=0)
     {
         if (retVal == FILE_ERROR_SIZE)
         {
             //retry with flush option
             hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
-            if (fileSize <= max_read){
-                retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
-            }
-            else {
-                retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
+            outputFile = fopen(outputPath,"wb");
+            if (outputFile != NULL)
+            {
+                if (fileSize <= max_read){
+                    retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
+                }
+                else {
+                    retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
+                }
+                fclose(outputFile);
+                outputFile = NULL;
             }
         }
         if (retVal !=0){

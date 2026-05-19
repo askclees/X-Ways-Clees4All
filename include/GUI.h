@@ -6,3 +6,4 @@
 #endif // GUI_H_INCLUDED
 
 extern int createWindow(WORD version);
+extern void cleanupGUI();

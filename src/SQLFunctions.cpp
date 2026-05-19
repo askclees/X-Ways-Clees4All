@@ -299,6 +299,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
     rc = sqlite3_exec(*sqlDB,"CREATE TABLE VICSPics (MediaID INT,Category INT,SHA1 TEXT,MD5Hash TEXT PRIMARY KEY NOT NULL, VictimID INT DEFAULT NULL, OffenderID INT DEFAULT NULL,IsDistributed INT DEFAULT NULL,  Comments TEXT DEFAULT \'\', Tags TEXT DEFAULT \'\',Series TEXT DEFAULT \'\', MediaSize INT,  RelativeFilePath TEXT DEFAULT \'\',DateUpdated INT, Timezone INT, PreCatSource TEXT, IsSuspected INT, MimeType TEXT DEFAULT \'\',PhotoDNA TEXT DEFAULT\'\')", NULL, NULL, &errMsg);
@@ -307,6 +308,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
     //creation of new tables for records
@@ -316,6 +318,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
     //creation of new tables for records
@@ -325,6 +328,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
     rc = sqlite3_exec(*sqlDB,"CREATE TABLE VICSMoviesRecords (MD5Hash TEXT NOT NULL, FileName TEXT NOT NULL,FilePath TEXT NOT NULL,Created INT,Modified INT,Accessed INT,Unallocated INT,SourceID TEXT,PhysicalLocation INT,Deleted INT,parentMD5 TEXT,parentName TEXT,parentPath TEXT,parentPhysLoc INT, itemID INT)", NULL, NULL, &errMsg);
@@ -333,6 +337,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
     //add indexes for speed!!!
@@ -342,6 +347,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
     rc = sqlite3_exec(*sqlDB,"CREATE INDEX IndexPicsRecords on VICSPicsRecords(MD5Hash);", NULL, NULL, &errMsg);
@@ -350,6 +356,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
 
@@ -360,6 +367,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
 
@@ -370,6 +378,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
 
@@ -380,6 +389,7 @@ int setupVics(sqlite3** sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
     }
     sqlite3_free(errMsg);
     return 0;
@@ -889,9 +899,11 @@ wchar_t* getSourceIDName(sqlite3* sqlDB, DWORD evID)
             wchar_t* tempResult = (wchar_t*)sqlite3_column_text16(statement,0);
             wchar_t* returnString = new wchar_t[wcslen(tempResult)+2];
             wcscpy(returnString,tempResult);
+            sqlite3_finalize(statement);
             return returnString;
         }
     }
+    sqlite3_finalize(statement);
     return NULL;
 }
 
@@ -1069,6 +1081,7 @@ int createOptionsExtractionTable(sqlite3* sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
         sqlite3_free(errMsg);
         return -1;
     }
@@ -1097,6 +1110,7 @@ int createOptionsSchemaTable(sqlite3* sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
         sqlite3_free(errMsg);
         return -1;
     }
@@ -1113,6 +1127,7 @@ int createOptionsLastrunTable(sqlite3* sqlDB)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
         sqlite3_free(errMsg);
         return -1;
     }
@@ -1129,6 +1144,7 @@ int clearExtractionOptionsTable(sqlite3* db)
         wchar_t* message = new wchar_t[strlen(errMsg)+1];
         swprintf(message,L"%s\0",errMsg);
         XWF_OutputMessage(message,0);
+        delete[] message;
         sqlite3_free(errMsg);
         return -1;
     }
@@ -1397,6 +1413,7 @@ ExtractOptions extractOldSchemaOptions(sqlite3* db, bool* error)
         {
             //error
             *error = true;
+            sqlite3_finalize(statement);
             return retOpt;
         }
         retOpt.maxPictureSize = sqlite3_column_int64(statement,0);
@@ -1434,6 +1451,7 @@ ExtractOptions extractV1SchemaOptions(sqlite3* db, bool* error)
         {
             //error
             *error = true;
+            sqlite3_finalize(statement);
             return retOpt;
         }
         retOpt.minPictureSize = sqlite3_column_int64(statement,0);
@@ -1473,6 +1491,7 @@ ExtractOptions extractV2SchemaOptions(sqlite3* db, bool* error)
         {
             //error
             *error = true;
+            sqlite3_finalize(statement);
             return retOpt;
         }
         retOpt.minPictureSize = sqlite3_column_int64(statement,0);

@@ -1739,6 +1739,7 @@ int caseCleanup()
     }
     clearReportTableDetails();
     if (currSrcID != NULL) { delete[] currSrcID; currSrcID = NULL; }
+    cleanupGUI();
     if (extractInfo.debugSet){debugWriteDetails(0, L"caseCleanup End");}
     return 0;
 }
