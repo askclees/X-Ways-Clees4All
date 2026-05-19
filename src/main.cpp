@@ -1561,12 +1561,31 @@ int UpdateRecords(int picture, long nItemID, hashValueStruct currHash)
         Calls       -   <DirExistsW>
 */
 
+static const char* detectGriffeyeExe(const wchar_t* folder)
+{
+    char narrowFolder[MAX_PATH];
+    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
+    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
+    char check[MAX_PATH];
+    sprintf(check, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
+    if (FILE* f = fopen(check, "r")) { fclose(f); return "analyze-cli.exe"; }
+    sprintf(check, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
+    if (FILE* f = fopen(check, "r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
+    return NULL;
+}
+
 int createGriffeyeCase()
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"createGriffeyeCase Start");}
+    const char* griffeyeExe = detectGriffeyeExe(extractOpt.GriffeyePath);
+    if (griffeyeExe == NULL)
+    {
+        XWF_OutputMessage(L"Griffeye CLI executable not found, cannot create case",0);
+        return 1;
+    }
     char cmdOutput[8192];
     char tempString[1024];
-    sprintf(cmdOutput,"\"%lsanalyze-cli.exe\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
+    sprintf(cmdOutput,"\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
     int sourceNo = 1;
 
     //1.41 add option to add to existing case

@@ -619,6 +619,21 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hwnd,uMsg,wParam, lParam);
 }
 
+static bool griffeyeExeAvailable()
+{
+    const wchar_t* folder = extractOpt.GriffeyePath;
+    if (folder[0] == L'\0') return false;
+    char narrowFolder[MAX_PATH];
+    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
+    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
+    char check[MAX_PATH];
+    sprintf(check, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
+    if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
+    sprintf(check, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
+    if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
+    return false;
+}
+
 void setExtractionOptions(ExtractionDetails record)
 {
     if (record.extractVideos){SendMessageA(vidChkBox,BM_SETCHECK,BST_CHECKED,0);}
@@ -629,14 +644,16 @@ void setExtractionOptions(ExtractionDetails record)
     else {SendMessageA(C4PChkBox,BM_SETCHECK,BST_UNCHECKED,0);}
     if (record.checkParent){SendMessageA(parentChkBox,BM_SETCHECK,BST_CHECKED,0);}
     else {SendMessageA(parentChkBox,BM_SETCHECK,BST_UNCHECKED,0);}
-    if (record.createGriffeye){
-            SendMessageA(griffChkBox,BM_SETCHECK,BST_CHECKED,0);
+    {
+        bool exeFound = griffeyeExeAvailable();
+        EnableWindow(griffChkBox, exeFound ? TRUE : FALSE);
+        bool griffOn = record.createGriffeye && exeFound;
+        SendMessageA(griffChkBox, BM_SETCHECK, griffOn ? BST_CHECKED : BST_UNCHECKED, 0);
+        if (!griffOn) {
+            EnableWindow(txtGriffeyeCaseLocation,FALSE);
+            EnableWindow(GriffeyePath,FALSE);
+            EnableWindow(GriffeyeSettings,FALSE);
         }
-    else {
-        SendMessageA(griffChkBox,BM_SETCHECK,BST_UNCHECKED,0);
-        EnableWindow(txtGriffeyeCaseLocation,FALSE);
-        EnableWindow(GriffeyePath,FALSE);
-        EnableWindow(GriffeyeSettings,FALSE);
     }
     if (record.VICExport){SendMessageA(vicChkBox,BM_SETCHECK,BST_CHECKED,0);}
     else {SendMessageA(vicChkBox,BM_SETCHECK,BST_UNCHECKED,0);}

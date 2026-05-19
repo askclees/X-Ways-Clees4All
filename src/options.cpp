@@ -104,6 +104,19 @@ bool file_exists(const char* filename)
     return false;
 }
 
+// Returns the griffeye exe name found in folder, or NULL if neither exists.
+// Caller must not free the returned pointer (it's a string literal).
+static const char* findGriffeyeExe(const char* folder)
+{
+    char check[MAX_PATH];
+    bool hasSlash = (folder[strlen(folder)-1] == '\\');
+    sprintf(check, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", folder);
+    if (file_exists(check)) return "analyze-cli.exe";
+    sprintf(check, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", folder);
+    if (file_exists(check)) return "magnet-griffeye-cli.exe";
+    return NULL;
+}
+
 /*Function: createOptionsWindow
     Creates the options window so that the defaults can be changed
 
@@ -193,19 +206,16 @@ bool detailsValid()
         MessageBox(NULL,"Report Output Path does not exist or cannot be accessed","Error ",MB_ICONERROR);
         return false;
     }
-    //check valid griffeye location
-    char tempPath[MAX_PATH], griffeyeTemp[MAX_PATH], griffeyeCheck[MAX_PATH];
+    //check valid griffeye location (optional — skip if empty)
+    char griffeyeTemp[MAX_PATH];
     GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
-    int pathLen = strlen(griffeyeTemp);
-    if (griffeyeTemp[pathLen-1] != '\\'){
-        sprintf((char*)griffeyeCheck,"%s\\analyze-cli.exe",griffeyeTemp);
-    }
-    else{
-        sprintf((char*)griffeyeCheck,"%sanalyze-cli.exe",griffeyeTemp);
-    }
-    if (!file_exists(griffeyeCheck)){
-        MessageBox(NULL,"Griffeye analyze-cli.exe file cannot be located in given folder","Error ",MB_ICONERROR);
-        return false;
+    if (strlen(griffeyeTemp) > 0)
+    {
+        if (findGriffeyeExe(griffeyeTemp) == NULL)
+        {
+            MessageBox(NULL,"Neither analyze-cli.exe nor magnet-griffeye-cli.exe found in the given folder","Error ",MB_ICONERROR);
+            return false;
+        }
     }
     //check sizes make sense
     INT64 maxSize = getSizeInBytes(drpMaxPic,MaxPicSize);
@@ -298,17 +308,10 @@ void BTN_OK_CLICK(HWND hwnd)
     opt.minPictureSize = getSizeInBytes(drpMinPic,MinPicSize);
     opt.minMovieSize = getSizeInBytes(drpMinVid,MinVidSize);
 
-    char tempPath[MAX_PATH], griffeyeTemp[MAX_PATH], griffeyeCheck[MAX_PATH];
+    char tempPath[MAX_PATH], griffeyeTemp[MAX_PATH];
     GetWindowText(ReportOutput,tempPath,MAX_PATH);
     swprintf((wchar_t*)opt.errorReportPath,L"%s",tempPath);
     GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
-    int pathLen = strlen(griffeyeTemp);
-    if (griffeyeTemp[pathLen-1] != '\\'){
-        sprintf((char*)griffeyeCheck,"%s\\analyze-cli.exe",griffeyeTemp);
-    }
-    else{
-        sprintf((char*)griffeyeCheck,"%sanalyze-cli.exe",griffeyeTemp);
-    }
     swprintf((wchar_t*)opt.GriffeyePath,L"%s",griffeyeTemp);
     int owrite = SendMessage(lstOverwrite,CB_GETCURSEL, NULL, NULL);
     if (owrite == 0){
@@ -623,7 +626,7 @@ int drawFourthLine(HWND hwnd)
 
 int drawFifthLine(HWND hwnd)
 {
-    txtGriffeyeLocation = CreateWindowEx(0,"Static","Griffeye Analyze-cli.exe",WS_CHILD|WS_VISIBLE|SS_RIGHT,0,FifthLineY,170,20,hwnd,0,GetModuleHandle(NULL),0);
+    txtGriffeyeLocation = CreateWindowEx(0,"Static","Griffeye CLI Folder (opt.)",WS_CHILD|WS_VISIBLE|SS_RIGHT,0,FifthLineY,170,20,hwnd,0,GetModuleHandle(NULL),0);
     if (!txtGriffeyeLocation) {outputControlOutputError("txtGriffeyeLocation");}
 
     char path[2048]={0};
