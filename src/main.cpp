@@ -1020,11 +1020,12 @@ int volumePrepare(HANDLE hEvidence)
          (currVidFile == NULL && extractInfo.extractVideos))
         && (extractInfo.C4ALLExport))
     {
-        XWF_OutputMessage(L"Didnt find a valid FILE",0);
+        XWF_OutputMessage(L"Didn't find a valid FILE",0);
     }
     //end of file matching
 
     //find srcID name
+    if (currSrcID != NULL) { delete[] currSrcID; currSrcID = NULL; }
     if (target !=0)
     {
         currSrcID = getSourceIDName(vicsDB, target);
@@ -1155,44 +1156,51 @@ int checkItemType(LONG nItemID, int* picture)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType Start");}
     LPWSTR type = new wchar_t[128];
-        type[0] = L'\0';
-        DWORD length = 0x40000080;
+    type[0] = L'\0';
+    DWORD length = 0x40000080;
 
-        LONG retVal = XWF_GetItemType(nItemID,type,length);
-        //return error val if function fails.
-        if (retVal == -1)    {return ERROR_GETITEMTYPE;}
-        if (!(((wcscmp(type,(LPWSTR)L"Pictures")==0) && extractInfo.extractPictures)||((wcscmp(type,(LPWSTR)L"Video")==0) && extractInfo.extractVideos)))
+    LONG retVal = XWF_GetItemType(nItemID,type,length);
+    //return error val if function fails.
+    if (retVal == -1)    {
+            delete[] type;
+            return ERROR_GETITEMTYPE;
+    }
+    if (!(((wcscmp(type,(LPWSTR)L"Pictures")==0) && extractInfo.extractPictures)||((wcscmp(type,(LPWSTR)L"Video")==0) && extractInfo.extractVideos)))
+    {
+        //not something we are interested in.
+        //1.38 add check here for flash videos Type Internet Type Description "Macromedia Flash [Certain potentially relevant types]"
+        if (wcscmp(type,(LPWSTR)L"Internet")==0)
         {
-            //not something we are interested in.
-            //1.38 add check here for flash videos Type Internet Type Description "Macromedia Flash [Certain potentially relevant types]"
-            if (wcscmp(type,(LPWSTR)L"Internet")==0)
-            {
-                //1.38 get description of file type, not category
-                long descLen = 0x20000080;
-                wchar_t descr[128]={0};
-                LONG retVal = XWF_GetItemType(nItemID,(wchar_t*)&descr,descLen);
-                if (retVal == -1)    {return ERROR_GETITEMTYPEDESC;}
-                if (wcsncmp(descr,L"Macromedia Flash",16)!=0)
-                {
+            //1.38 get description of file type, not category
+            long descLen = 0x20000080;
+            wchar_t descr[128]={0};
+            LONG retVal = XWF_GetItemType(nItemID,(wchar_t*)&descr,descLen);
+            if (retVal == -1){
                     delete[] type;
-                    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
-                    return TYPE_OTHER;
-                }
+                    return ERROR_GETITEMTYPEDESC;
             }
-            else{
-                if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
+            if (wcsncmp(descr,L"Macromedia Flash",16)!=0)
+            {
                 delete[] type;
+                if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
                 return TYPE_OTHER;
             }
         }
-        //must be picture or movie
-        *picture = 0;
-        if (wcscmp(type,(LPWSTR)L"Pictures")==0)
-        {
-            *picture = 1;
+        else{
+            if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
+            delete[] type;
+            return TYPE_OTHER;
         }
-        if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End - return TYPE_MEDIA");}
-        return TYPE_MEDIA;
+    }
+    //must be picture or movie
+    *picture = 0;
+    if (wcscmp(type,(LPWSTR)L"Pictures")==0)
+    {
+        *picture = 1;
+    }
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End - return TYPE_MEDIA");}
+    delete[] type;
+    return TYPE_MEDIA;
 }
 
 /*Function: validFileSize
@@ -1730,6 +1738,7 @@ int caseCleanup()
         extractInfo.GriffeyeSettingsName = NULL;
     }
     clearReportTableDetails();
+    if (currSrcID != NULL) { delete[] currSrcID; currSrcID = NULL; }
     if (extractInfo.debugSet){debugWriteDetails(0, L"caseCleanup End");}
     return 0;
 }

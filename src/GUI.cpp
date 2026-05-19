@@ -1039,6 +1039,7 @@ void CreateControls(HWND hwnd)
             sprintf(message,"Textbox Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
         }
+        delete[] txtEvCurr;
     }
     getGriffeyeDetails();
     setExtractionOptions(extractInfo);
