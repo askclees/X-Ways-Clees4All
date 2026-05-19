@@ -299,6 +299,14 @@ INT64 getMediaRecordSize(VICSMedia &record)
 
 /*Section: cJSON Helper Functions*/
 
+/* Add an INT64 field to a cJSON object as a JSON integer (no double conversion). */
+static void cjsonAddInt64(cJSON* obj, const char* key, INT64 value)
+{
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%lld", (long long)value);
+    cJSON_AddItemToObject(obj, key, cJSON_CreateRaw(buf));
+}
+
 /* Add a wide string field to a cJSON object.
    Converts wchar_t* to UTF-8 via convertWideToChar. Skips NULL or empty strings. */
 static void cjsonAddWide(cJSON* obj, const char* key, const wchar_t* wstr)
@@ -367,9 +375,9 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
     cjsonAddWide(obj, "ParentFilePath", f->parentFilePath);
 
     if (f->parentPhysLoc != 0)
-        cJSON_AddNumberToObject(obj, "ParentPhysicalLocation", (double)f->parentPhysLoc);
+        cjsonAddInt64(obj, "ParentPhysicalLocation", f->parentPhysLoc);
     if (f->physicalLocation != 0)
-        cJSON_AddNumberToObject(obj, "PhysicalLocation", (double)f->physicalLocation);
+        cjsonAddInt64(obj, "PhysicalLocation", f->physicalLocation);
 
     cjsonAddWide(obj, "SourceID", f->sourceID);
 
@@ -384,7 +392,7 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
 
     cJSON* obj = cJSON_CreateObject();
 
-    cJSON_AddNumberToObject(obj, "MediaID", (double)m.MediaID);
+    cjsonAddInt64(obj, "MediaID", m.MediaID);
 
     if (m.Category != 0)
         cJSON_AddNumberToObject(obj, "Category", m.Category);
@@ -413,7 +421,7 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     cjsonAddFiletime(obj, "DateUpdated", m.DateUpdated, m.timeZone);
 
     if (m.MediaSize != 0)
-        cJSON_AddNumberToObject(obj, "MediaSize", (double)m.MediaSize);
+        cjsonAddInt64(obj, "MediaSize", m.MediaSize);
 
     cjsonAddWide(obj, "RelativeFilePath", m.RelativeFilePath);
 

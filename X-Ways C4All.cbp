@@ -94,12 +94,16 @@
 				<Option createDefFile="1" />
 				<Option createStaticLib="1" />
 				<Option projectCompilerOptionsRelation="2" />
-				<Option projectIncludeDirsRelation="-1" />
-				<Option projectLibDirsRelation="-1" />
+				<Option projectIncludeDirsRelation="2" />
+				<Option projectLibDirsRelation="2" />
 				<Compiler>
 					<Add option="-std=c++17" />
 					<Add option="-m64" />
 					<Add option="-g" />
+					<Add directory="include" />
+					<Add directory="third_party/sqlite" />
+					<Add directory="third_party/libarchive" />
+					<Add directory="third_party/cjson" />
 				</Compiler>
 				<Linker>
 					<Add option="-static-libstdc++" />
