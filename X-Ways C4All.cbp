@@ -162,65 +162,68 @@
 		</Build>
 		<Compiler>
 			<Add option="-march=x86-64 -mfpmath=sse" />
+			<Add directory="include" />
+			<Add directory="third_party/sqlite" />
+			<Add directory="third_party/libarchive" />
 		</Compiler>
-		<Unit filename="ArchiveWriter.cpp">
+		<Unit filename="src/ArchiveWriter.cpp">
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="ArchiveWriter.h">
+		<Unit filename="include/ArchiveWriter.h">
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="FileOutput.cpp" />
-		<Unit filename="FileOutput.h" />
-		<Unit filename="GUI.cpp" />
-		<Unit filename="GUI.h" />
-		<Unit filename="ReportTableAssociations.cpp" />
-		<Unit filename="ReportTableAssociations.h" />
-		<Unit filename="SQLFunctions.cpp" />
-		<Unit filename="SQLFunctions.h" />
-		<Unit filename="VICS.cpp" />
-		<Unit filename="VICS.h" />
-		<Unit filename="X-Tension.cpp">
+		<Unit filename="src/FileOutput.cpp" />
+		<Unit filename="include/FileOutput.h" />
+		<Unit filename="src/GUI.cpp" />
+		<Unit filename="include/GUI.h" />
+		<Unit filename="src/ReportTableAssociations.cpp" />
+		<Unit filename="include/ReportTableAssociations.h" />
+		<Unit filename="src/SQLFunctions.cpp" />
+		<Unit filename="include/SQLFunctions.h" />
+		<Unit filename="src/VICS.cpp" />
+		<Unit filename="include/VICS.h" />
+		<Unit filename="src/X-Tension.cpp">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="X-Tension.h">
+		<Unit filename="include/X-Tension.h">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="X-tension.def" />
-		<Unit filename="XML.cpp" />
-		<Unit filename="XML.h" />
-		<Unit filename="accessible.cpp" />
-		<Unit filename="accessible.h" />
-		<Unit filename="archive.h" />
-		<Unit filename="archive_entry.h" />
-		<Unit filename="base64.cpp" />
-		<Unit filename="base64.h" />
-		<Unit filename="debugMessage.cpp" />
-		<Unit filename="debugMessage.h" />
-		<Unit filename="main.cpp">
+		<Unit filename="src/XML.cpp" />
+		<Unit filename="include/XML.h" />
+		<Unit filename="src/accessible.cpp" />
+		<Unit filename="include/accessible.h" />
+		<Unit filename="third_party/libarchive/archive.h" />
+		<Unit filename="third_party/libarchive/archive_entry.h" />
+		<Unit filename="src/base64.cpp" />
+		<Unit filename="include/base64.h" />
+		<Unit filename="src/debugMessage.cpp" />
+		<Unit filename="include/debugMessage.h" />
+		<Unit filename="src/main.cpp">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="main.h">
+		<Unit filename="include/main.h">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="options.cpp" />
-		<Unit filename="options.h" />
-		<Unit filename="shell.c">
+		<Unit filename="src/options.cpp" />
+		<Unit filename="include/options.h" />
+		<Unit filename="third_party/sqlite/shell.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="sqlite3.c">
+		<Unit filename="third_party/sqlite/sqlite3.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="sqlite3.h" />
-		<Unit filename="sqlite3ext.h" />
-		<Unit filename="utility.cpp">
+		<Unit filename="third_party/sqlite/sqlite3.h" />
+		<Unit filename="third_party/sqlite/sqlite3ext.h" />
+		<Unit filename="src/utility.cpp">
 			<Option target="Release" />
 			<Option target="Debug - New" />
 		</Unit>
-		<Unit filename="utility.h">
+		<Unit filename="include/utility.h">
 			<Option target="Release" />
 			<Option target="Debug - New" />
 		</Unit>
