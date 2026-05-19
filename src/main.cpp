@@ -26,7 +26,6 @@
 #include "FileOutput.h"
 #include "utility.h"
 #include "ArchiveWriter.h"
-#include "options.h"
 #include "ReportTableAssociations.h"
 
 using namespace std;
@@ -42,7 +41,6 @@ const wchar_t* const errorValues[] = {L"No MD5 Hash Value Located", L"No SHA1 Ha
 #define hashTypeSHA1 2
 #define hashTypePDNA 3
 
-//1.38 defining check file type code
 #define TYPE_MEDIA                  0
 #define TYPE_OTHER                  1
 #define ERROR_GETITEMTYPE           2
@@ -100,18 +98,14 @@ int getCommandLineOptions();
 void addCaseDetail(wchar_t* strArg);
 void freeVicsCaseData();
 
-//1.41 added prototyping after reshuffle of code
 int determineHashTypes();
 int determineColumnNumber(wchar_t* compareStr);
 int checkItemType(LONG nItemID, int* picture);
 int checkParentType(LONG nItemID);
 int caseCleanup();
 
-//1.50 added function from Prepare
 int firstRunSetup();
 int volumePrepare(HANDLE hEvidence);
-
-//1.50 added dedicated function to check if file is exported
 bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize);
 
 //VCIS Stuff
@@ -121,13 +115,15 @@ int outputVICSFile();
 int writeRecords(sqlite3* database,FILE* vicFile, int picture);
 int writeMediaRecord(FILE* vicFile, VICSRecord &record);
 
-//1.41 added Device Type column number
 int DeviceTypeCol = -1;
-
-//1.50 added get physical offset function
 INT64 getPhysicalOffset(DWORD nItemID);
 INT64 getPhysicalOffset(DWORD nItemID, BOOL* unallocated, BOOL* deleted);
 
+/**
+ * @brief DLL entry point — stores the DLL instance handle and module path.
+ *
+ * @return TRUE always.
+ */
 BOOL APIENTRY DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
 	extractInfo.thisDLL = hInstDLL;
@@ -136,21 +132,17 @@ BOOL APIENTRY DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpvReserved)
 }
 
 
-/*Section: X-Ways Functions*/
+// X-Ways Functions
 
-/*Function: XT_Init
-    Init Function of X-tension, called when X-Tension loaded
-    Checks version of X-Ways and decides if it can be used
-    Also loads options from SQLite Database
-
-    Returns:
-        -1 - Prevent use of DLL
-        1 - If X-Tension is Thread Safe
-        2 - If X-Tension is not Thread Safe
-
-    See Also:
-        Calls   -   <loadOrCreateOptions>
-*/
+/**
+ * @brief Init function called when X-Tension is loaded.
+ *
+ * Checks the X-Ways version and decides if the DLL can be used. Also loads options from SQLite database.
+ *
+ * @return -1 to prevent use of DLL, 1 if X-Tension is thread-safe, 2 if not thread-safe.
+ *
+ * @see loadOrCreateOptions
+ */
 LONG DLL_EXPORT XT_Init(CallerInfo info, DWORD nFlags, HANDLE hMainWnd, void* lpReserved)
 {
     if (extractInfo.debugSet){debugWriteDetails(0,L"XT_Init Start");}
@@ -184,13 +176,13 @@ LONG DLL_EXPORT XT_Init(CallerInfo info, DWORD nFlags, HANDLE hMainWnd, void* lp
     }
     else if (info.version < 2030)
     {
-        //1.50 updated message //1.41 - Notify that Device type detection unavailable
+
         XWF_OutputMessage(L"X-Ways version below 20.3, some features are disabled",0);
         XWF_OutputMessage(L"Specifically Device type detection is disabled",0);
     }
     else if (info.version < 2050)
     {
-        //1.50 updated message //1.41 - Notify that Device type detection unavailable
+
         XWF_OutputMessage(L"X-Ways version below 20.5, some features are disabled",0);
         XWF_OutputMessage(L"Specifically 'Extracting thumbnails embedded in picture files only if mismatched' will not be available",0);
     }
@@ -211,21 +203,18 @@ LONG DLL_EXPORT XT_Init(CallerInfo info, DWORD nFlags, HANDLE hMainWnd, void* lp
     BOOL loadSuccess;
     extractOpt = loadOrCreateOptions(&loadSuccess);
 
-    //1.50 need to extract last run settings after default set
     loadLastExtractionSettings(&extractInfo);
     if (extractInfo.debugSet){debugWriteDetails(0,L"XT_Init End");}
     return 2;
 }
 
-/*Function: XT_About
-    Calls the options window creation function
-
-    Returns:
-        0 - Always returns
-
-    See Also:
-        Calls   -   <createOptionsWindow>
-*/
+/**
+ * @brief Called by X-Ways to display the options window.
+ *
+ * @return 0 always.
+ *
+ * @see createOptionsWindow
+ */
 LONG DLL_EXPORT XT_About(HANDLE hParentWnd, PVOID lpReserved)
 {
     //setup options
@@ -234,19 +223,16 @@ LONG DLL_EXPORT XT_About(HANDLE hParentWnd, PVOID lpReserved)
 }
 
 
-/*Function: XT_Prepare
-    Called at the start of every new volume being processed.
-    If its the first time XT_Prepare has been called, it displays the menu.
-
-    Returns:
-        -4  -   Stops whole operation if VICS Setup fails
-        -3  -   Prevents use of X-Tension if not run from RVS
-        3   -   XT_PREPARE_CALLPI | XT_PREPARE_CALLPILATE
-
-    See Also:
-        Calls   -   <determineHashTypes>, <setupVics>, <getCaseOptions>, <getFileNumber>
-
-*/
+/**
+ * @brief Called at the start of each new volume being processed.
+ *
+ * Displays the configuration window on first call, then prepares hash types and volume state.
+ *
+ * @return -4 if VICS setup fails, -3 if not run from RVS, 3 (XT_PREPARE_CALLPI | XT_PREPARE_CALLPILATE) on success.
+ *
+ * @see determineHashTypes
+ * @see getCaseOptions
+ */
 LONG DLL_EXPORT XT_Prepare(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void* lpReserved)
 {
     if (extractInfo.debugSet){debugWriteDetails(0,L"XT_Prepare Start");}
@@ -274,34 +260,27 @@ LONG DLL_EXPORT XT_Prepare(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void*
     tmpVidCount = 0;
     if (firstTime == 0)
     {
-        //1.50 moved this section to a separate function.
         int firstRun = firstRunSetup();
         firstTime = 1;
         if (firstRun != 0) { return firstRun;}
     }
 
-    //1.50 run volume prepare function
     int result = volumePrepare(hEvidence);
     if (extractInfo.debugSet){debugWriteDetails(0,L"XT_Prepare End");}
     return 0x03;
 }
 
 
-/*Function: XT_ProcessItem
-    Main worker function, first checks that item is of type media
-
-    Then checks if file is excluded as embedded in video file (if option to do so selected)
-
-    Then calls mainItemProcess if its deemed to be a file of interest
-
-    Returns:
-        0 - Always
-        -1 - would stop operation (RVS) - *NEVER RETURNED*
-        -2 - would skip refinement for this item - *NEVER RETURNED*
-
-    See Also:
-        Calls   -   <MainItemProcess>
-*/
+/**
+ * @brief Main worker function called per item during RVS processing.
+ *
+ * Checks whether the item is an exportable media file and calls MainItemProcess if so.
+ *
+ * @return 0 always.
+ *
+ * @see checkItemExport
+ * @see MainItemProcess
+ */
 LONG DLL_EXPORT XT_ProcessItem(LONG nItemID, void* lpReserved)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"XT_ProcessItem Start");}
@@ -316,17 +295,13 @@ LONG DLL_EXPORT XT_ProcessItem(LONG nItemID, void* lpReserved)
 }
 
 
-/*Function: XT_Finalize
-    Function that is invoked at the end of processing an x-ways evidence object (partition for example).
-
-    Resets counters and writes numbers of media extracted from devices to text file.
-
-    Returns:
-        0 - Always
-
-    See Also:
-        Calls   -   None
-*/
+/**
+ * @brief Called at the end of processing an evidence object.
+ *
+ * Resets per-volume counters and writes the media item counts to the results text files.
+ *
+ * @return 0 always.
+ */
 LONG DLL_EXPORT XT_Finalize(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void* lpReserved)
 {
     if (extractInfo.debugSet){debugWriteDetails("XT_Finalize Function Start");}
@@ -350,18 +325,16 @@ LONG DLL_EXPORT XT_Finalize(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void
 }
 
 
-/*Function: XT_Done
-
-    Called by X-Ways before X-Tension is unloaded.
-
-    Call case cleanup and error reporting functions
-
-    Returns:
-        0   - Always
-
-    See Also:
-        Calls   -   <caseCleanup>, <errorReport>
-*/
+/**
+ * @brief Called by X-Ways before the X-Tension is unloaded.
+ *
+ * Triggers case cleanup and error reporting.
+ *
+ * @return 0 always.
+ *
+ * @see caseCleanup
+ * @see errorReport
+ */
 
 LONG DLL_EXPORT XT_Done(void* lpReserved)
 {
@@ -377,25 +350,18 @@ LONG DLL_EXPORT XT_Done(void* lpReserved)
     return 0;
 }
 
-/*Section: Initial Setup Functions
-    This section contains functions that set up information or files required for the extraction.
+// Initial Setup Functions
 
-    This includes creation of XML/VICS files and getting case options
-
-*/
-
-/*Function: firstRunSetup
-    Setup case when X-Tension is first run. Only called on first XT_Prepare call of run.
-
-    Created in 1.50, split from <XT_Prepare>
-
-    Returns:
-        0 - Always
-
-    See Also:
-        Called by   -   <XT_Prepare>
-        Calls       -   <setupVics>, <getCaseOptions>
-*/
+/**
+ * @brief Performs one-time setup on the first XT_Prepare call.
+ *
+ * Initialises the VICS database, reads case options, and identifies report tables.
+ *
+ * @return 0 on success, -4 if VICS setup fails, -3 if getCaseOptions fails.
+ *
+ * @see setupVics
+ * @see getCaseOptions
+ */
 
 int firstRunSetup()
 {
@@ -420,20 +386,15 @@ int firstRunSetup()
 }
 
 
-/*Function: createC4POutput
-    Creates two XML output file locations, one for pictures and the other for videos
-    Files only created if option to export that file type is actually ticked.
-
-    Called from <getCaseOptions>
-
-    Maybe should be included in XML file
-
-    Returns:
-        0 - Always
-
-    See Also:
-        Calls   -   <getCaseOptions>
-*/
+/**
+ * @brief Creates the C4P/C4M XML output files for each evidence object.
+ *
+ * Creates a picture and/or video XML file per evidence name, depending on which export types are enabled.
+ *
+ * @return 0 on success, -1 if a file could not be created.
+ *
+ * @see getCaseOptions
+ */
 int createC4POutput()
 {
     if (extractInfo.debugSet){debugWriteDetails("createC4POutput Function Start");}
@@ -489,26 +450,26 @@ int createC4POutput()
 
 
 
+/**
+ * @brief Builds the evidence-object name list in the VICS database.
+ *
+ * @param evObj X-Ways evidence object handle.
+ * @return 0 always.
+ */
 int createNameList(HANDLE evObj)
 {
     createSQLNameList(vicsDB, evObj);
     return 0;
 }
 
-/*Function: determineHashTypes
-    Function to determine where primary or secondary hash is MD5 or SHA1
-    Stores values in global variables MD5Hash and SHA1Hash
-
-    1 indicates that primary hash relates to that hash type
-
-    2 indicates secondary hash relates that that hash type
-
-    0 indicates that this hash is not computed
-
-    Returns:
-        0 - Always
-
-*/
+/**
+ * @brief Determines which hash slots (primary/secondary) are MD5 or SHA1.
+ *
+ * Stores results in the global variables MD5Hash and SHA1Hash.
+ * 1 = primary slot, 2 = secondary slot, 0 = not computed.
+ *
+ * @return 0 always.
+ */
 
 int determineHashTypes()
 {
@@ -537,18 +498,15 @@ int determineHashTypes()
     return 0;
 }
 
-/*Function: setupResultsFiles
-    Function for managing creation of XML files and debug log if required.
-
-    Called from <getCaseOptions>
-
-    Returns:
-        0 - Function completed successfully
-        1 - Failed to create either Picture or Video output file.
-
-    See Also:
-        <getCaseOptions>
-*/
+/**
+ * @brief Creates the per-run picture and video results text files.
+ *
+ * Also opens the debug log file if debug mode is enabled.
+ *
+ * @return 0 on success, 1 if a file could not be opened.
+ *
+ * @see getCaseOptions
+ */
 
 int setupResultsFiles()
 {
@@ -558,6 +516,7 @@ int setupResultsFiles()
     {
         sprintf(filePath,"%ls Pictures Results.txt",extractInfo.C4PPath);
         picResults=fopen(filePath,"w");
+        if (picResults == NULL) { return 1; }
         filePath[0]='\0';
         if (extractInfo.debugSet)
         {
@@ -576,6 +535,7 @@ int setupResultsFiles()
     {
         sprintf(filePath,"%ls Video Results.txt",extractInfo.C4MPath);
         vidResults=fopen(filePath,"w");
+        if (vidResults == NULL) { return 1; }
         filePath[0]='\0';
         if (extractInfo.debugSet && (!extractInfo.extractPictures))
         {
@@ -594,19 +554,13 @@ int setupResultsFiles()
     return 0;
 }
 
-/*Function: setupVicsExport
-    Function for managing creation of VICS output files
-
-    Called from <getCaseOptions>, should possibly be delayed until generating VICS data
-
-    Returns:
-        0 - Function completed successfully
-        -1 - Failed to create VICS Picture file output
-        -2 - Failed to create VICS Video file output
-
-    See Also:
-        <getCaseOptions>
-*/
+/**
+ * @brief Opens the VICS JSON output files for pictures and/or videos.
+ *
+ * @return 0 on success, -1 if the picture file could not be opened, -2 if the video file could not be opened.
+ *
+ * @see getCaseOptions
+ */
 
 int setupVicsExport()
 {
@@ -641,22 +595,14 @@ int setupVicsExport()
     return 0;
 }
 
-/*Function: getCaseOptions
-    Function for setting up a number of things, only executed in the first run of XT_Prepare (i.e. when program starts).
-
-    Called from <XT_Prepare>
-
-    Returns:
-        0  - Function completed successfully
-        -1 - Failed (generic)
-        -4 - Failed to start process
-
-    See Also:
-        <XT_Prepare>
-        <setupVicsExport>
-        <setupResultsFiles>
-
-*/
+/**
+ * @brief Performs first-run case setup: shows the GUI or processes command-line args, then creates output files.
+ *
+ * @return 0 on success, -1 on generic failure, -4 if the process could not start.
+ *
+ * @see setupVicsExport
+ * @see setupResultsFiles
+ */
 
 int getCaseOptions()
 {
@@ -701,7 +647,6 @@ int getCaseOptions()
             return -4;
         }
     }
-    //1.50 only create if not just ZIP
     else
     {
         char buffer[1024];
@@ -726,7 +671,6 @@ int getCaseOptions()
     {
         XWF_OutputMessage(L"Debug mode on",0);
     }
-    //1.50 moved this to when records are output.
     /*
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
@@ -754,7 +698,6 @@ int getCaseOptions()
             return -1;
         }
     }
-    //1.50 setup zip file
     if (extractInfo.VICSCompressed)
     {
         setArchivePath(extractInfo.C4PPath, SET_PIC_PATH);
@@ -765,19 +708,13 @@ int getCaseOptions()
     return 0;
 }
 
-/*Function: getCommandLineOptions
-    Function for parsing out command line options. If there are none, or not enough to run,
-    options window will be displayed in parent function
-
-    Called from <getCaseOptions>
-
-    Returns:
-        0 - No Arguments or insufficent to process
-        1 - Command line arguments extracted successfully.
-
-    See Also:
-        <getCaseOptions>
-*/
+/**
+ * @brief Parses XTparam command-line arguments into extractInfo.
+ *
+ * @return 0 if no usable arguments found, 1 if arguments were extracted successfully.
+ *
+ * @see getCaseOptions
+ */
 
 int getCommandLineOptions()
 {
@@ -799,6 +736,7 @@ int getCommandLineOptions()
     if (numArgv == 1)
     {
         if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions End - No Args");}
+        LocalFree(argv);
         return 0;
     }
     //check for XTparam
@@ -817,6 +755,7 @@ int getCommandLineOptions()
     if ((extractInfo.C4MPath[0] == L'\0') && (extractInfo.C4PPath[0] == L'\0'))
     {
         if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions End - No paths provided");}
+        LocalFree(argv);
         return 0;
     }
     if (extractInfo.C4PPath[0] == L'\0')
@@ -831,7 +770,6 @@ int getCommandLineOptions()
     {
         extractInfo.createGriffeye = FALSE;
     }
-    //1.50 added check if vicscompressed is set.
     if (extractInfo.VICSCompressed == FALSE)
     {
         extractInfo.C4ALLExport = TRUE;
@@ -842,7 +780,6 @@ int getCommandLineOptions()
         swprintf(extractInfo.nameList[i].prefName,L"%ls",extractInfo.nameList[i].actualName);
         XWF_OutputMessage(extractInfo.nameList[i].prefName,0);
     }
-    //1.39 - need to create a GUID and case reference
     HRESULT error = CoCreateGuid(&vCaseData.caseGuid);
     if (extractInfo.GriffeyeCaseName == NULL)
     {
@@ -850,22 +787,20 @@ int getCommandLineOptions()
         INT64 result = XWF_GetCaseProp(NULL,1,vCaseData.CaseNumber,128);
     }
     extractInfo.processStart = TRUE;
+    LocalFree(argv);
     if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions End - return 1");}
     return 1;
 }
 
-/*Function: addCaseDetail
-    Parses individual command line parameters
-
-    Ensures all paths end with a '\' character.
-
-    Should look at having a function that parses arguments into the 2 sections first (name, value)
-
-    Called from <getCommandLineOptions>
-
-    See Also:
-        <getCommandLineOptions>
-*/
+/**
+ * @brief Parses a single XTparam key:value argument and applies it to extractInfo.
+ *
+ * Paths are normalised to end with a backslash. Unknown keys produce a warning message.
+ *
+ * @param strArg Null-terminated wide string containing one key:value parameter.
+ *
+ * @see getCommandLineOptions
+ */
 
 void addCaseDetail(wchar_t* strArg)
 {
@@ -928,26 +863,22 @@ void addCaseDetail(wchar_t* strArg)
         extractInfo.GriffeyeCaseName[wcslen(strArg)-7] = L'\0';
         XWF_OutputMessage(extractInfo.GriffeyeCaseName,0);
     }
-    //1.41 add option for excluding media from within live videos
     else if (wcsncmp(L"excludeFromVid",strArg,14)==0)
     {
         //set option
         extractInfo.checkParent = true;
     }
-    //1.50 added compressed vics
     else if (wcsncmp(L"compressVICS",strArg,12)==0){
         extractInfo.C4ALLExport = false;
         extractInfo.VICExport = false;
         extractInfo.VICSCompressed = true;
     }
-    //1.51 added custom griffeye settings file
-    else if (wcsncmp(L"grfset",strArg,7)==0){
+    else if (wcsncmp(L"grfset",strArg,6)==0){
         extractInfo.GriffeyeSettingsName = new wchar_t[wcslen(strArg)];
         memcpy(extractInfo.GriffeyeSettingsName,(wchar_t*)strArg+7,(wcslen(strArg)-7) * sizeof(wchar_t));
         extractInfo.GriffeyeSettingsName[wcslen(strArg)-7] = L'\0';
-        XWF_OutputMessage(extractInfo.GriffeyeCaseName,0);
+        XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
     }
-    //1.51 added excluding thumbnail options
     else if (wcsncmp(L"exthmbs",strArg,7)==0){
         extractInfo.ignoreThumbs = TRUE;
     }
@@ -962,23 +893,18 @@ void addCaseDetail(wchar_t* strArg)
     if (extractInfo.debugSet){debugWriteDetails(0, L"addCaseDetail End");}
 }
 
-/* Section: Volume Setup Functions
-    Functions each time the X-Tension moves to a new volume
-*/
+// Volume Setup Functions
 
-/*Function: volumePrepare
-
-    Function to prepare for run over next volume.
-
-    Added in version 1.50, split from XT_Prepare
-
-    Returns:
-        0 - Always
-
-    See Also:
-        <XT_Prepare>
-
-*/
+/**
+ * @brief Prepares state for the next volume being processed.
+ *
+ * Resolves the current evidence object's output file handles, counters, and source ID.
+ *
+ * @param hEvidence Handle to the X-Ways evidence object for this volume.
+ * @return 0 always.
+ *
+ * @see XT_Prepare
+ */
 
 int volumePrepare(HANDLE hEvidence)
 {
@@ -1003,7 +929,6 @@ int volumePrepare(HANDLE hEvidence)
         picCount = extractInfo.outputFiles[fileNumber].picCounter;
         vidCount = extractInfo.outputFiles[fileNumber].vidCounter;
     }
-    //1.50 added check if C4All XML export selected
     if (((currPicFile==NULL && extractInfo.extractPictures) ||
          (currVidFile == NULL && extractInfo.extractVideos))
         && (extractInfo.C4ALLExport))
@@ -1032,20 +957,13 @@ int volumePrepare(HANDLE hEvidence)
     return 0;
 }
 
-/*Function: determineColumnNumber
-    Function to locate the ID of a column, given the name as a wchar_t* parameter
+/**
+ * @brief Returns the column index whose title matches the supplied wide string.
+ *
+ * @param compareStr Null-terminated column title to search for.
+ * @return Column index (>=0) if found, -1 if not located.
+ */
 
-    Wide character string should be NULL terminated
-
-    Added in version 1.41
-
-    Returns:
-        >0 - ID of the column that matches provided text
-        -1 - column not located
-
-*/
-
-//1.41 to be used to get device type column
 int determineColumnNumber(wchar_t* compareStr)
 {
     if (extractInfo.debugSet){debugWriteDetails(0,L"determineColumnNumber Start");}
@@ -1070,25 +988,17 @@ int determineColumnNumber(wchar_t* compareStr)
     return -1;
 }
 
-/* Section: Main Processing
-    Functions used by the processing of items, generally the functions that will be called once when processing a media item
-*/
+// Main Processing
 
-/*Function: checkParentType
-    Function to check if parent type is a video file.
+/**
+ * @brief Checks whether the parent item is a signature-confirmed video file.
+ *
+ * Used to exclude embedded frames or sub-videos from extraction.
+ *
+ * @param nItemID X-Ways item ID of the child item to check.
+ * @return 1 if the parent is a confirmed video, 0 otherwise.
+ */
 
-    This function is used to exclude pictures and videos that are embedded in live videos
-    This includes extracted frames or sub videos, to prevent issues with numbers in grading tools.
-
-    Added in version 1.40
-
-    Returns:
-        0 - parent is not a video file or not confirmed as such
-        1 - parent is a Video file with file signature confirmation
-
-*/
-
-//1.40 new function for checking if file is in live video
 int checkParentType(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkParentType Start");}
@@ -1123,22 +1033,16 @@ int checkParentType(LONG nItemID)
     return 1;
 }
 
-/*Function: checkItemType
-    Function to check the type of an item. nItemID and an int* named picture passed as parameters
-
-    nItemID is the internal item ID of the object being checked
-
-    picture parameter indicates where media is picture or not. Picture is set to 1 if item is a picture
-
-    Generally speaking it checks that the category of the file is either a picture or a video
-
-    In version 1.38, a check was added to include Flash videos, which are included in the Internet category
-
-    Returns:
-        TYPE_MEDIA - Item is a media type
-        TYPE_OTHER - Item is not a media item
-
-*/
+/**
+ * @brief Determines whether an item is a picture or video (or neither).
+ *
+ * Sets @p picture to 1 if the item is a picture, 0 if it is a video. Macromedia Flash items
+ * in the Internet category are treated as video.
+ *
+ * @param nItemID  X-Ways item ID.
+ * @param picture  Output: 1 for picture, 0 for video.
+ * @return TYPE_MEDIA if item is a media file, TYPE_OTHER if not.
+ */
 
 int checkItemType(LONG nItemID, int* picture)
 {
@@ -1155,11 +1059,8 @@ int checkItemType(LONG nItemID, int* picture)
     }
     if (!(((wcscmp(type,(LPWSTR)L"Pictures")==0) && extractInfo.extractPictures)||((wcscmp(type,(LPWSTR)L"Video")==0) && extractInfo.extractVideos)))
     {
-        //not something we are interested in.
-        //1.38 add check here for flash videos Type Internet Type Description "Macromedia Flash [Certain potentially relevant types]"
         if (wcscmp(type,(LPWSTR)L"Internet")==0)
         {
-            //1.38 get description of file type, not category
             long descLen = 0x20000080;
             wchar_t descr[128]={0};
             LONG retVal = XWF_GetItemType(nItemID,(wchar_t*)&descr,descLen);
@@ -1191,18 +1092,14 @@ int checkItemType(LONG nItemID, int* picture)
     return TYPE_MEDIA;
 }
 
-/*Function: validFileSize
-    Function to determine if size is within required range
-
-    Added in version 1.50 as part of request to exclude small files (set by user).
-
-    Returns:
-        true    - File within valid size range
-        false   - File outside valid size range
-
-    See Also:
-        Called from <MainItemProcess>
-*/
+/**
+ * @brief Returns true if the file size falls within the user-configured min/max range.
+ *
+ * @param opt      Current extraction options containing the size limits.
+ * @param fileSize File size in bytes.
+ * @param picture  1 if picture limits apply, 0 for movie limits.
+ * @return true if within range, false otherwise.
+ */
 
 bool validFileSize(ExtractOptions opt, INT64 fileSize, int picture)
 {
@@ -1231,6 +1128,13 @@ bool validFileSize(ExtractOptions opt, INT64 fileSize, int picture)
 }
 
 
+/**
+ * @brief Returns true if the item is a recognised media type (picture or video).
+ *
+ * @param nItemID  X-Ways item ID.
+ * @param picture  Output: 1 if picture, 0 if video.
+ * @return true if the item is a media file, false otherwise.
+ */
 bool validType(LONG nItemID, int* picture)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"validType - Start");}
@@ -1261,6 +1165,15 @@ bool validType(LONG nItemID, int* picture)
     return true;
 }
 
+/**
+ * @brief Returns true if the item is a thumbnail embedded within a picture file.
+ *
+ * When the exceptMismatch option is set, items associated with a mismatch report table
+ * are exempted and returned as false (i.e. included in extraction).
+ *
+ * @param nItemID X-Ways item ID.
+ * @return true if the item should be excluded as a thumbnail, false otherwise.
+ */
 bool isThumbnailObject(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - Start of Function");}
@@ -1288,13 +1201,18 @@ bool isThumbnailObject(LONG nItemID)
             }
         }
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return True");}
-        else{return true;}
+        return true;
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return False");}
     return false;
 }
 
-//1.51 added new function to check file type status is one user selected.
+/**
+ * @brief Returns true if the item's file type status matches the user-selected flags.
+ *
+ * @param nItemID X-Ways item ID.
+ * @return true if the type status is one the user has chosen to include, false otherwise.
+ */
 bool isSelectedFileTypeStatus(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isSelectedFileTypeStatus - Start of Function");}
@@ -1335,7 +1253,12 @@ bool isSelectedFileTypeStatus(LONG nItemID)
     return true;
 }
 
-//1.51 added new function to check file type status is one user selected.
+/**
+ * @brief Returns true if the item's file format/consistency status matches the user-selected flags.
+ *
+ * @param nItemID X-Ways item ID.
+ * @return true if the format status is one the user has chosen to include, false otherwise.
+ */
 bool isSelectedFileFormatStatus(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isSelectedFileFormatStatus - Start of Function");}
@@ -1368,27 +1291,24 @@ bool isSelectedFileFormatStatus(LONG nItemID)
     return true;
 }
 
-/*Function: checkItemExport
-    Function for determining whether item is exported
-
-    Added in 1.50 to put all checks in same function
-
-    Called from <XT_ProcessItem>
-
-    Returns:
-        True - item to be exported
-        False - item to be ignored
-
-    See Also:
-        <XT_ProcessItem>
-*/
+/**
+ * @brief Runs all exclusion checks and returns true if the item should be exported.
+ *
+ * Checks type, parent type, file size, thumbnail status, type status, and format consistency.
+ *
+ * @param nItemID   X-Ways item ID.
+ * @param picture   Output: 1 if picture, 0 if video.
+ * @param fileSize  Output: file size in bytes.
+ * @return true if the item should be exported, false if it should be skipped.
+ *
+ * @see XT_ProcessItem
+ */
 
 bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemExport - Start of Function");}
     if (!validType(nItemID,picture)) {return false;}
 
-    //1.40 need to add a check to see if parent file is a video
     if (extractInfo.checkParent){
         int result = checkParentType(nItemID);
         if (result != 0)
@@ -1403,13 +1323,10 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
         errorRaised(nItemID,REPORT_UNKNOWN_FILESIZE);
         return false;
     }
-    //1.50 check if valid size
     if (!validFileSize(extractOpt,*fileSize,*picture)){
-        //1.50 add excluded on filesize
         errorRaised(nItemID,REPORT_EXCLUDED_FILESIZE);
         return false;
     }
-    //1.50 new feature to exclude thumbnails
     if (extractInfo.ignoreThumbs)
     {
         if (isThumbnailObject(nItemID)) {
@@ -1417,7 +1334,6 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
             return false;
         }
     }
-    //1.51 new ability to filter out based on file consistency and status
     if (!isSelectedFileTypeStatus(nItemID))
     {
         errorRaised(nItemID,REPORT_EXCLUDED_TYPESTATUS);
@@ -1434,23 +1350,18 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
 
 
 
-/*Function: MainItemProcess
-    Main function for processing items
-
-    Gets hash values for files using <returnHashValue>
-
-    Write the output file using <writeOutputFile>
-
-    Then writes the XML/VICS details (as appropriate) using <UpdateRecords> function
-
-    Returns:
-        0 - Always
-
-    See Also:
-        <returnHashValue>
-        <writeOutputFile>
-        <UpdateRecords>
-*/
+/**
+ * @brief Retrieves hash values and writes output records for a qualifying media item.
+ *
+ * @param nItemID  X-Ways item ID.
+ * @param picture  1 if picture, 0 if video.
+ * @param fileSize File size in bytes.
+ * @return 0 always.
+ *
+ * @see returnHashValue
+ * @see writeOutputFile
+ * @see UpdateRecords
+ */
 
 LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
 {
@@ -1460,7 +1371,6 @@ LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
     int result = returnHashValue(nItemID,(wchar_t*)&currHash.MD5,(wchar_t*)&currHash.SHA1,(wchar_t*)&currHash.photoDNA);
     if (result == 0)
     {
-        //1.50 changed to switch whether compressed output or not.
         if (extractInfo.VICExport || extractInfo.C4ALLExport){
             int result = writeOutputFile(nItemID,picture,currHash.MD5,fileSize, hdlCurrVol);
             if (result != SUCCESS) {return 0;}
@@ -1485,83 +1395,74 @@ LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
     return 0;
 }
 
-/*Function: UpdateRecords
-    Function for managing creation of XML/VICS records. Called from <MainItemProcess>
-
-    Calls <createC4AllRecord> is XML output is selected and <createVICSRecord> if VICS output selected
-
-    Increments counters for pictures and videos after record updates
-
-    Returns:
-        0 - Always
-
-    See Also:
-        <MainItemProcess>
-*/
+/**
+ * @brief Creates XML and/or VICS database records for a processed media item and increments counters.
+ *
+ * @param picture   1 if picture, 0 if video.
+ * @param nItemID   X-Ways item ID.
+ * @param currHash  Hash values for the item.
+ * @return 0 always.
+ *
+ * @see MainItemProcess
+ */
 
 int UpdateRecords(int picture, long nItemID, hashValueStruct currHash)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"UpdateRecords Start");}
-	//we now have hash values!!!!
-	if (extractInfo.C4ALLExport)
-	{
-		lockC4All.lock();
-		createC4AllRecord(nItemID,picture,currHash.MD5);
-		lockC4All.unlock();
-	}
-	// code for finding VICS record ID
-	if (extractInfo.VICExport || extractInfo.VICSCompressed)
-	{
-		lockVics.lock();
-		createVICSRecord(nItemID,picture,currHash);
-		lockVics.unlock();
-	}
-	updateLock.lock();
-	if (picture == 1)
-	{
-		pictureCount++;
-		tmpPicCount++;
-	}
-	else
-	{
-		tmpVidCount++;
-		movieCount++;
-	}
-	updateLock.unlock();
-	if (extractInfo.debugSet){debugWriteDetails(nItemID, L"UpdateRecords End");}
-	return 0;
+    if (extractInfo.C4ALLExport)
+    {
+        lockC4All.lock();
+        createC4AllRecord(nItemID,picture,currHash.MD5);
+        lockC4All.unlock();
+    }
+    if (extractInfo.VICExport || extractInfo.VICSCompressed)
+    {
+        lockVics.lock();
+        createVICSRecord(nItemID,picture,currHash);
+        lockVics.unlock();
+    }
+    updateLock.lock();
+    if (picture == 1)
+    {
+        pictureCount++;
+        tmpPicCount++;
+    }
+    else
+    {
+        tmpVidCount++;
+        movieCount++;
+    }
+    updateLock.unlock();
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"UpdateRecords End");}
+    return 0;
 }
 
-/*Function: createGriffeyeCase
-    Function for creating Griffeye case. Adds pictures then Videos
-
-    Needs amending to allow addition to existing case, this requires --add source to be included in argument
-
-    Given that --add-source is a case level argument, assume it only needs including once.
-    Should have a function that checks if the case already exists in that path and therefore requires the --add-source flag.
-
-    Possibly need to look at issues relating to Unicode characters in path name
-
-    Called from <caseCleanup>
-
-    See Also:
-        Called from -   <caseCleanup>
-        Calls       -   <DirExistsW>
-*/
-
+/**
+ * @brief Detects which Griffeye CLI executable is present in the configured Griffeye folder.
+ *
+ * @param folder Wide string path to the Griffeye installation directory.
+ * @return Filename of the found executable, or NULL if neither is present.
+ */
 static const char* detectGriffeyeExe(const wchar_t* folder)
 {
     char narrowFolder[MAX_PATH];
     snprintf(narrowFolder, MAX_PATH, "%ls", folder);
     bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
     char check[MAX_PATH];
-    sprintf(check, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
+    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
     if (FILE* f = fopen(check, "r")) { fclose(f); return "analyze-cli.exe"; }
-    sprintf(check, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
+    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
     if (FILE* f = fopen(check, "r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
     return NULL;
 }
 
+/**
+ * @brief Launches the Griffeye CLI to import VICS results into a new or existing case.
+ *
+ * @return 0 on success, 1 if the Griffeye executable was not found or CreateProcess failed.
+ *
+ * @see caseCleanup
+ */
 int createGriffeyeCase()
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"createGriffeyeCase Start");}
@@ -1573,12 +1474,11 @@ int createGriffeyeCase()
     }
     char cmdOutput[8192];
     char tempString[1024];
-    sprintf(cmdOutput,"\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
+    snprintf(cmdOutput,sizeof(cmdOutput),"\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
     int sourceNo = 1;
 
-    //1.41 add option to add to existing case
     wchar_t path[32768] ={0};
-    snwprintf(path,32768,L"%ls\\%ls\\%ls.ANCF",extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName,extractInfo.GriffeyeCaseName);
+    swprintf(path,32768,L"%ls\\%ls\\%ls.ANCF",extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName,extractInfo.GriffeyeCaseName);
     if (ifFileExistsW((wchar_t*)&path))
     {
         strncat(cmdOutput, " --add-source",8191);
@@ -1586,23 +1486,20 @@ int createGriffeyeCase()
 
     if (extractInfo.extractPictures)
     {
-        //1.41 use temp string an concatenate
         tempString[0] = '\0';
-        sprintf(tempString," --source-id source%d --source-path \"%lsVICS_Pictures_Results.json\" --source-type vics --include-vics-data all",sourceNo++,extractInfo.C4PPath);
+        snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Pictures_Results.json\" --source-type vics --include-vics-data all",sourceNo++,extractInfo.C4PPath);
         strncat(cmdOutput,tempString,8191);
     }
     if (extractInfo.extractVideos)
     {
-        //1.41 use temp string an concatenate
         tempString[0] = '\0';
-        sprintf(tempString," --source-id source%d --source-path \"%lsVICS_Movies_Results.json\" --source-type vics --include-vics-data all", sourceNo++,extractInfo.C4MPath);
+        snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Movies_Results.json\" --source-type vics --include-vics-data all", sourceNo++,extractInfo.C4MPath);
         strncat(cmdOutput,tempString,8191);
     }
-    //1.51 added use of settings file
     if (extractInfo.GriffeyeSettingsName != nullptr)
     {
         tempString[0] = '\0';
-        sprintf(tempString," --import-settings-file %ls", extractInfo.GriffeyeSettingsName);
+        snprintf(tempString,sizeof(tempString)," --import-settings-file %ls", extractInfo.GriffeyeSettingsName);
         strncat(cmdOutput,tempString,8191);
     }
     XWF_OutputMessage((wchar_t*)cmdOutput,4);
@@ -1627,22 +1524,13 @@ int createGriffeyeCase()
     return 0;
 }
 
-/*Function: caseCleanup
-
-    Called when XT_Done called (at end of run)
-
-    Used to clean up files and perform end of run jobs. This includes output of VICS data and Griffeye case creation
-
-    Appears database is never output, need to check why.
-
-    Called from <XT_Done>
-
-    Returns:
-        0   - Always
-
-    See Also:
-        <XT_Done>
-*/
+/**
+ * @brief Performs end-of-run cleanup: closes output files, writes VICS records, and launches Griffeye.
+ *
+ * @return 0 always.
+ *
+ * @see XT_Done
+ */
 
 int caseCleanup()
 {
@@ -1661,38 +1549,35 @@ int caseCleanup()
         }
         firstTime = 0;
     }
-    //1.50 moved here for when C4All not selected.
-    fclose(picResults);
-    fclose(vidResults);
+    if (picResults) { fclose(picResults); picResults = NULL; }
+    if (vidResults) { fclose(vidResults); vidResults = NULL; }
     if (extractInfo.debugSet)
     {
         endDebugLog();
     }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
-        int errChk = outputVICSFile();
+        outputVICSFile();
     }
     //used for debug
     if (extractInfo.debugSet)
     {
         char sqlOutputPath[4096]= {0};
         sprintf(sqlOutputPath,"%ls%ls",extractOpt.errorReportPath, caseTitle);
-        //1.41 changed to function in utility module rather than seperate function.
         if (!DirExists(sqlOutputPath))
         {
             CreateDirectory(sqlOutputPath,NULL);
         }
         //sprintf(sqlOutputPath,"%s\\errorOutput.sqlite",sqlOutputPath);
         //this is not called?
-        strncat(sqlOutputPath,"\\errorOutput.sqlite",4095); //1.37 change
+        strncat(sqlOutputPath,"\\errorOutput.sqlite",4095);
         loadOrSaveDb(vicsDB,sqlOutputPath,1);
     }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
         sqlite3_close(vicsDB);
-        fclose(vicPicFile);
-        fclose(vicMovieFile);
-        //1.50 add to zip file
+        if (vicPicFile)   { fclose(vicPicFile);   vicPicFile   = NULL; }
+        if (vicMovieFile) { fclose(vicMovieFile);  vicMovieFile = NULL; }
         if (extractInfo.VICSCompressed)
         {
             char filePath[2048]={0};
@@ -1722,7 +1607,6 @@ int caseCleanup()
         delete[] extractInfo.nameList;
         extractInfo.nameList = NULL;
     }
-    //1.50 close zip archives
     if (extractInfo.VICSCompressed)
     {
         closeZipArchives();
@@ -1752,35 +1636,18 @@ int caseCleanup()
     return 0;
 }
 
-/*Section: Hash Value Functions*/
+// Hash Value Functions
 
-/*Function: getHashValue
-
-    Function that gets hash value of a file of nItemID.
-
-    If the forced flag is set, it will tell X-Ways to generate the hash value if it has not been computed.
-
-    Parameters:
-
-        LONG nItemID            - X-Ways item ID that the function will get the hash value for
-
-        wchar_t* hashValue      - buffer to contain the extracted hash value
-
-        int hashSize            - size in bytes of the hash type being extracted
-
-        int hashNumber          - Type of hash to be extracted (1 = primary, 2 = secondary, 3 = PhotoDNA)
-
-        BOOL forced             - Flag to state whether function should force X-Ways to compute a hashvalue if it hasn't already
-
-    Returns:
-        0       -   Success
-        1       -   Error getting the hash value for this item
-
-
-    See Also:
-        Called by   -   <returnHashValue>, <getSingleHash>, <forceHashes>
-
-*/
+/**
+ * @brief Retrieves a hash value for the specified item from X-Ways.
+ *
+ * @param nItemID    X-Ways item ID.
+ * @param hashValue  Output buffer for the hex hash string.
+ * @param hashSize   Number of hex characters expected (32 for MD5, 40 for SHA1, 144 for PhotoDNA).
+ * @param hashNumber Hash slot: 1 = primary, 2 = secondary, 3 = PhotoDNA.
+ * @param forced     If TRUE, instructs X-Ways to compute the hash if not already done.
+ * @return 0 on success, 1 on failure.
+ */
 
 int getHashValue(LONG nItemID, wchar_t* hashValue, int hashSize, int hashNumber, BOOL forced)
 {
@@ -1827,32 +1694,17 @@ int getHashValue(LONG nItemID, wchar_t* hashValue, int hashSize, int hashNumber,
     return 0;
 }
 
-/*Function: getSingleHash
-
-    Function that gets a single hash value of a file of nItemID, either MD5 or SHA1.
-
-    Calls getHashValue without forced flag
-
-    Parameters:
-
-        LONG nItemID            - X-Ways item ID that the function will get the hash value for
-
-        wchar_t* md5buffer      - buffer to contain the MD5 hash value
-
-        wchar_t* SHA1buffer     - buffer to contain the SHA1 hash value
-
-        int hashType            - Type of hash to be extracted (MD5Hash or SHA1Hash)
-
-    Returns:
-        0       -   Success
-        1       -   Error getting the hash value for this item
-
-
-    See Also:
-        Called by   -   <returnHashValue>
-        Calls       -   <getHashValue>
-
-*/
+/**
+ * @brief Reads a pre-computed primary or secondary hash (without forcing computation).
+ *
+ * @param nItemID    X-Ways item ID.
+ * @param md5Buffer  Output buffer for the MD5 hex string.
+ * @param SHA1Buffer Output buffer for the SHA1 hex string.
+ * @param hashType   Hash slot to read (1 = primary, 2 = secondary).
+ * @return 0 on success, 1 on failure.
+ *
+ * @see getHashValue
+ */
 
 int getSingleHash(LONG nItemID,wchar_t* md5Buffer, wchar_t* SHA1Buffer, int hashType)
 {
@@ -1876,47 +1728,29 @@ int getSingleHash(LONG nItemID,wchar_t* md5Buffer, wchar_t* SHA1Buffer, int hash
     return 0;
 }
 
-/*Function: forceHashes
-
-    Function that gets a single hash value of a file of nItemID, either MD5 or SHA1.
-
-    Calls getHashValue with forced flag
-
-    Parameters:
-
-        LONG nItemID            - X-Ways item ID that the function will get the hash value for
-
-        wchar_t* md5buffer      - buffer to contain the MD5 hash value
-
-        wchar_t* SHA1buffer     - buffer to contain the SHA1 hash value
-
-        int md5Type             - 0 if MD5 hash not to be extracted, any other value otherwise
-
-        int sha1Type            - 0 if SHA1 hash not to be extracted, any other value otherwise
-
-    Returns:
-        0       -   Success
-        1       -   Error getting the hash value for this item
-
-
-    See Also:
-        Called by   -   <returnHashValue>
-        Calls       -   <getHashValue>
-
-*/
+/**
+ * @brief Forces X-Ways to compute and return a hash for an item that has not yet been hashed.
+ *
+ * @param nItemID    X-Ways item ID.
+ * @param md5Buffer  Output buffer for the MD5 hex string.
+ * @param SHA1Buffer Output buffer for the SHA1 hex string.
+ * @param md5Type    Non-zero if MD5 should be forced.
+ * @param sha1Type   Non-zero if SHA1 should be forced.
+ * @return 0 on success, 1 on failure.
+ *
+ * @see getHashValue
+ */
 
 int forceHashes(LONG nItemID,wchar_t* md5Buffer, wchar_t* SHA1Buffer, int md5Type,int sha1Type)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"forceHashes Start");}
     //check if
     int checkVal = 0;
-    //1.41 changed from MD5Hash to md5Type
     if (md5Type !=0)
     {
         //this is primary hash
         checkVal = getHashValue(nItemID,md5Buffer,32,MD5Hash,true);
     }
-    //1.41 changed from SHA1Hash to sha1Type
     else if (sha1Type != 0)
     {
         checkVal = getHashValue(nItemID,SHA1Buffer,40,SHA1Hash,true);
@@ -1930,32 +1764,18 @@ int forceHashes(LONG nItemID,wchar_t* md5Buffer, wchar_t* SHA1Buffer, int md5Typ
     return 0;
 }
 
-/*Function: returnHashValue
-
-    Function that returns MD5, SHA1 and PhotoDNA hashes (if computed)
-
-    Parameters:
-
-        LONG nItemID            - X-Ways item ID that the function will get the hash value for
-
-        wchar_t* md5buffer      - buffer to contain the MD5 hash value
-
-        wchar_t* SHA1buffer     - buffer to contain the SHA1 hash value
-
-        int md5Type             - 0 if MD5 hash not to be extracted, any other value otherwise
-
-        int sha1Type            - 0 if SHA1 hash not to be extracted, any other value otherwise
-
-    Returns:
-        0       -   Success
-        1       -   Error getting the hash value for this item
-
-
-    See Also:
-        Called by   -   <MainItemProcess>
-        Calls       -   <getSingleHash>, <forceHashes>
-
-*/
+/**
+ * @brief Returns MD5, SHA1, and PhotoDNA hashes for an item, forcing computation if needed.
+ *
+ * @param nItemID    X-Ways item ID.
+ * @param md5Buffer  Output buffer for the MD5 hex string.
+ * @param SHA1Buffer Output buffer for the SHA1 hex string.
+ * @param PDNABuffer Output buffer for the base64-encoded PhotoDNA string.
+ * @return 0 on success, non-zero if a required hash could not be retrieved.
+ *
+ * @see getSingleHash
+ * @see forceHashes
+ */
 
 int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar_t* PDNABuffer)
 {
@@ -1999,7 +1819,6 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         {
             //still failed
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"GetFileDetails - No hash computed for file");}
-            //1.38 changed to add to report table
             errorRaised(nItemID,REPORT_NOHASH);
             xwfOutputLock.lock();
             recordError(vicsDB, ERROR_HASH_NOT_COMPUTED,nItemID,L"No hash computed for item");
@@ -2031,25 +1850,15 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
 
 }
 
-/* Section: Writing VICS records*/
+// Writing VICS records
 
-/*Function: outputVICSFile
-
-    Function for writing VICS records to file.
-
-    1.41 fix - Made a check to ensure that only attempt to write files that re selected (i.e. pictures or videos)
-
-    Called from <caseCleanup>
-
-    Returns:
-        0   - Success
-        1   - Error writing picture files
-        2   - Error writing Video files
-        3   - Error writing both Picture and Video files
-
-    See Also:
-        <caseCleanup>
-*/
+/**
+ * @brief Writes all accumulated VICS records to the JSON output files.
+ *
+ * @return 0 on success, 1 if picture write failed, 2 if video write failed, 3 if both failed.
+ *
+ * @see caseCleanup
+ */
 
 int outputVICSFile()
 {
@@ -2063,7 +1872,6 @@ int outputVICSFile()
     retVal = setupVicsExport();
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
-        //1.41 add check for each media type
         if (extractInfo.extractPictures)
         {
             int check = writeRecords(vicsDB,vicPicFile, 1);
@@ -2073,7 +1881,6 @@ int outputVICSFile()
                 retVal = retVal | 0x01;
             }
         }
-        //1.41 add check for each media type
         if (extractInfo.extractVideos)
         {
             int check = writeRecords(vicsDB,vicMovieFile, 0);
@@ -2093,23 +1900,15 @@ int outputVICSFile()
     return retVal;
 }
 
-/*Function: writeSQLMediaRecord
-
-    Function that creates a VICS media record and calls functions to insert record into SQLite database
-
-    Parameters:
-
-        LONG nItemID                - X-Ways item ID that the media file relates to
-
-        hashValueStruct* hashVals   - Structure containing hash values for item
-
-        int picture                  - Flag indicating whether file is a picture
-
-    See Also:
-        Called by   -   <createVICSRecord>
-        Calls       -   <generateRelativeFilePathVICS>, <insertMediaRecord>, <deallocateMediaRecord>
-
-*/
+/**
+ * @brief Inserts a VICS media hash record into the SQLite database.
+ *
+ * @param nItemID   X-Ways item ID.
+ * @param hashVals  Hash values for the item.
+ * @param picture   1 if picture, 0 if video.
+ *
+ * @see createVICSRecord
+ */
 
 void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
 {
@@ -2147,11 +1946,14 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
 }
 
 
-/*Function: getPhysicalOffset
-
-    Function that gets a Physical Offset to a file, given an ItemID.
-
-*/
+/**
+ * @brief Returns the physical byte offset of an item.
+ *
+ * @param nItemID    X-Ways item ID.
+ * @param unallocated Output: set to true if the item is in unallocated space.
+ * @param deleted     Output: set to true if the item has no file record.
+ * @return Physical offset in bytes, or 0 if not available.
+ */
 
 INT64 getPhysicalOffset(DWORD nItemID, BOOL* unallocated, BOOL* deleted)
 {
@@ -2167,7 +1969,6 @@ INT64 getPhysicalOffset(DWORD nItemID, BOOL* unallocated, BOOL* deleted)
         *unallocated = true;
         retValue = PhysOffset * -1;
     }
-    //1.53 0 represents an error, 0xFFFFFFFF indicates Not available.
     else if(PhysOffset == 0 || PhysOffset == 0xFFFFFFFF)
     {
         retValue = 0;
@@ -2180,6 +1981,12 @@ INT64 getPhysicalOffset(DWORD nItemID, BOOL* unallocated, BOOL* deleted)
     return retValue;
 }
 
+/**
+ * @brief Returns the physical byte offset of an item without setting deleted/unallocated flags.
+ *
+ * @param nItemID X-Ways item ID.
+ * @return Physical offset in bytes, or 0 if not available.
+ */
 INT64 getPhysicalOffset(DWORD nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getPhysicalOffset Start");}
@@ -2192,7 +1999,6 @@ INT64 getPhysicalOffset(DWORD nItemID)
         //no file record, can't be live. Set deleted and Unallocated flags
         retValue = PhysOffset * -1;
     }
-    //1.53 0 represents an error, 0xFFFFFFFF indicates Not available.
     else if(PhysOffset == 0 || PhysOffset == 0xFFFFFFFF)
     {
         retValue = 0;
@@ -2206,8 +2012,16 @@ INT64 getPhysicalOffset(DWORD nItemID)
 }
 
 
-//1.51 created a seperate function for getting dates
-
+/**
+ * @brief Reads a file timestamp from X-Ways and stores it in a FILETIME struct.
+ *
+ * Timestamps that exceed a sanity threshold are treated as invalid and left unchanged.
+ *
+ * @param timeValue Output FILETIME to populate.
+ * @param nItemID   X-Ways item ID.
+ * @param time_type X-Ways time info index (32=created, 33=written, 34=accessed).
+ * @return 0 always.
+ */
 int getFileTimestamp(FILETIME* timeValue, long nItemID, int time_type)
 {
     INT64 timeTmp = 0;
@@ -2234,6 +2048,13 @@ int getFileTimestamp(FILETIME* timeValue, long nItemID, int time_type)
     return 0;
 }
 
+/**
+ * @brief Returns true if the item has a deleted status in X-Ways.
+ *
+ * @param nItemID     X-Ways item ID.
+ * @param unallocated Output: set to TRUE if the item is in unallocated space (deletion code 5).
+ * @return true if deleted, false if live.
+ */
 bool getDeletedStatus(long nItemID, BOOL* unallocated)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getDeletedStatus Start");}
@@ -2247,7 +2068,6 @@ bool getDeletedStatus(long nItemID, BOOL* unallocated)
     else
     {
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getDeletedStatus return true");}
-        //1.54 added unallocated flag to check
         if (delStatus == 5)
         {
             *unallocated = true;
@@ -2259,6 +2079,14 @@ bool getDeletedStatus(long nItemID, BOOL* unallocated)
         return true;
     }
 }
+/**
+ * @brief Retrieves the item filename from X-Ways and stores it in a VICSMediaFile record.
+ *
+ * Falls back to "-noName-" if the filename is empty. Removes invalid characters in-place.
+ *
+ * @param nItemID X-Ways item ID.
+ * @param record  Output record whose fileName field is populated.
+ */
 void getItemFileName(long nItemID, VICSMediaFile* record)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getItemFileName Start");}
@@ -2288,25 +2116,17 @@ void getItemFileName(long nItemID, VICSMediaFile* record)
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getItemFileName End");}
 }
 
-/*Function: extractMediaFileRecordDetails
-
-    Function that creates a VICS media record and calls functions to insert record into SQLite database
-
-    Parameters:
-
-        LONG nItemID                - X-Ways item ID that the media file relates to
-
-        wchar_t* MD5Hash            - Pointer to Wide character String that contains MD5 hash value
-
-        int picture                 - Flag indicating whether file is a picture
-
-        VICSMediaFile* record       - Pointer to a VICSMediaFile struct that details will be stored in
-
-    See Also:
-        Called by   -   <createVICSRecord>
-        Calls       -   <insertMediaFileRecord>, <deallocateMediaFileRecord>, <extractMediaFileRecordDetails>
-
-*/
+/**
+ * @brief Populates a VICSMediaFile record with metadata for the given item.
+ *
+ * @param nItemID  X-Ways item ID.
+ * @param MD5Hash  MD5 hex string for the item.
+ * @param picture  1 if picture, 0 if video.
+ * @param record   Output struct to populate.
+ * @return 0 always.
+ *
+ * @see createVICSRecord
+ */
 
 int extractMediaFileRecordDetails(LONG nItemID,wchar_t MD5Hash[33], int picture, VICSMediaFile* record)
 {
@@ -2321,46 +2141,33 @@ int extractMediaFileRecordDetails(LONG nItemID,wchar_t MD5Hash[33], int picture,
         record->filePath = new wchar_t[16];
         wcscpy(record->filePath,L"Error");
     }
-    //1.51 getting filename is own function
     getItemFileName(nItemID,record);
     //MAC times
-    //1.51 used specific function instead
     getFileTimestamp(&record->created,nItemID,32);
     getFileTimestamp(&record->written,nItemID,33);
     getFileTimestamp(&record->accessed,nItemID,34);
     //get deleted status
-    //1.51 moved to own function
     record->deleted = getDeletedStatus(nItemID, &record->unallocated);
     //getPhysical Sector
-    //1.50 moved into function
     record->physicalLocation = getPhysicalOffset(nItemID,&record->unallocated,&record->deleted);
     //add source
     record->sourceID = new wchar_t[128];
     record->sourceID[0] = L'\0';
     swprintf(record->sourceID,L"%ls",currSrcID);
-    //1.50 add itemid to record
     record->XWFitemID = nItemID;
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"extractMediaFileRecordDetails End");}
     return 0;
 }
 
-/*Function: writeSQLMediaFileRecord
-
-    Function that creates a VICS media record and calls functions to insert record into SQLite database
-
-    Parameters:
-
-        LONG nItemID                - X-Ways item ID that the media file relates to
-
-        wchar_t* MD5Hash            - Pointer to Wide character String that contains MD5 hash value
-
-        in picture                  - Flag indicating whether file is a picture
-
-    See Also:
-        Called by   -   <createVICSRecord>
-        Calls       -   <insertMediaFileRecord>, <deallocateMediaFileRecord>, <extractMediaFileRecordDetails>
-
-*/
+/**
+ * @brief Extracts media file metadata and inserts a VICSMediaFile record into the database.
+ *
+ * @param nItemID  X-Ways item ID.
+ * @param MD5Hash  MD5 hex string for the item.
+ * @param picture  1 if picture, 0 if video.
+ *
+ * @see createVICSRecord
+ */
 
 void writeSQLMediaFileRecord(LONG nItemID,wchar_t MD5Hash[33], int picture)
 {
@@ -2374,27 +2181,18 @@ void writeSQLMediaFileRecord(LONG nItemID,wchar_t MD5Hash[33], int picture)
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaFileRecord End");}
 }
 
-/*Function: writeSQLMediaMetadataRecord
-
-    Function that creates a VICS media metadata record and calls functions to insert record into SQLite database
-
-    Deallocates memory associated with record afterwards
-
-    Parameters:
-
-        LONG nItemID            - X-Ways item ID that the media file relates to
-
-        wchar_t* MD5Hash        - Pointer to Wide character String that contains MD5 hash value
-
-        wchar_t* PropertyName   - Pointer to wide character string containing NULL terminated property name
-
-        wchar_t* PropertyValue  - Pointer to wide character string containing NULL terminated property value
-
-    See Also:
-        Called by   -   <createVICSRecord>
-        Calls       -   <insertMediaMetadataRecord>, <deallocateMediaMetadataRecord>
-
-*/
+/**
+ * @brief Inserts a VICS media metadata (property name/value) record into the database.
+ *
+ * Skips insertion if an identical record already exists.
+ *
+ * @param nItemID        X-Ways item ID.
+ * @param MD5Hash        MD5 hex string for the item.
+ * @param PropertyName   Null-terminated property name.
+ * @param PropertyValue  Null-terminated property value.
+ *
+ * @see createVICSRecord
+ */
 
 void writeSQLMediaMetadataRecord(LONG nItemID,wchar_t MD5Hash[33], wchar_t* PropertyName, wchar_t* PropertyValue)
 {
@@ -2424,6 +2222,15 @@ void writeSQLMediaMetadataRecord(LONG nItemID,wchar_t MD5Hash[33], wchar_t* Prop
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaMetadataRecord End");}
 }
 
+/**
+ * @brief Returns true if the new item should replace the existing duplicate in the VICS record.
+ *
+ * Compares deletion flags: an item with a higher deletion status is considered less preferred.
+ *
+ * @param origID X-Ways item ID of the existing record.
+ * @param newID  X-Ways item ID of the candidate replacement.
+ * @return true if @p newID should replace @p origID, false otherwise.
+ */
 bool replaceOriginalItem(LONG origID, LONG newID)
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"replaceOriginalItem Start");}
@@ -2441,25 +2248,19 @@ bool replaceOriginalItem(LONG origID, LONG newID)
     }
 }
 
-/*Function: createVICSRecord
-
-    Function that creates a VICS media metadata record and calls functions to insert record into SQLite database
-
-    <writeSQLMediaMetadataRecord> only called if Device Type is not blank or "unknown".
-
-    Parameters:
-
-        LONG nItemID            - X-Ways item ID that the media file relates to
-
-        int picture             - flag to state if item is a picture
-
-        hashValueStruct hasVals - structure containing hash values relating to X-Ways itemID
-
-    See Also:
-        Called by   -   <UpdateRecords>
-        Calls       -   <writeSQLMediaRecord>, <writeSQLMediaFileRecord>, <writeSQLMediaMetadataRecord>
-
-*/
+/**
+ * @brief Creates or updates all VICS SQLite records for a processed media item.
+ *
+ * Handles deduplication by physical offset and MD5, and optionally writes device-type and
+ * report-table metadata records.
+ *
+ * @param nItemID  X-Ways item ID.
+ * @param picture  1 if picture, 0 if video.
+ * @param hashVals Hash values for the item.
+ * @return 0 always.
+ *
+ * @see UpdateRecords
+ */
 
 int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
 {
@@ -2469,7 +2270,6 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
         //needs adding
         writeSQLMediaRecord(nItemID, hashVals, picture);
     }
-    //1.50 - look at checking if record for same sector and hash value exists
     INT64 offset = getPhysicalOffset(nItemID);
     long duplicateItemID = 0;
     int duplicate = checkDuplicateFile(vicsDB, offset, hashVals.MD5, currSrcID, &duplicateItemID, picture);
@@ -2496,7 +2296,6 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
     //if not duplicate (will have returned) add media record
     writeSQLMediaFileRecord(nItemID, hashVals.MD5, picture);
 
-    //1.41 add media metadata
     if (DeviceTypeCol != -1)
     {
         //check if device type column is blank
@@ -2512,13 +2311,11 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
             {
                 writeSQLMediaMetadataRecord(nItemID, hashVals.MD5, L"Device Type",(wchar_t*)buffer);
             }
-            //1.50 needed for testing
             else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type either blank or unknown");}
         }
     }
     else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type column unidentified");}
 
-    //1.50 added Report Table Association checks
     if (extractInfo.exportReportTables){
         wchar_t* buffer = retrieveUserReportTableAssociations(nItemID);
         if (buffer!= nullptr)
@@ -2531,25 +2328,18 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
     return 0;
 }
 
-/*Section: C4All XML Records*/
+// C4All XML Records
 
-/*Function: createC4AllRecord
-
-    Function that creates an XML record and writes it to the relevant XML file
-
-    Parameters:
-
-        LONG nItemID            - X-Ways item ID that the media file relates to
-
-        int picture             - flag to state if item is a picture
-
-        wchar_t[33] MD5Hash     - Wide character string with MD5 hash relating to item
-
-    See Also:
-        Called by   -   <UpdateRecords>
-        Calls       -   <removeInvalidChars>
-
-*/
+/**
+ * @brief Creates and writes a C4All XML record for a media item.
+ *
+ * @param nItemID  X-Ways item ID.
+ * @param picture  1 if picture, 0 if video.
+ * @param MD5Hash  MD5 hex string for the item.
+ * @return 0 always.
+ *
+ * @see UpdateRecords
+ */
 
 int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
 {
@@ -2631,30 +2421,19 @@ int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
     return 0;
 }
 
-/*Section: X-Ways Utility Functions  */
+// X-Ways Utility Functions
 
-/*Function: getFileName
-
-    Function that gets a filename for a given ItemID in an Evidence object.
-
-    Takes a pointer to a Wide Character buffer and the size of the buffer.
-
-    Replaces new lines and '\' characters in name
-
-    Parameters:
-
-        LPWSTR evObject     -
-        LONG nItemID        -
-        wchar_t* retValue   - Pointer to Wide Character String where file name will be returned
-        long bufferSize     - Size of buffer for filename
-
-    Returns:
-            0       -   Always
-
-    See Also:
-        Called by   -   <createC4AllRecord>
-
-*/
+/**
+ * @brief Retrieves the filename for an item, sanitising newlines and backslashes.
+ *
+ * @param evObject   Evidence object handle (unused, retained for API symmetry).
+ * @param nItemID    X-Ways item ID.
+ * @param retValue   Output buffer for the filename.
+ * @param bufferSize Size of @p retValue in wide characters.
+ * @return 0 always.
+ *
+ * @see createC4AllRecord
+ */
 
 int getFileName(LPWSTR evObject,LONG nItemID, wchar_t* retValue,long bufferSize)
 {
@@ -2680,29 +2459,23 @@ int getFileName(LPWSTR evObject,LONG nItemID, wchar_t* retValue,long bufferSize)
                 fileName[i] = L'|';
             }
         }
-        snwprintf(retValue,bufferSize,L"%ls",fileName);
+        swprintf(retValue,bufferSize,L"%ls",fileName);
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"End of getFileName Function Output");}
     return 0;
 }
 
-/*Function: getFullPath
-    Returns a full path for a give item provided as parameter nItemID.
-    Returns slight difference between XML version and VICS
-    XML version requires full path, including filename
-    VICS version requires on path of parent of item
-    In VICS versions, it replaces '\' characters with '|'
-
-    This function needs a re-write in order to make it more readable and modular
-
-
-    See Also:
-        <extractVICSMediaFileSQL>
-        <extractVICSMediaSQL>
-        <createVICSstring>
-        <outputVICSFile>
-
-*/
+/**
+ * @brief Returns the full path for an item, formatted for XML or VICS output.
+ *
+ * XML paths include the filename; VICS paths contain only the parent directory with
+ * backslashes replaced by double-backslashes and pipe characters.
+ *
+ * @param evObject Evidence object wide string (used as path prefix).
+ * @param nItemID  X-Ways item ID.
+ * @param isVic    TRUE for VICS format, FALSE for XML format.
+ * @return Newly allocated wide string containing the path (caller must delete[]).
+ */
 
 wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
 {
@@ -2791,7 +2564,6 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
     {
         if (isVic)
         {
-            //1.51 remove evidence source id from beginning of path
             //swprintf(retValue,L"%ls\\\\%ls%ls",currSrcID,partName,temp);
             swprintf(retValue,L"%ls%ls",partName,temp);
         }
@@ -2822,34 +2594,19 @@ int openMediaEntry(FILE* vFile)
 }
 */
 
-/*Section: VICS Record Export*/
+// VICS Record Export
 
-/*Function: extractIntoVicsRecord
-
-    Function that locates all the MediaFile Entries, stored in supplied database, with matching hash value to parameter.
-
-    Allocated memory for number of media file records required.
-
-    Parameters:
-
-        sqlite3* database           - Handle to an SQLite3 database. This should have created with setupVICS function
-
-        VICSRecord*                 - Pointer to a VICSRecord that media file records are to be added to
-
-        wchar_t* hashValue          - Pointer to wide character string containing hash value to match against. Must be NULL terminated.
-
-        int picture                 - Integer to state if getting picture of video records. 1 indicates pictures.
-
-    Returns:
-        -1      -   Error getting media file records from database
-        0       -   No records in table
-
-
-    See Also:
-        Called by   -   <writeRecords>
-
-        <returnMediaFileRecords>
-*/
+/**
+ * @brief Populates a VICSRecord with all media file and metadata entries matching a hash value.
+ *
+ * @param database   SQLite database handle.
+ * @param record     Output record to populate.
+ * @param hashValue  Null-terminated MD5 hash to match.
+ * @param picture    1 for pictures, 0 for videos.
+ * @return 0 on success, -1 on database error.
+ *
+ * @see writeRecords
+ */
 
 int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashValue ,int picture)
 {
@@ -2898,21 +2655,16 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
 
 
 
-/*Function: writeRecords
-    Takes a FILE* to the JSON file that the records are to be written to.
-
-    This functions probably needs a re-write, along with the associated functions
-    Called from outputVICSFile
-
-    See Also:
-        <extractVICSMediaFileSQL>
-        <extractVICSMediaSQL>
-        <createVICSstring>
-        <outputVICSFile>
-
-*/
-
-//start of VICS code
+/**
+ * @brief Writes all VICS records from the database to the supplied JSON output file.
+ *
+ * @param database  SQLite database handle.
+ * @param vicFile   Open FILE pointer to the VICS JSON output file.
+ * @param picture   1 for picture records, 0 for video records.
+ * @return 0 on success, -1 on database error.
+ *
+ * @see outputVICSFile
+ */
 int writeRecords(sqlite3* database,FILE* vicFile, int picture)
 {
     sqlite3_stmt *statement;
@@ -2926,8 +2678,6 @@ int writeRecords(sqlite3* database,FILE* vicFile, int picture)
     {
         //no records to process
         sqlite3_finalize(statement);
-        //1.383 added if there are no records
-        //1.50 removed fprintf(vicFile,"}");
         closeVICSFile(vicFile);
         return 0;
     }

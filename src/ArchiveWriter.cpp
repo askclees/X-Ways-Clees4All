@@ -267,7 +267,7 @@ struct archive* selectArchiveObject(bool picFile)
  *
  * @see FileSize, createZipArchiveEntry
  */
-int writeJSONFile(char* inFilePath, char* filename, bool picFile)
+int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
 {
     struct archive *outa = selectArchiveObject(picFile);
     struct archive_entry *entry;

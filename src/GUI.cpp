@@ -92,7 +92,6 @@ static HBRUSH hBrush = CreateSolidBrush(RGB(240,240,240));
 WORD versionNumber;
 //prototyping
 void CreateControls(HWND hwnd);
-BOOL DirectoryExists(LPCTSTR szPath);
 LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam);
 LPWSTR GetFolderPath();
 int startProcess();
@@ -1079,17 +1078,6 @@ void CreateControls(HWND hwnd)
 }
 
 
-/**
- * @brief Tests whether a path exists and refers to a directory.
- * @param szPath Null-terminated path string to test.
- * @return TRUE if the path is an existing directory, FALSE otherwise.
- */
-BOOL DirectoryExists(LPCTSTR szPath)
-{
-    DWORD dwAttrib = GetFileAttributes(szPath);
-    return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-}
-
 
 /**
  * @brief Displays the system folder-picker dialog and returns the selected path.
@@ -1168,7 +1156,7 @@ int startProcess()
         }
         length = GetWindowTextLength(GriffeyePath);
         GetWindowText(GriffeyePath,buffer,1024);
-        if(!DirectoryExists(buffer))
+        if(!DirExists(buffer))
         {
             MessageBox(NULL,"Griffeye Case Location does not exist","Error!! ",MB_ICONERROR);
             return 1;
@@ -1202,7 +1190,7 @@ int startProcess()
     {
         int length = GetWindowTextLength(PicturePath);
         GetWindowText(PicturePath,buffer,1024);
-        if(!DirectoryExists(buffer))
+        if(!DirExists(buffer))
         {
             if (strcmp(buffer,CaseDir)==0)
             {
@@ -1238,7 +1226,7 @@ int startProcess()
     {
         int length = GetWindowTextLength(VideoPath);
         GetWindowText(VideoPath,buffer,1024);
-        if(!DirectoryExists(buffer))
+        if(!DirExists(buffer))
         {
             if (strcmp(buffer,CaseDir)==0)
             {
@@ -1336,12 +1324,12 @@ int getGriffeyeDetails()
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
-        if (!DirectoryExists(appdataPath))
+        if (!DirExists(appdataPath))
         {
             CreateDirectoryA(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (DirectoryExists(appdataPath))
+        if (DirExists(appdataPath))
         {
             //folder exists, check if options database does!
             char optPath[MAX_PATH];
@@ -1410,12 +1398,12 @@ int saveGriffeyeDetails()
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
-        if (!DirectoryExists(appdataPath))
+        if (!DirExists(appdataPath))
         {
             CreateDirectoryA(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (DirectoryExists(appdataPath))
+        if (DirExists(appdataPath))
         {
             //folder exists, check if options database does!
             char optPath[MAX_PATH];

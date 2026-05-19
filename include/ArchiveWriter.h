@@ -46,6 +46,6 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
 int setupZipArchives();
 int closeZipArchives();
 void cleanupArchivePaths();
-int writeJSONFile(char* inFilePath, char* filename, bool picFile);
+int writeJSONFile(const char* inFilePath, const char* filename, bool picFile);
 
 #endif // ARCHIVEWRITER_H_INCLUDED

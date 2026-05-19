@@ -14,6 +14,7 @@
 //other modules
 #include "main.h"
 #include "SQLFunctions.h"
+#include "utility.h"
 
 //windows form sizes
 #define MainWindowWidth 850
@@ -87,7 +88,6 @@ char optionsDatabasePath[MAX_PATH];
 
 //prototyping
 void CreateOptionsControls(HWND hwnd);
-BOOL DirectoryExists(LPCTSTR szPath);
 LRESULT CALLBACK OptionsWindowProc (HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam);
 static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARAM lpData);
 ExtractOptions loadOrCreateOptions(BOOL* success);
@@ -202,7 +202,7 @@ bool detailsValid()
     char buffer[1024];
     int length = GetWindowTextLength(ReportOutput);
     GetWindowText(ReportOutput,buffer,1024);
-    if(!DirectoryExists(buffer)){
+    if(!DirExists(buffer)){
         MessageBox(NULL,"Report Output Path does not exist or cannot be accessed","Error ",MB_ICONERROR);
         return false;
     }
@@ -741,13 +741,6 @@ void CreateOptionsControls(HWND hwnd)
 }
 
 
-BOOL OptDirectoryExists(LPCTSTR szPath)
-{
-    DWORD dwAttrib = GetFileAttributes(szPath);
-    return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-}
-
-
 static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARAM lpData)
 {
     if (uMsg== BFFM_INITIALIZED)
@@ -765,12 +758,12 @@ char* createOptionsFolderString()
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strncat(appdataPath,"\\X-Ways\\",MAX_PATH);
-        if (!OptDirectoryExists(appdataPath))
+        if (!DirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (!OptDirectoryExists(appdataPath))
+        if (!DirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
