@@ -196,7 +196,8 @@
 			<Add directory="third_party/libarchive" />
 			<Add directory="third_party/cjson" />
 		</Compiler>
-		<Unit filename="src/ArchiveWriter.cpp">
+		<Unit filename="X-tension.def">
+			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
@@ -206,47 +207,59 @@
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
+		<Unit filename="include/FileOutput.h" />
+		<Unit filename="include/GUI.h" />
+		<Unit filename="include/ReportTableAssociations.h" />
+		<Unit filename="include/SQLFunctions.h" />
+		<Unit filename="include/VICS.h" />
+		<Unit filename="include/X-Tension.h">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="include/XML.h" />
+		<Unit filename="include/base64.h" />
+		<Unit filename="include/debugMessage.h" />
+		<Unit filename="include/main.h">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="include/options.h" />
+		<Unit filename="include/utility.h">
+			<Option target="Release" />
+			<Option target="Debug - New" />
+			<Option target="Tests" />
+		</Unit>
+		<Unit filename="src/ArchiveWriter.cpp">
+			<Option target="Release" />
+			<Option target="Debug - New" />
+			<Option target="Release (x86)" />
+		</Unit>
 		<Unit filename="src/FileOutput.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
+			<Option target="Tests" />
 		</Unit>
-		<Unit filename="include/FileOutput.h" />
 		<Unit filename="src/GUI.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="include/GUI.h" />
 		<Unit filename="src/ReportTableAssociations.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="include/ReportTableAssociations.h" />
 		<Unit filename="src/SQLFunctions.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="include/SQLFunctions.h" />
 		<Unit filename="src/VICS.cpp" />
-		<Unit filename="include/VICS.h" />
 		<Unit filename="src/X-Tension.cpp">
 			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="include/X-Tension.h">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="X-tension.def">
-			<Option target="Debug" />
-			<Option target="Release" />
-			<Option target="Debug - New" />
-			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/XML.cpp">
 			<Option target="Debug" />
@@ -254,23 +267,19 @@
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="include/XML.h" />
-		<Unit filename="third_party/libarchive/archive.h" />
-		<Unit filename="third_party/libarchive/archive_entry.h" />
 		<Unit filename="src/base64.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
+			<Option target="Tests" />
 		</Unit>
-		<Unit filename="include/base64.h" />
 		<Unit filename="src/debugMessage.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="include/debugMessage.h" />
 		<Unit filename="src/main.cpp">
 			<Option compilerVar="CC" />
 			<Option target="Debug" />
@@ -278,20 +287,38 @@
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="include/main.h">
-			<Option compilerVar="CC" />
-		</Unit>
 		<Unit filename="src/options.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
 			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
-		<Unit filename="include/options.h" />
+		<Unit filename="src/utility.cpp">
+			<Option target="Release" />
+			<Option target="Debug - New" />
+			<Option target="Tests" />
+		</Unit>
+		<Unit filename="tests/test_vics_json.cpp">
+			<Option target="Tests" />
+		</Unit>
+		<Unit filename="tests/test_base64.cpp">
+			<Option target="Tests" />
+		</Unit>
+		<Unit filename="tests/test_fileoutput.cpp">
+			<Option target="Tests" />
+		</Unit>
+		<Unit filename="tests/stubs_fileoutput.cpp">
+			<Option target="Tests" />
+		</Unit>
+		<Unit filename="tests/testharness.h">
+			<Option target="Tests" />
+		</Unit>
 		<Unit filename="third_party/cjson/cJSON.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="third_party/cjson/cJSON.h" />
+		<Unit filename="third_party/libarchive/archive.h" />
+		<Unit filename="third_party/libarchive/archive_entry.h" />
 		<Unit filename="third_party/sqlite/shell.c">
 			<Option compilerVar="CC" />
 			<Option target="Debug" />
@@ -301,30 +328,9 @@
 		</Unit>
 		<Unit filename="third_party/sqlite/sqlite3.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug" />
-			<Option target="Release" />
-			<Option target="Debug - New" />
-			<Option target="Release (x86)" />
-			<Option target="Tests" />
 		</Unit>
 		<Unit filename="third_party/sqlite/sqlite3.h" />
 		<Unit filename="third_party/sqlite/sqlite3ext.h" />
-		<Unit filename="src/utility.cpp">
-			<Option target="Release" />
-			<Option target="Debug - New" />
-			<Option target="Tests" />
-		</Unit>
-		<Unit filename="include/utility.h">
-			<Option target="Release" />
-			<Option target="Debug - New" />
-			<Option target="Tests" />
-		</Unit>
-		<Unit filename="tests/testharness.h">
-			<Option target="Tests" />
-		</Unit>
-		<Unit filename="tests/test_vics_json.cpp">
-			<Option target="Tests" />
-		</Unit>
 		<Extensions />
 	</Project>
 </CodeBlocks_project_file>

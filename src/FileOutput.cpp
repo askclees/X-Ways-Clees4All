@@ -10,155 +10,78 @@
 #include "debugMessage.h"
 #include "utility.h"
 
-
-//defines
-/* Constant: folderDepth
-Depth of folders to be created based on hash values. Currently set to 2*/
+/** @brief Depth of folder hierarchy created from the MD5 hash prefix. */
 #define folderDepth 2
 
-//set max_read to 4MB - reduce ram requirements and possible file writing issues.
-/* Constant: max_read
-Maximum size of file to be written in a single chunk. Currently set at 4MiB*/
-
+/** @brief Maximum number of bytes read from an item in a single pass (4 MiB). */
 #define max_read 4194304LL
 
-//globals
-std::mutex lockFile, lockFolder;
+/** @brief Mutex serialising file creation to prevent simultaneous writes of the same file. */
+std::mutex lockFile;
 
-//1.41 removed from this section and used one from Utility section
-/*BOOL fileExists(char* path)
+/** @brief Mutex serialising directory creation to prevent duplicate mkdir calls. */
+std::mutex lockFolder;
+
+/**
+ * @brief Generates a relative folder path from an MD5 hash filename.
+ *
+ * Builds a two-level hierarchy under "Files" using the first four characters
+ * of @p fileName: Files\\<c0><c1>\\<c2><c3>
+ *
+ * @param buffer       Output buffer to write the path into.
+ * @param sizeBuffer   Size of @p buffer in bytes.
+ * @param fileName     Wide character string of the MD5 hash used as the filename.
+ * @param escapedSlash If true, folder separators are written as \\\\ (for VICS JSON output).
+ * @return             0 always.
+ *
+ * @see generateFilePath
+ */
+int generateRelativeFilePath(char* buffer, int sizeBuffer, wchar_t* fileName, bool escapedSlash)
 {
-    DWORD chkAttributes = GetFileAttributes(path);
-    return (chkAttributes != INVALID_FILE_ATTRIBUTES);
-}*/
-
-/*Section: File Path Generation
-
-    This section contains functions to generate path files relating to output files on users local system*/
-
-/*Function: generateRelativeFilePathVICS
-
-    Function that generates relative file path for exported image.
-
-    Filename is MD5 hash value and folders are created base don first 2 characters.
-
-    So MD5 1234567890ABCDEF1234567890ABCDEF would be stored in folder \12\34\ using a depth of 2 (current)
-
-    Differs from <generateRelativeFilePath> in that '\' character must be escaped. These should be merged and a VICS flag added.
-
-    Parameters:
-
-        char* buffer            - character array to store resulting path in
-
-        int sizeBuffer          - integer to give max size of buffer
-
-        wchar_t* fileName       - Wide character string with MD5 hash relating to item
-
-    Returns:
-        0   -   Always
-
-    See Also:
-        Called by   -   <writeSQLMediaRecord>
-        Calls       -   None
-
-*/
-
-int generateRelativeFilePathVICS(char*buffer, int sizeBuffer,wchar_t* fileName)
-{
-    char tempBuffer[128]={0};
-    strncat(buffer,"Files",128);
-    for (int i=0;i<folderDepth;i++)
+    int pos = snprintf(buffer, sizeBuffer, "Files");
+    if (pos < 0) pos = 0;
+    const char* sep = escapedSlash ? "\\\\%lc%lc" : "\\%lc%lc";
+    for (int i = 0; i < folderDepth && pos < sizeBuffer - 1; i++)
     {
-        snprintf(tempBuffer,128,"\\\\%lc%lc",fileName[i*2],fileName[(i*2)+1]);
-        strncat(buffer,tempBuffer,sizeBuffer);
-        tempBuffer[0]='\0';
+        int written = snprintf(buffer + pos, sizeBuffer - pos, sep, fileName[i*2], fileName[(i*2)+1]);
+        if (written > 0) pos += written;
     }
     return 0;
 }
 
-
-/*Function: generateRelativeFilePath
-
-    Function that generates relative file path for exported image.
-
-    Filename is MD5 hash value and folders are created base don first 2 characters.
-
-    So MD5 1234567890ABCDEF1234567890ABCDEF would be stored in folder \12\34\ using a depth of 2 (current)
-
-    Parameters:
-
-        char* buffer            - character array to store resulting path in
-
-        int sizeBuffer          - integer to give max size of buffer
-
-        wchar_t* fileName       - Wide character string with MD5 hash relating to item
-
-    Returns:
-        0   -   Always
-
-    See Also:
-        Called by   -   <generateFilePath>
-        Calls       -   None
-
-*/
-
-int generateRelativeFilePath(char*buffer, int sizeBuffer,wchar_t* fileName)
-{
-    char tempBuffer[128]={0};
-    strncat(buffer,"Files",128);
-    for (int i=0;i<folderDepth;i++)
-    {
-        snprintf(tempBuffer,128,"\\%lc%lc",fileName[i*2],fileName[(i*2)+1]);
-        strncat(buffer,tempBuffer,sizeBuffer);
-        tempBuffer[0]='\0';
-    }
-    return 0;
-}
-
-/*Function: generateFilePath
-
-    Function that generates relative file path for exported image.
-
-    Filename is MD5 hash value and folders are created base don first 2 characters.
-
-    So MD5 1234567890ABCDEF1234567890ABCDEF would be stored in folder \12\34\ using a depth of 2 (current)
-
-    (TODO) Needs to have some kind of error return code for handling.
-
-    Parameters:
-
-        char* buffer            - character array to store resulting path in
-
-        int sizeBuffer          - integer to give max size of buffer
-
-        wchar_t* fileName       - Wide character string with MD5 hash relating to item
-
-        int picFile             - integer flag showing if file is a picture or not
-
-    Returns:
-        0   -   Always
-
-    See Also:
-        Called by   -   <writeOutputFile>
-        Calls       -   <generateRelativeFilePath>
-
-*/
-
-int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, int picFile)
+/**
+ * @brief Generates the full output path for an exported media file and creates the directory.
+ *
+ * Combines the base output path (picture or video) with the relative folder hierarchy
+ * derived from the MD5 hash, creates the directory if it does not exist, then appends
+ * the filename.
+ *
+ * @param buffer   Output buffer to write the full path into.
+ * @param maxSize  Size of @p buffer in bytes.
+ * @param fileName Wide character string of the MD5 hash used as the filename.
+ * @param picFile  True if the file is a picture (uses C4PPath), false for video (uses C4MPath).
+ * @return         0 always.
+ *
+ * @see generateRelativeFilePath, writeOutputFile
+ */
+static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool picFile)
 {
     //generate file path
     char tempBuffer[128]={0};
-    if (picFile == 1)
+    int pos;
+    if (picFile)
     {
-        snprintf(buffer,maxSize,"%ls\\",extractInfo.C4PPath);
+        pos = snprintf(buffer, maxSize, "%ls\\", extractInfo.C4PPath);
     }
     else
     {
-        snprintf(buffer,maxSize,"%ls\\",extractInfo.C4MPath);
+        pos = snprintf(buffer, maxSize, "%ls\\", extractInfo.C4MPath);
     }
+    if (pos < 0) pos = 0;
     //generate subfolder to split out number of files.
-    int retVal = generateRelativeFilePath(&tempBuffer[0],128,fileName);
-    strncat(buffer,tempBuffer,128);
+    generateRelativeFilePath(tempBuffer, 128, fileName, false);
+    int written = snprintf(buffer + pos, maxSize - pos, "%s", tempBuffer);
+    if (written > 0) pos += written;
     //lock folder mutex to stop folder being created twice.
     lockFolder.lock();
     if (!ifFileExists(buffer))
@@ -167,53 +90,35 @@ int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, int picFile)
         int retVal = SHCreateDirectoryEx(NULL,buffer,NULL);
         if (retVal !=0 && retVal != ERROR_FILE_EXISTS && retVal != ERROR_ALREADY_EXISTS)
         {
-            outputErrorMessage(L"Error creating directory, Error Code:",retVal); //1.38 message changed slightly
+            outputErrorMessage(L"Error creating directory, Error Code:",retVal);
         }
     }
     lockFolder.unlock();
-    snprintf(tempBuffer,128,"\\%ls",fileName);
-    strncat(buffer,tempBuffer,maxSize);
+    written = snprintf(buffer + pos, maxSize - pos, "\\%ls", fileName);
     return 0;
 }
 
-/*Section: File Output Generation
-
-    This section contains functions to write the media selected from X-Ways into local files on user's machine
-*/
-
-
-/*Function: writeOutputFileLarge
-
-    Function that writes a file that is over a certain size (defined by <max_read>)
-
-    Writes file in <max_read> sized buffer chunks until all file has been written.
-
-    Also includes a wrapper function where flush flag is not provided. This defaults to flush being false
-
-    Parameters:
-
-        FILE* fileOut   -   Handle to file that is to be used for output data
-        INT64 fileSize  -   fileSize of the file to be written
-        HANDLE hItem    -   X-Ways Handle to the item to be written
-        LONG nItemID    -   X-Ways item ID for file being written
-        bool flush      -   flag to flush output after each write.
-
-    Returns:
-        0   -   Success
-        1   -   Error occurred
-
-    See Also:
-        Called by   -   <writeOutputFile>
-        Calls       -   None
-
-*/
-
-int writeOutputFileLarge(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID, bool flush)
+/**
+ * @brief Writes a file larger than max_read to disk in buffered chunks.
+ *
+ * Reads the item from X-Ways in max_read sized chunks until the full file has
+ * been written. Closes @p hItem on both success and failure.
+ *
+ * @param fileOut  Open file handle to write to.
+ * @param fileSize Size of the file in bytes.
+ * @param hItem    X-Ways handle to the item to read.
+ * @param nItemID  X-Ways item ID (used for debug output).
+ * @param flush    If true, flushes the output file after each chunk.
+ * @return         0 on success, 1 if a read returned zero or fewer bytes than requested.
+ *
+ * @see writeOutputFile
+ */
+static int writeOutputFileLarge(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID, bool flush)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of writeOutputFileLarge Function Output");}
     BYTE* buffer = new BYTE[max_read+1];
     INT64 currentOffset = 0;
-    BOOL Done = FALSE;
+    bool done = false;
     INT64 bytesLeft = fileSize;
     DWORD readSize;
     do
@@ -243,52 +148,41 @@ int writeOutputFileLarge(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID
         bytesLeft = bytesLeft - readSize;
         if (bytesLeft <= 0)
         {
-            Done = TRUE;
+            done = true;
         }
         memset(buffer,0,readSize);
         currentOffset = currentOffset + readSize;
         XWF_ShouldStop();
     }
-    while (Done ==FALSE);
+    while (!done);
     XWF_Close(hItem);
-    delete[] buffer; //1.37
+    delete[] buffer;
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"End of writeOutputFileLarge Function Output");}
     return 0;
 }
 
-//wrapper function
-int writeOutputFileLarge(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID)
+/** @brief Overload of writeOutputFileLarge with flush defaulting to false. */
+static int writeOutputFileLarge(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID)
 {
     return writeOutputFileLarge(fileOut,fileSize,hItem,nItemID,false);
 }
 
-
-/*Function: writeOutputFileSmall
-
-    Function that writes a file that is under a certain size (defined by <max_read>)
-
-    File written as a single block.
-
-    If an error occurs and debug is set, creates an array of data for debugWriteDetails function
-
-    Parameters:
-
-        FILE* fileOut   -   Handle to file that is to be used for output data
-        INT64 fileSize  -   fileSize of the file to be written
-        HANDLE hItem    -   X-Ways Handle to the item to be written
-        LONG nItemID    -   X-Ways item ID for file being written
-
-    Returns:
-        0   -   Success
-        1   -   Error occurred
-
-    See Also:
-        Called by   -   <writeOutputFile>
-        Calls       -   <debugWriteDetails> if debug set
-
-*/
-
-int writeOutputFileSmall(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID)
+/**
+ * @brief Writes a file smaller than or equal to max_read to disk in a single read.
+ *
+ * Reads the entire item from X-Ways in one call. Tolerates a size difference of
+ * one byte between the reported file size and the actual bytes read. Closes
+ * @p hItem on both success and failure.
+ *
+ * @param fileOut  Open file handle to write to.
+ * @param fileSize Size of the file in bytes as reported by X-Ways.
+ * @param hItem    X-Ways handle to the item to read.
+ * @param nItemID  X-Ways item ID (used for debug output).
+ * @return         0 on success, 1 if the read returned zero or an unexpected size.
+ *
+ * @see writeOutputFile
+ */
+static int writeOutputFileSmall(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of writeOutputFileSmall Function Output");}
     BYTE* buffer = new BYTE[fileSize+1];
@@ -300,18 +194,19 @@ int writeOutputFileSmall(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID
         delete[] buffer;
         if (extractInfo.debugSet){
             varList errDetails;
-            errDetails.entries[errDetails.noVars].varData = new int64_t;
-            *(int64_t*)errDetails.entries[errDetails.noVars].varData = fileSize;
+            int64_t* fileSizeVar = new int64_t(fileSize);
+            errDetails.entries[errDetails.noVars].varData = fileSizeVar;
             errDetails.entries[errDetails.noVars].varLen = 8;
             errDetails.entries[errDetails.noVars].type ='i';
             errDetails.noVars++;
-            errDetails.entries[errDetails.noVars].varData = new int32_t;
-            *(int32_t*)errDetails.entries[errDetails.noVars].varData = read;
+            int32_t* readVar = new int32_t(read);
+            errDetails.entries[errDetails.noVars].varData = readVar;
             errDetails.entries[errDetails.noVars].varLen = 4;
             errDetails.entries[errDetails.noVars].type ='i';
             errDetails.noVars++;
             debugWriteDetails(nItemID, L"writeOutputFileSmall",L"Read value 0 or not matching filesize",errDetails);
-
+            delete fileSizeVar;
+            delete readVar;
         }
         return 1;
     }
@@ -322,30 +217,21 @@ int writeOutputFileSmall(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG nItemID
     return 0;
 }
 
-/*Function: checkFileSize
-
-    Function to check that file size matches that provided by x-ways +- 2 bytes.
-
-    This allows X-Tension to see if network issues have caused file to not write correctly.
-
-    Parameters:
-
-        LONG nItemID    -   X-Ways ItemID of file being checked
-        char* path      -   Path of data that has been output (local machine)
-        INT64 fileSize  -   Filesize as provided by X-Ways
-
-    Returns:
-        -1  -   Error getting filesize from file on disk
-        0   -   File size matches expected size
-        1   -   File size does not match expected size
-
-    See Also:
-        Called by   -   <writeOutputFile>
-        Calls       -   None
-
-*/
-
-int checkFileSize(LONG nItemID,char* path,INT64 fileSize)
+/**
+ * @brief Checks that the size of a file on disk matches the size reported by X-Ways.
+ *
+ * Polls up to 10 times with a 250ms delay to allow the file system to flush.
+ * Allows a tolerance of ±2 bytes.
+ *
+ * @param nItemID  X-Ways item ID (used for debug output).
+ * @param path     Path to the file on disk.
+ * @param fileSize Expected file size in bytes as reported by X-Ways.
+ * @return         0 if sizes match, 1 if they do not, or -1 if the file attributes
+ *                 could not be read.
+ *
+ * @see writeOutputFile
+ */
+static int checkFileSize(LONG nItemID,char* path,INT64 fileSize)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of checkFileSize Function Output");}
     WIN32_FILE_ATTRIBUTE_DATA fad;
@@ -379,41 +265,26 @@ int checkFileSize(LONG nItemID,char* path,INT64 fileSize)
     return 0;
 }
 
-
-/*Function: writeOutputFile
-
-    Function to write the media file to disk.
-
-    Checks if the file already exists and returns if it has. Checks filesize to see if file was completely written.
-
-    Attempts to write the file. If this fails re-attempts with flush option set.
-
-    Large files are handed seperatly to small files, defined by  being larger or smaller that <max_read>
-
-    Could do with a tidy up to avoid repeated code. Possible error where 2 files with the same has value are trying to be written simultaneously.
-
-    Where errors occur, the items are tagged with the corresponding report table for ease of finding later.
-
-    Parameters:
-
-        LONG nItemID        -   X-Ways ItemID of file being outputted
-        int picFile         -   Flag to indicate if file is a picture
-        wchar_t* fileName   -   Wide character string of filename, must be NULL terminated
-        INT64 fileSize      -   Filesize as reported by X-Ways
-        HANDLE hdlCurrVol   -   Handle to Current Volume being processed by X-Ways
-
-    Returns:
-        <SUCCESS>                 -   No Errors
-        <ERROR_FILE_OPEN>         -   Error occurred when getting a HANDLE from X-Ways for nItemID
-        <RETERR_FILE_READ>        -   Corresponding writeoutput returned an error other than filesize error
-        <RETERR_SIZE_MISMATCH>    -   Size of output file does not match reported size by X-Ways
-
-    See Also:
-        Called by   -   <MainItemProcess>
-        Calls       -   <ifFileExists>, <writeOutputFileSmall>, <writeOutputFileLarge>
-*/
-
-int writeOutputFile(LONG nItemID,int picFile,wchar_t* fileName, INT64 fileSize,HANDLE hdlCurrVol)
+/**
+ * @brief Writes a media file from X-Ways to disk, with size verification and retry on failure.
+ *
+ * Checks whether the file already exists with the correct size before writing.
+ * Files up to max_read are written in a single read; larger files are written in
+ * chunks. If the initial write fails due to a size mismatch, one retry is attempted
+ * with flushing enabled. Errors are recorded in the appropriate X-Ways report table.
+ *
+ * @param nItemID    X-Ways item ID of the file to write.
+ * @param picFile    True if the file is a picture, false for video.
+ * @param fileName   Wide character string of the MD5 hash used as the filename.
+ * @param fileSize   Size of the file in bytes as reported by X-Ways.
+ * @param hdlCurrVol Handle to the current volume being processed.
+ * @return           SUCCESS on success, ERROR_FILE_OPEN if the item or output file
+ *                   could not be opened, RETERR_FILE_READ on a read error, or
+ *                   RETERR_SIZE_MISMATCH if the written file size does not match.
+ *
+ * @see generateFilePath, writeOutputFileSmall, writeOutputFileLarge, checkFileSize
+ */
+int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,HANDLE hdlCurrVol)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of WriteOutputFile Function Output");}
     char outputPath[2048];
@@ -433,12 +304,9 @@ int writeOutputFile(LONG nItemID,int picFile,wchar_t* fileName, INT64 fileSize,H
     lockFile.lock();
     HANDLE hItem;
 
-    //1.41 try catch does not work, code removed
     hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
     if (hItem == 0)
     {
-        //1.38 move to report table
-        //outputErrorMessage(L"Unable to open fileID: ",nItemID);
         errorRaised(nItemID,REPORT_FILEOPEN_ERROR);
         //clear file lock to prevent deadlock
         lockFile.unlock();
@@ -448,6 +316,7 @@ int writeOutputFile(LONG nItemID,int picFile,wchar_t* fileName, INT64 fileSize,H
     lockFile.unlock();
     if (outputFile == NULL)
     {
+        XWF_Close(hItem);
         errorRaised(nItemID,REPORT_FILEOPEN_ERROR);
         return ERROR_FILE_OPEN;
     }
@@ -466,34 +335,36 @@ int writeOutputFile(LONG nItemID,int picFile,wchar_t* fileName, INT64 fileSize,H
         {
             //retry with flush option
             hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
-            outputFile = fopen(outputPath,"wb");
-            if (outputFile != NULL)
+            if (hItem != 0)
             {
-                if (fileSize <= max_read){
-                    retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
+                outputFile = fopen(outputPath,"wb");
+                if (outputFile != NULL)
+                {
+                    if (fileSize <= max_read){
+                        retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
+                    }
+                    else {
+                        retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
+                    }
+                    fclose(outputFile);
+                    outputFile = NULL;
                 }
-                else {
-                    retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
+                else
+                {
+                    XWF_Close(hItem);
                 }
-                fclose(outputFile);
-                outputFile = NULL;
             }
         }
         if (retVal !=0){
-            //1.38 change to report table rather than output message
             errorRaised(nItemID,REPORT_UNKNOWN_FILESIZE);
-            //outputErrorMessage(L"Error reading file data from ItemID: ",nItemID);
-
             //delete partially written/corrupt file
-            DeleteFile((char*)&outputPath);
+            DeleteFileA(outputPath);
             return RETERR_FILE_READ;
         }
     }
     //add check to make sure full file has been written
     retVal = checkFileSize(nItemID,outputPath,fileSize);
     if (retVal != 0){
-        //1.38 move to report table
-        //outputErrorMessage(L"Filesize written to disk does not match expected size for ItemID: ",nItemID);
         errorRaised(nItemID,REPORT_FILESIZE_MISMATCH);
         return RETERR_SIZE_MISMATCH;
     }

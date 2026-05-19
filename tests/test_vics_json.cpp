@@ -7,6 +7,8 @@
 #include "cJSON.h"
 #include "testharness.h"
 
+int _tc_pass = 0, _tc_fail = 0;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -481,6 +483,9 @@ static void test_validfiletime_far_future_rejected()
 // Entry point
 // ---------------------------------------------------------------------------
 
+void run_base64_tests();
+void run_fileoutput_tests();
+
 int main()
 {
     printf("=== VICS JSON Tests ===\n\n");
@@ -531,5 +536,12 @@ int main()
     RUN(test_validfiletime_far_future_rejected);
 
     remove("_vics_test.tmp");
+
+    printf("\n=== Base64 Tests ===\n\n");
+    run_base64_tests();
+
+    printf("\n=== FileOutput Tests ===\n\n");
+    run_fileoutput_tests();
+
     SUMMARY();
 }

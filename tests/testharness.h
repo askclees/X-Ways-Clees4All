@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static int _tc_pass = 0, _tc_fail = 0;
+extern int _tc_pass, _tc_fail;
 
 #define CHECK(expr) \
     do { \

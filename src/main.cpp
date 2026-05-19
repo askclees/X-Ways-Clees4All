@@ -2138,7 +2138,7 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
     currentRecord.RelativeFilePath = new wchar_t[128];
     //edit to include new folder path
     char relativeBuffer[128]={0};
-    int retVal = generateRelativeFilePathVICS(&relativeBuffer[0],128,currentRecord.MD5);
+    int retVal = generateRelativeFilePath(&relativeBuffer[0],128,currentRecord.MD5,true);
     //merge paths
     swprintf(currentRecord.RelativeFilePath,L"%s\\\\%ls",relativeBuffer,currentRecord.MD5);
     currentRecord.MediaSize = XWF_GetItemSize(nItemID);

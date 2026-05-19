@@ -78,7 +78,7 @@ LONG writeXML(FileRecord &fr,int picture, FILE* tmpOutput, INT64 counter)
         fwprintf(tmpOutput,L"\t\t<Movie>\r\n");
     }
     char path_buffer[128]={0};
-    generateRelativeFilePath((char*)&path_buffer,128,(wchar_t*)&fr.hashValue);
+    generateRelativeFilePath((char*)&path_buffer,128,(wchar_t*)&fr.hashValue,false);
     fwprintf(tmpOutput,L"\t\t\t<path><![CDATA[%s\\]]></path>\r\n",path_buffer);
     if (picture==1){
         fwprintf(tmpOutput,L"\t\t\t<picture>%ls</picture>\r\n",fr.hashValue);
