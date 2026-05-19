@@ -150,6 +150,7 @@ void InitializeMediaFileRecord(VICSMediaFile& record)
     record.fileName = NULL;
     record.filePath = NULL;
     record.parentFilePath = NULL;
+    record.MD5[0] = L'\0';
     record.parentMD5[0]=L'\0';
     record.parentName = NULL;
     record.sourceID = NULL;

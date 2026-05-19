@@ -23,8 +23,6 @@
 #include "VICS.h"
 #include "XML.h"
 #include "debugMessage.h"
-//1.50 currently unused
-//#include "accessible.h"
 #include "FileOutput.h"
 #include "utility.h"
 #include "ArchiveWriter.h"
@@ -418,15 +416,6 @@ int firstRunSetup()
     }
     writeExtractionDetails(extractInfo);
     result = identifyReportTables();
-    //setting up accesible paths, currently unused
-    /*AddPath(L"System Volume Information");
-    AddPath(L"Carved files");
-    AddPath(L"AppData");
-    AddPath(L"thumbs.db");
-    AddPath(L"Thumbs.db");
-    AddPath(L"ProgramData");
-    AddPath(L"pagefile.sys");
-    AddPath(L"hiberfil.sys");*/
     if (extractInfo.debugSet){debugWriteDetails("firstRunSetup Function End");}
     return 0;
 }
@@ -1739,6 +1728,7 @@ int caseCleanup()
     {
         closeZipArchives();
     }
+    cleanupArchivePaths();
     extractInfo.noNames = 0;
     freeVicsCaseData();
     delete [] extractInfo.C4PPath;

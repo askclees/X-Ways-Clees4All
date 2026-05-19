@@ -98,7 +98,7 @@ int setArchivePath(wchar_t* path, int flags)
 
 int setupZipArchives()
 {
-    if (strcmp(archivePic,archiveVid)==0)
+    if (archivePic != nullptr && archiveVid != nullptr && strcmp(archivePic,archiveVid)==0)
     {
         //same location for both
         ArchAll = archive_write_new();
@@ -156,7 +156,11 @@ int createZipArchiveEntry(struct archive** archFile, struct archive_entry** entr
     archive_entry_set_pathname(*entry, filePath);
     archive_entry_set_mode(*entry, AE_IFREG);
     if (archive_write_header(*archFile,*entry)!=ARCHIVE_OK)
+    {
+        archive_entry_free(*entry);
+        *entry = nullptr;
         return ERROR_WRITE;
+    }
     return SUCCESS;
 }
 
@@ -181,6 +185,14 @@ int closeZipArchives()
     closeZipArchive(&ArchVid);
     closeZipArchive(&ArchAll);
     return SUCCESS;
+}
+
+void cleanupArchivePaths()
+{
+    delete[] archivePic;
+    archivePic = nullptr;
+    delete[] archiveVid;
+    archiveVid = nullptr;
 }
 
 /*Function: closeZipArchiveEntry
@@ -242,18 +254,12 @@ int closeZipArchive(struct archive** archFile)
 
 char* generateCompressedPath(wchar_t* fileName)
 {
-    char* retBuffer= new char[128];
-    char tempBuffer[128] ={0};
-    retBuffer[0] = '\0';
-    strncat(retBuffer,"Files",128);
-    for (int i=0;i<folderDepth;i++)
-    {
-        snprintf(tempBuffer,128,"\\%lc%lc",fileName[i*2],fileName[(i*2)+1]);
-        strncat(retBuffer,tempBuffer,128);
-        tempBuffer[0]='\0';
-    }
-    snprintf(tempBuffer,128,"\\%ls",fileName);
-    strncat(retBuffer,tempBuffer,128);
+    char* retBuffer = new char[128];
+    // Build: Files\<c0><c1>\<c2><c3>\<fileName>  (folderDepth = 2)
+    snprintf(retBuffer, 128, "Files\\%lc%lc\\%lc%lc\\%ls",
+             fileName[0], fileName[1],
+             fileName[2], fileName[3],
+             fileName);
     return retBuffer;
 }
 
@@ -287,7 +293,7 @@ struct archive* selectArchiveObject(bool picFile)
     {
         return ArchVid;
     }
-};
+}
 
 /*Section: Archive Writing Functions*/
 
@@ -314,8 +320,10 @@ int writeJSONFile(char* inFilePath, char* filename, bool picFile)
     struct archive_entry *entry;
     size_t bytesRead=0;
 
-    int result = createZipArchiveEntry(&outa,&entry,filename,FileSize(inFilePath));
-    INT64 currOffset = 0;
+    INT64 fSize = FileSize(inFilePath);
+    if (fSize < 0)
+        return ERROR_OPEN;
+    int result = createZipArchiveEntry(&outa,&entry,filename,fSize);
     unsigned char* buffer = new unsigned char[max_read+1];
     FILE* inputFile = fopen(inFilePath,"rb");
     if (inputFile != NULL)
@@ -324,8 +332,8 @@ int writeJSONFile(char* inFilePath, char* filename, bool picFile)
         {
             archive_write_data(outa,buffer,bytesRead);
         }
+        fclose(inputFile);
     }
-    fclose(inputFile);
     closeZipArchiveEntry(&outa, entry);
     delete[] buffer;
     return SUCCESS;
@@ -385,7 +393,13 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
     }
     struct archive *outa = selectArchiveObject(picFile);
     struct archive_entry *entry;
-    int result = createZipArchiveEntry(&outa,&entry,filePath,fileSize);
+    if (createZipArchiveEntry(&outa,&entry,filePath,fileSize) != SUCCESS)
+    {
+        XWF_Close(hItem);
+        archiveLock.unlock();
+        delete[] filePath;
+        return ERROR_WRITE;
+    }
 
     //file writing section
     INT64 currOffset = 0;

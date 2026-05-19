@@ -180,7 +180,9 @@
 				<Linker>
 					<Add option="-static-libstdc++" />
 					<Add option="-static-libgcc" />
+					<Add option="-static" />
 					<Add option="-m64" />
+					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
 					<Add library="ole32" />
 					<Add library="user32" />
 					<Add library="uuid" />
@@ -253,13 +255,6 @@
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="include/XML.h" />
-		<Unit filename="src/accessible.cpp">
-			<Option target="Debug" />
-			<Option target="Release" />
-			<Option target="Debug - New" />
-			<Option target="Release (x86)" />
-		</Unit>
-		<Unit filename="include/accessible.h" />
 		<Unit filename="third_party/libarchive/archive.h" />
 		<Unit filename="third_party/libarchive/archive_entry.h" />
 		<Unit filename="src/base64.cpp">

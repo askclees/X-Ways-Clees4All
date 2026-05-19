@@ -25,10 +25,10 @@
 #define ERROR_OPEN          4
 
 //Archive entry Creation
-#define ERROR_WRITE         1
+#define ERROR_WRITE         5
 
 //Archive Close
-#define ERROR_CLOSE         1
+#define ERROR_CLOSE         6
 
 //Case path flags
 /*Constant
@@ -38,15 +38,14 @@
 #define SET_PIC_PATH    1
 #define SET_VID_PATH    2
 
-int openZipArchive(const char* filename, struct archive** archFile);
 int createZipArchiveEntry(struct archive** archFile, struct archive_entry** entry, const char* filePath,int64_t fileSize);
 int closeZipArchiveEntry(struct archive** archFile, struct archive_entry* entry);
 int closeZipArchive(struct archive** archFile);
-bool findFile(const char* filename);
 int setArchivePath(wchar_t* path, int flags);
 int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,HANDLE hdlCurrVol);
 int setupZipArchives();
 int closeZipArchives();
+void cleanupArchivePaths();
 int writeJSONFile(char* inFilePath, char* filename, bool picFile);
 
 #endif // ARCHIVEWRITER_H_INCLUDED
