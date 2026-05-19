@@ -1,9 +1,9 @@
-#include <stdio.h>
+#include <stdint.h>
 #include "base64.h"
 
 const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-size_t b64_encoded_size(size_t inlen)
+static size_t b64EncodedSize(size_t inlen)
 {
 	size_t ret;
 
@@ -18,18 +18,18 @@ size_t b64_encoded_size(size_t inlen)
 
 
 
-char* b64_encode(unsigned char* in, size_t len)
+char* b64Encode(unsigned char* in, size_t len)
 {
-	char*   out;
-	size_t  elen;
-	size_t  i;
-	size_t  j;
-	size_t  v;
+	char*    out;
+	size_t   elen;
+	size_t   i;
+	size_t   j;
+	uint32_t v;
 
 	if (in == NULL || len == 0)
 		return NULL;
 
-	elen = b64_encoded_size(len);
+	elen = b64EncodedSize(len);
 	out  = new char[elen+1];
 	out[elen] = '\0';
 

@@ -2022,7 +2022,7 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         int checkVal = getHashValue(nItemID,tempBuffer,144,hashTypePDNA,false);
         unsigned char* tBuffer = new unsigned char[145];
         sprintf((char*)tBuffer,"%ls",tempBuffer);
-        char* result = b64_encode(tBuffer, strlen((char*)tBuffer));
+        char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
         swprintf(PDNABuffer,L"%s",result);
         delete[] tBuffer;
         delete[] result;
