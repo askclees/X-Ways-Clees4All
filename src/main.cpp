@@ -514,14 +514,14 @@ int setupResultsFiles()
     char filePath[2048]={0};
     if (extractInfo.extractPictures)
     {
-        sprintf(filePath,"%ls Pictures Results.txt",extractInfo.C4PPath);
+        snprintf(filePath,sizeof(filePath),"%ls Pictures Results.txt",extractInfo.C4PPath);
         picResults=fopen(filePath,"w");
         if (picResults == NULL) { return 1; }
         filePath[0]='\0';
         if (extractInfo.debugSet)
         {
             //open debug file
-            sprintf(filePath,"%lsdebug.log",extractInfo.C4PPath);
+            snprintf(filePath,sizeof(filePath),"%lsdebug.log",extractInfo.C4PPath);
             int retVal = startDebugLog(filePath);
             if (retVal !=0)
             {
@@ -533,14 +533,14 @@ int setupResultsFiles()
     }
     if (extractInfo.extractVideos)
     {
-        sprintf(filePath,"%ls Video Results.txt",extractInfo.C4MPath);
+        snprintf(filePath,sizeof(filePath),"%ls Video Results.txt",extractInfo.C4MPath);
         vidResults=fopen(filePath,"w");
         if (vidResults == NULL) { return 1; }
         filePath[0]='\0';
         if (extractInfo.debugSet && (!extractInfo.extractPictures))
         {
             //open debug file
-            sprintf(filePath,"%lsdebug.log",extractInfo.C4MPath);
+            snprintf(filePath,sizeof(filePath),"%lsdebug.log",extractInfo.C4MPath);
             int retVal = startDebugLog(filePath);
             if (retVal !=0)
             {
@@ -650,17 +650,14 @@ int getCaseOptions()
     else
     {
         char buffer[1024];
-        sprintf(buffer,"%ls",extractInfo.C4PPath);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
+            snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4PPath);
             CreateDirectory(buffer,NULL);
         }
-        buffer[0] = '\0';
-        sprintf(buffer,"%ls",extractInfo.C4MPath);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
+            snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4MPath);
             CreateDirectory(buffer,NULL);
         }
     }
@@ -744,10 +741,12 @@ int getCommandLineOptions()
     {
         if (wcsncmp(L"xtparam:",argv[i],8)==0)
         {
-            int argLen = wcslen(argv[i]);
-            wchar_t* tempArg = new wchar_t[argLen - 7];
-            memcpy(tempArg,(wchar_t*)(argv[i] + 8) ,sizeof(wchar_t) * (argLen - 8));
-            tempArg[argLen - 8] = L'\0';
+            size_t argLen = wcslen(argv[i]);
+            if (argLen <= 8) continue;
+            size_t valueLen = argLen - 8;
+            wchar_t* tempArg = new wchar_t[valueLen + 1];
+            memcpy(tempArg, argv[i] + 8, valueLen * sizeof(wchar_t));
+            tempArg[valueLen] = L'\0';
             addCaseDetail(tempArg);
             delete[] tempArg;
         }
@@ -807,15 +806,21 @@ void addCaseDetail(wchar_t* strArg)
     if (extractInfo.debugSet){debugWriteDetails(0, L"addCaseDetail Start");}
     if (wcsncmp(L"picpth:",strArg,7)==0)
     {
-        memcpy(extractInfo.C4PPath,(wchar_t*)strArg+7,(wcslen(strArg)-7) * sizeof(wchar_t));
-        if (extractInfo.C4PPath[wcslen(strArg)-8] != L'\\')
+        size_t valueLen = wcslen(strArg) - 7;
+        if (valueLen == 0 || valueLen >= MAX_PATH - 2)
         {
-            extractInfo.C4PPath[wcslen(strArg)-7] = L'\\';
-            extractInfo.C4PPath[wcslen(strArg)-6] = L'\0';
+            XWF_OutputMessage(L"Error: picpth value empty or too long (max 256 chars)",0);
+            return;
+        }
+        memcpy(extractInfo.C4PPath, strArg + 7, valueLen * sizeof(wchar_t));
+        if (extractInfo.C4PPath[valueLen - 1] != L'\\')
+        {
+            extractInfo.C4PPath[valueLen] = L'\\';
+            extractInfo.C4PPath[valueLen + 1] = L'\0';
         }
         else
         {
-            extractInfo.C4PPath[wcslen(strArg)-7] = L'\0';
+            extractInfo.C4PPath[valueLen] = L'\0';
         }
         SHCreateDirectoryExW(NULL,extractInfo.C4PPath,NULL);
         XWF_OutputMessage(extractInfo.C4PPath,0);
@@ -834,15 +839,21 @@ void addCaseDetail(wchar_t* strArg)
         }
         else
         {
-            memcpy(extractInfo.C4MPath,(wchar_t*)strArg+7,(wcslen(strArg)-7) * sizeof(wchar_t));
-            if (extractInfo.C4MPath[wcslen(strArg)-8] != L'\\')
+            size_t valueLen = wcslen(strArg) - 7;
+            if (valueLen == 0 || valueLen >= MAX_PATH - 2)
             {
-                extractInfo.C4MPath[wcslen(strArg)-7] = L'\\';
-                extractInfo.C4MPath[wcslen(strArg)-6] = L'\0';
+                XWF_OutputMessage(L"Error: vidpth value empty or too long (max 256 chars)",0);
+                return;
+            }
+            memcpy(extractInfo.C4MPath, strArg + 7, valueLen * sizeof(wchar_t));
+            if (extractInfo.C4MPath[valueLen - 1] != L'\\')
+            {
+                extractInfo.C4MPath[valueLen] = L'\\';
+                extractInfo.C4MPath[valueLen + 1] = L'\0';
             }
             else
             {
-                extractInfo.C4MPath[wcslen(strArg)-7] = L'\0';
+                extractInfo.C4MPath[valueLen] = L'\0';
             }
             SHCreateDirectoryExW(NULL,extractInfo.C4MPath,NULL);
             XWF_OutputMessage(extractInfo.C4MPath,0);
@@ -850,17 +861,19 @@ void addCaseDetail(wchar_t* strArg)
     }
     else if (wcsncmp(L"grfpth:",strArg,7)==0)
     {
-        extractInfo.GriffeyeCaseLocation = new wchar_t[wcslen(strArg)];
-        memcpy(extractInfo.GriffeyeCaseLocation,(wchar_t*)strArg+7,(wcslen(strArg)-7) * sizeof(wchar_t));
-        extractInfo.GriffeyeCaseLocation[wcslen(strArg)-7] = L'\0';
+        size_t valueLen = wcslen(strArg) - 7;
+        extractInfo.GriffeyeCaseLocation = new wchar_t[valueLen + 1];
+        memcpy(extractInfo.GriffeyeCaseLocation, strArg + 7, valueLen * sizeof(wchar_t));
+        extractInfo.GriffeyeCaseLocation[valueLen] = L'\0';
         SHCreateDirectoryExW(NULL,extractInfo.GriffeyeCaseLocation,NULL);
         XWF_OutputMessage(extractInfo.GriffeyeCaseLocation,0);
     }
     else if (wcsncmp(L"grfcse:",strArg,7)==0)
     {
-        extractInfo.GriffeyeCaseName = new wchar_t[wcslen(strArg)];
-        memcpy(extractInfo.GriffeyeCaseName,(wchar_t*)strArg+7,(wcslen(strArg)-7) * sizeof(wchar_t));
-        extractInfo.GriffeyeCaseName[wcslen(strArg)-7] = L'\0';
+        size_t valueLen = wcslen(strArg) - 7;
+        extractInfo.GriffeyeCaseName = new wchar_t[valueLen + 1];
+        memcpy(extractInfo.GriffeyeCaseName, strArg + 7, valueLen * sizeof(wchar_t));
+        extractInfo.GriffeyeCaseName[valueLen] = L'\0';
         XWF_OutputMessage(extractInfo.GriffeyeCaseName,0);
     }
     else if (wcsncmp(L"excludeFromVid",strArg,14)==0)
@@ -874,9 +887,10 @@ void addCaseDetail(wchar_t* strArg)
         extractInfo.VICSCompressed = true;
     }
     else if (wcsncmp(L"grfset",strArg,6)==0){
-        extractInfo.GriffeyeSettingsName = new wchar_t[wcslen(strArg)];
-        memcpy(extractInfo.GriffeyeSettingsName,(wchar_t*)strArg+7,(wcslen(strArg)-7) * sizeof(wchar_t));
-        extractInfo.GriffeyeSettingsName[wcslen(strArg)-7] = L'\0';
+        size_t valueLen = wcslen(strArg) - 7;
+        extractInfo.GriffeyeSettingsName = new wchar_t[valueLen + 1];
+        memcpy(extractInfo.GriffeyeSettingsName, strArg + 7, valueLen * sizeof(wchar_t));
+        extractInfo.GriffeyeSettingsName[valueLen] = L'\0';
         XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
     }
     else if (wcsncmp(L"exthmbs",strArg,7)==0){
