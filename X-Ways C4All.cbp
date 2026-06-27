@@ -72,9 +72,12 @@
 					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
 					<Add library="user32" />
 					<Add library="gdi32" />
-					<Add library="ole32" />
 					<Add library="comdlg32" />
-					<Add library="libs/archive.lib" />
+					<Add library="libs/libarchive_static.a" />
+					<Add library="libs/libz.a" />
+					<Add library="bcrypt" />
+					<Add library="ole32" />
+					<Add library="xmllite" />
 					<Add library="uuid" />
 				</Linker>
 				<MakeCommands>
@@ -113,9 +116,12 @@
 					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
 					<Add library="user32" />
 					<Add library="gdi32" />
-					<Add library="ole32" />
 					<Add library="comdlg32" />
-					<Add library="libs/archive.lib" />
+					<Add library="libs/libarchive_static.a" />
+					<Add library="libs/libz.a" />
+					<Add library="bcrypt" />
+					<Add library="ole32" />
+					<Add library="xmllite" />
 					<Add library="comctl32" />
 					<Add library="uuid" />
 				</Linker>
@@ -150,9 +156,12 @@
 					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
 					<Add library="user32" />
 					<Add library="gdi32" />
-					<Add library="ole32" />
 					<Add library="comdlg32" />
-					<Add library="libs/archive.lib" />
+					<Add library="libs/libarchive_static.a" />
+					<Add library="libs/libz.a" />
+					<Add library="bcrypt" />
+					<Add library="ole32" />
+					<Add library="xmllite" />
 				</Linker>
 				<MakeCommands>
 					<Build command="" />

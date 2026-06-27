@@ -1,14 +1,13 @@
 #ifndef ARCHIVEWRITER_H_INCLUDED
 #define ARCHIVEWRITER_H_INCLUDED
 
+#define LIBARCHIVE_STATIC
 #include "archive.h"
 #include "archive_entry.h"
 
 //define error codes
 //generic
 #define SUCCESS 0
-
-#define LIBARCHIVE_STATIC
 
 //Archive open errors
 /* Constants: Open Error Types
