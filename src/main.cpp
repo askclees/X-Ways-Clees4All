@@ -1061,14 +1061,12 @@ int checkParentType(LONG nItemID)
 int checkItemType(LONG nItemID, int* picture)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType Start");}
-    LPWSTR type = new wchar_t[128];
-    type[0] = L'\0';
+    wchar_t type[128] = {0};
     DWORD length = 0x40000080;
 
     LONG retVal = XWF_GetItemType(nItemID,type,length);
     //return error val if function fails.
     if (retVal == -1)    {
-            delete[] type;
             return ERROR_GETITEMTYPE;
     }
     if (!(((wcscmp(type,(LPWSTR)L"Pictures")==0) && extractInfo.extractPictures)||((wcscmp(type,(LPWSTR)L"Video")==0) && extractInfo.extractVideos)))
@@ -1079,19 +1077,16 @@ int checkItemType(LONG nItemID, int* picture)
             wchar_t descr[128]={0};
             LONG retVal = XWF_GetItemType(nItemID,(wchar_t*)&descr,descLen);
             if (retVal == -1){
-                    delete[] type;
                     return ERROR_GETITEMTYPEDESC;
             }
             if (wcsncmp(descr,L"Macromedia Flash",16)!=0)
             {
-                delete[] type;
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
                 return TYPE_OTHER;
             }
         }
         else{
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
-            delete[] type;
             return TYPE_OTHER;
         }
     }
@@ -1102,7 +1097,6 @@ int checkItemType(LONG nItemID, int* picture)
         *picture = 1;
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End - return TYPE_MEDIA");}
-    delete[] type;
     return TYPE_MEDIA;
 }
 

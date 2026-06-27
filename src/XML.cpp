@@ -24,6 +24,7 @@ FILE* createXML(const char* filePath, const wchar_t* progVersion)
 {
     FILE* newFile;
     newFile = fopen(filePath,"wb");
+    if (newFile == NULL) { return NULL; }
     fwrite(BOM,1,2,newFile);
     fwprintf(newFile,L"<?xml version=\"1.0\"  encoding=\"utf-16\"?>\r\n");
     fwprintf(newFile,L"\t<ReportIndex version=\"2.0\" source=\"X-Ways\" dll=\"Griffeye Extraction %ls\">\r\n", progVersion);
@@ -170,42 +171,50 @@ wchar_t* strReplaceChar(wchar_t* strIn, int position, const wchar_t* replaceStr)
 wchar_t* replaceInvalidXMLChars(wchar_t* strIn)
 {
     wchar_t* retStr = strIn;
-    int length = wcslen(strIn);
+    int length = wcslen(retStr);
     for (int i=0;i<length;i++)
     {
-        if (strIn[i] == L'<')
+        if (retStr[i] == L'<')
         {
             retStr = strReplaceChar(retStr,i, L"&lt;");
             i += 3;
-            length = wcslen(strIn);
+            length = wcslen(retStr);
         }
-        else if (strIn[i] == L'>')
+        else if (retStr[i] == L'>')
         {
             retStr = strReplaceChar(retStr,i, L"&gt;");
             i += 3;
-            length = wcslen(strIn);
+            length = wcslen(retStr);
         }
-        else if (strIn[i] == L'\"')
+        else if (retStr[i] == L'\"')
         {
             retStr = strReplaceChar(retStr,i, L"&quot;");
             i += 5;
-            length = wcslen(strIn);
+            length = wcslen(retStr);
         }
-        else if (strIn[i] == L'\'')
+        else if (retStr[i] == L'\'')
         {
             retStr = strReplaceChar(retStr,i, L"&apos;");
             i += 5;
-            length = wcslen(strIn);
+            length = wcslen(retStr);
         }
-        else if(strIn[i] == L'&')
+        else if(retStr[i] == L'&')
         {
-            //check its not another tag!
-            if ( !((strIn[i+1] == L'l' || strIn[i+1] == L'g') && strIn[i+2] == L't' && strIn[i+2] == L';') && !(strIn[i+1] == L'q' &&  strIn[i+2] == L'u' && strIn[i+3] == L'o' && strIn[i+4] == L't') && !(strIn[i+1] == L'a' &&  strIn[i+2] == L'p' && strIn[i+3] == L'o' && strIn[i+4] == L's'))
+            //check its not an already-escaped entity
+            bool alreadyEscaped = false;
+            if (i + 3 < length && (retStr[i+1] == L'l' || retStr[i+1] == L'g') && retStr[i+2] == L't' && retStr[i+3] == L';')
+                alreadyEscaped = true;
+            if (i + 5 < length && retStr[i+1] == L'q' && retStr[i+2] == L'u' && retStr[i+3] == L'o' && retStr[i+4] == L't' && retStr[i+5] == L';')
+                alreadyEscaped = true;
+            if (i + 5 < length && retStr[i+1] == L'a' && retStr[i+2] == L'p' && retStr[i+3] == L'o' && retStr[i+4] == L's' && retStr[i+5] == L';')
+                alreadyEscaped = true;
+            if (i + 4 < length && retStr[i+1] == L'a' && retStr[i+2] == L'm' && retStr[i+3] == L'p' && retStr[i+4] == L';')
+                alreadyEscaped = true;
+            if (!alreadyEscaped)
             {
-                //not anther tag
                 retStr = strReplaceChar(retStr,i, L"&amp;");
                 i += 4;
-                length = wcslen(strIn);
+                length = wcslen(retStr);
             }
         }
     }
