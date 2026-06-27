@@ -668,16 +668,6 @@ int getCaseOptions()
     {
         XWF_OutputMessage(L"Debug mode on",0);
     }
-    /*
-    if (extractInfo.VICExport || extractInfo.VICSCompressed)
-    {
-        int retVal = setupVicsExport();
-        if (retVal !=0)
-        {
-            outputErrorMessage(L"Error setting up VICS export files");
-            return -1;
-        }
-    }*/
     //open results files.
     int retVal = setupResultsFiles();
     if (retVal !=0)
@@ -728,7 +718,7 @@ int getCommandLineOptions()
     LPWSTR* argv = CommandLineToArgvW(cmdLine,&numArgv);
     if (argv == NULL)
     {
-        XWF_OutputMessage(L"CommandLinxToArgw Failed\n",0);
+        XWF_OutputMessage(L"CommandLineToArgvW Failed\n",0);
     }
     if (numArgv == 1)
     {
@@ -2591,17 +2581,6 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
     return retValue;
 }
 
-
-/*1.41 removed this function, appears to be unused
-
-int openMediaEntry(FILE* vFile)
-{
-    //fwprintf(vFile,L"\t\t\"odata.id\":\"Media(\\\"0\\\")\",");
-    //1.38 changed to single byte strings
-    fprintf(vFile,"\t\t\"");
-    return 0;
-}
-*/
 
 // VICS Record Export
 

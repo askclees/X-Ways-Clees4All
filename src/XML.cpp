@@ -71,11 +71,9 @@ void closeXML(FILE* xmlFile)
 LONG writeXML(FileRecord &fr,int picture, FILE* tmpOutput, INT64 counter)
 {
     if (picture==1){
-        //tmpOutput = currPicFile;
         fwprintf(tmpOutput,L"\t\t<Image>\r\n");
     }
     else{
-        //tmpOutput = currVidFile;
         fwprintf(tmpOutput,L"\t\t<Movie>\r\n");
     }
     char path_buffer[128]={0};
