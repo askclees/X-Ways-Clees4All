@@ -11,10 +11,13 @@
 #include "sqlite3.h"
 #include "shlwapi.h"
 
+#include <commctrl.h>
+
 //other modules
 #include "main.h"
 #include "SQLFunctions.h"
 #include "utility.h"
+#include "VisualStyles.h"
 
 //windows form sizes
 #define MainWindowWidth 850
@@ -133,6 +136,7 @@ static const char* findGriffeyeExe(const char* folder)
  */
 int createOptionsWindow()
 {
+    VisualStylesScope visualStyles;
     const char CLASS_NAME[] = C4A_TITLE " Options";
     WNDCLASSEX wc = {};
 

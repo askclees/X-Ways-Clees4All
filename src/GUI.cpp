@@ -15,12 +15,15 @@
 #include <climits>
 #include <map>
 
+#include <commctrl.h>
+
 //other modules
 #include "main.h"
 #include "VICS.h"
 #include "debugMessage.h"
 
 #include "utility.h"
+#include "VisualStyles.h"
 
 
 //winapi controls
@@ -150,6 +153,7 @@ HWND CreateToolTip(int toolID, HWND hDlg, PTSTR pszText)
  */
 int createWindow(WORD version)
 {
+    VisualStylesScope visualStyles;
     versionNumber = version;
     const char CLASS_NAME[] = C4A_TITLE;
     WNDCLASSEX wc = {};
