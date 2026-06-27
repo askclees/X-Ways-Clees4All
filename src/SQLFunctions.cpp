@@ -1137,7 +1137,7 @@ int createOptionsLastrunTable(sqlite3* sqlDB)
 int clearExtractionOptionsTable(sqlite3* db)
 {
     char* errMsg = 0;
-    char* sqlQuery = "DELETE FROM ExtractionOptions;";
+    const char* sqlQuery = "DELETE FROM ExtractionOptions;";
     int rc = sqlite3_exec(db,sqlQuery,NULL,NULL,&errMsg);
     if (rc!=SQLITE_OK)
     {
@@ -1154,7 +1154,7 @@ int clearExtractionOptionsTable(sqlite3* db)
 int insertOptionsExtraction(sqlite3* sqlDB, ExtractOptions record)
 {
     sqlite3_stmt* stmt;
-    char* sqlQuery = "INSERT INTO ExtractionOptions VALUES (?,?,?,?,?,?,?,?,?);";
+    const char* sqlQuery = "INSERT INTO ExtractionOptions VALUES (?,?,?,?,?,?,?,?,?);";
     int rc = sqlite3_prepare_v2(sqlDB,sqlQuery, strlen(sqlQuery), &stmt, NULL);
     if (rc!= SQLITE_OK)
     {
@@ -1231,7 +1231,7 @@ int intToBool(int value)
 //1.50 - new function to insert last run settings
 int insertExtractionDetails(sqlite3* db, ExtractionDetails *record)
 {
-    char* updateQuery = "Insert into lastSettings Values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    const char* updateQuery = "Insert into lastSettings Values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db,updateQuery,-1,&stmt,NULL);
     if (rc != SQLITE_OK) {
@@ -1376,7 +1376,7 @@ int getOptionsSchemaValue(sqlite3* db)
 
 int getOptionsSchemaVersion(sqlite3* db)
 {
-    char* query = "Select count(*) from SQLITE_MASTER where Tbl_name like '%SchemaVersion%';";
+    const char* query = "Select count(*) from SQLITE_MASTER where Tbl_name like '%SchemaVersion%';";
     sqlite3_stmt *statement;
     int rc = sqlite3_prepare_v2(db,query, strlen(query),&statement,NULL);
     if (rc == SQLITE_OK)

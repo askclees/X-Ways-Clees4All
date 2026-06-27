@@ -937,7 +937,8 @@ int volumePrepare(HANDLE hEvidence)
     {
         //we have match
         currentFileObject=fileNumber;
-        wcscpy(currentEvObject,extractInfo.outputFiles[fileNumber].evidenceObj);
+        wcsncpy(currentEvObject,extractInfo.outputFiles[fileNumber].evidenceObj,2048);
+        currentEvObject[2047] = L'\0';
         currPicFile = extractInfo.outputFiles[fileNumber].picOutput;
         currVidFile = extractInfo.outputFiles[fileNumber].vidOutput;
         picCount = extractInfo.outputFiles[fileNumber].picCounter;

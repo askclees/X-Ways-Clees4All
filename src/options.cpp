@@ -348,7 +348,7 @@ void BTN_OK_CLICK(HWND hwnd)
     swprintf((wchar_t*)opt.errorReportPath,L"%s",tempPath);
     GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
     swprintf((wchar_t*)opt.GriffeyePath,L"%s",griffeyeTemp);
-    int owrite = SendMessage(lstOverwrite,CB_GETCURSEL, NULL, NULL);
+    int owrite = SendMessage(lstOverwrite,CB_GETCURSEL, 0, 0);
     if (owrite == 0){
         opt.overwriteFiles = FALSE;
     }
@@ -659,7 +659,7 @@ int drawThirdLine(HWND hwnd)
     SendMessage(lstOverwrite, CB_ADDSTRING, 0, (LPARAM)"Yes");
     int pos = 0;
     if (extractOpt.overwriteFiles) { pos = 1;}
-    SendMessage(lstOverwrite,CB_SETCURSEL, pos, NULL);
+    SendMessage(lstOverwrite,CB_SETCURSEL, pos, 0);
 
     return 0;
 }
