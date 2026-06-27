@@ -14,42 +14,6 @@
 			<SilentBuild command=" &gt; $(CMD_NULL)" />
 		</MakeCommands>
 		<Build>
-			<Target title="Debug">
-				<Option output="bin/Debug/Griffeye Export" prefix_auto="1" extension_auto="1" />
-				<Option object_output="obj/Debug/" />
-				<Option type="3" />
-				<Option compiler="gcc-mingw32" />
-				<Option createDefFile="1" />
-				<Option createStaticLib="1" />
-				<Option projectCompilerOptionsRelation="2" />
-				<Option projectLinkerOptionsRelation="-1" />
-				<Option projectIncludeDirsRelation="-1" />
-				<Option projectLibDirsRelation="-1" />
-				<Compiler>
-					<Add option="-std=c++11" />
-					<Add option="-m64" />
-					<Add option="-g" />
-				</Compiler>
-				<Linker>
-					<Add option="-static-libstdc++" />
-					<Add option="-static-libgcc" />
-					<Add option="-static" />
-					<Add option="-m64" />
-					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
-					<Add library="ole32" />
-					<Add library="comctl32" />
-					<Add library="oleaut32" />
-					<Add library="uuid" />
-				</Linker>
-				<MakeCommands>
-					<Build command="" />
-					<CompileFile command="" />
-					<Clean command="" />
-					<DistClean command="" />
-					<AskRebuildNeeded command="" />
-					<SilentBuild command=" &gt; $(CMD_NULL)" />
-				</MakeCommands>
-			</Target>
 			<Target title="Release">
 				<Option output="bin/Release/XT_Clees4All" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Release/" />
@@ -58,8 +22,8 @@
 				<Option createDefFile="1" />
 				<Option createStaticLib="1" />
 				<Option projectCompilerOptionsRelation="2" />
-				<Option projectIncludeDirsRelation="-1" />
-				<Option projectLibDirsRelation="-1" />
+				<Option projectIncludeDirsRelation="2" />
+				<Option projectLibDirsRelation="2" />
 				<Compiler>
 					<Add option="-std=c++17" />
 					<Add option="-m64" />
@@ -78,6 +42,7 @@
 					<Add library="bcrypt" />
 					<Add library="ole32" />
 					<Add library="xmllite" />
+					<Add library="comctl32" />
 					<Add library="uuid" />
 				</Linker>
 				<MakeCommands>
@@ -89,7 +54,7 @@
 					<SilentBuild command=" &gt; $(CMD_NULL)" />
 				</MakeCommands>
 			</Target>
-			<Target title="Debug - New">
+			<Target title="Debug">
 				<Option output="bin/Debug/XT_Clees4All" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Debug/" />
 				<Option type="3" />
@@ -142,8 +107,8 @@
 				<Option createDefFile="1" />
 				<Option createStaticLib="1" />
 				<Option projectCompilerOptionsRelation="2" />
-				<Option projectIncludeDirsRelation="-1" />
-				<Option projectLibDirsRelation="-1" />
+				<Option projectIncludeDirsRelation="2" />
+				<Option projectLibDirsRelation="2" />
 				<Compiler>
 					<Add option="-std=c++17" />
 					<Add option="-m64" />
@@ -162,6 +127,8 @@
 					<Add library="bcrypt" />
 					<Add library="ole32" />
 					<Add library="xmllite" />
+					<Add library="comctl32" />
+					<Add library="uuid" />
 				</Linker>
 				<MakeCommands>
 					<Build command="" />
@@ -208,12 +175,11 @@
 		<Unit filename="X-tension.def">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="include/ArchiveWriter.h">
 			<Option target="Release" />
-			<Option target="Debug - New" />
+			<Option target="Debug" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="include/FileOutput.h" />
@@ -233,37 +199,33 @@
 		<Unit filename="include/options.h" />
 		<Unit filename="include/utility.h">
 			<Option target="Release" />
-			<Option target="Debug - New" />
+			<Option target="Debug" />
 			<Option target="Tests" />
 		</Unit>
 		<Unit filename="src/ArchiveWriter.cpp">
 			<Option target="Release" />
-			<Option target="Debug - New" />
+			<Option target="Debug" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/FileOutput.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 			<Option target="Tests" />
 		</Unit>
 		<Unit filename="src/GUI.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/ReportTableAssociations.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/SQLFunctions.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/VICS.cpp" />
@@ -273,38 +235,33 @@
 		<Unit filename="src/XML.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/base64.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 			<Option target="Tests" />
 		</Unit>
 		<Unit filename="src/debugMessage.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/main.cpp">
 			<Option compilerVar="CC" />
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/options.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="src/utility.cpp">
 			<Option target="Release" />
-			<Option target="Debug - New" />
+			<Option target="Debug" />
 			<Option target="Tests" />
 		</Unit>
 		<Unit filename="tests/test_vics_json.cpp">
@@ -332,7 +289,6 @@
 			<Option compilerVar="CC" />
 			<Option target="Debug" />
 			<Option target="Release" />
-			<Option target="Debug - New" />
 			<Option target="Release (x86)" />
 		</Unit>
 		<Unit filename="third_party/sqlite/sqlite3.c">
