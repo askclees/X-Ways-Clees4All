@@ -78,14 +78,14 @@ const wchar_t* INFO_DELETION[] =    {L"Existing",
 const int max_deletion = 5;
 
 //prototyping
-INT64 Filetime2Unix(INT64 fTime);
+INT64 filetime2Unix(INT64 fTime);
 wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVIC);
 int createC4POutput();
 void removeInvalidChars(wchar_t* strIn);
 
 int createC4AllRecord(LONG nItemID, int picture, wchar_t MD5Hash[33]);
-LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize);
-int UpdateRecords(int picture, long nItemID,hashValueStruct currHash);
+LONG mainItemProcess(LONG nItemID, int picture, INT64 fileSize);
+int updateRecords(int picture, long nItemID,hashValueStruct currHash);
 
 int createVICSRecord(LONG nItemID, int picture,hashValueStruct hashVals);
 
@@ -149,7 +149,7 @@ LONG DLL_EXPORT XT_Init(CallerInfo info, DWORD nFlags, HANDLE hMainWnd, void* lp
     //required if testing command line to set debugger
     //MessageBox(NULL,"Test","Test",MB_OK);
     XT_RetrieveFunctionPointers();
-    int retVal = SQLInit();
+    int retVal = sqlInit();
     if (retVal !=0){
         //error with SQL
         return -1;
@@ -274,12 +274,12 @@ LONG DLL_EXPORT XT_Prepare(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void*
 /**
  * @brief Main worker function called per item during RVS processing.
  *
- * Checks whether the item is an exportable media file and calls MainItemProcess if so.
+ * Checks whether the item is an exportable media file and calls mainItemProcess if so.
  *
  * @return 0 always.
  *
  * @see checkItemExport
- * @see MainItemProcess
+ * @see mainItemProcess
  */
 LONG DLL_EXPORT XT_ProcessItem(LONG nItemID, void* lpReserved)
 {
@@ -288,7 +288,7 @@ LONG DLL_EXPORT XT_ProcessItem(LONG nItemID, void* lpReserved)
     INT64 fileSize;
     if (checkItemExport(nItemID,&picture,&fileSize)){
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"XT_ProcessItem - Valid Item");}
-        return MainItemProcess(nItemID, picture, fileSize);
+        return mainItemProcess(nItemID, picture, fileSize);
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"XT_ProcessItem End");}
     return 0;
@@ -1359,12 +1359,12 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
  *
  * @see returnHashValue
  * @see writeOutputFile
- * @see UpdateRecords
+ * @see updateRecords
  */
 
-LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
+LONG mainItemProcess(LONG nItemID, int picture, INT64 fileSize)
 {
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"MainItemProcess Start");}
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"mainItemProcess Start");}
     hashValueStruct currHash;
     //start processing item
     int result = returnHashValue(nItemID,(wchar_t*)&currHash.MD5,(wchar_t*)&currHash.SHA1,(wchar_t*)&currHash.photoDNA);
@@ -1385,12 +1385,12 @@ LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
         }
     }
     else{
-        if (extractInfo.debugSet){debugWriteDetails(nItemID, L"MainItemProcess End");}
+        if (extractInfo.debugSet){debugWriteDetails(nItemID, L"mainItemProcess End");}
         return 0;
     }
-    UpdateRecords(picture,nItemID, currHash);
+    updateRecords(picture,nItemID, currHash);
     //reset completed flag to 0
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"MainItemProcess End");}
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"mainItemProcess End");}
     return 0;
 }
 
@@ -1402,12 +1402,12 @@ LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
  * @param currHash  Hash values for the item.
  * @return 0 always.
  *
- * @see MainItemProcess
+ * @see mainItemProcess
  */
 
-int UpdateRecords(int picture, long nItemID, hashValueStruct currHash)
+int updateRecords(int picture, long nItemID, hashValueStruct currHash)
 {
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"UpdateRecords Start");}
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"updateRecords Start");}
     if (extractInfo.C4ALLExport)
     {
         lockC4All.lock();
@@ -1432,7 +1432,7 @@ int UpdateRecords(int picture, long nItemID, hashValueStruct currHash)
         movieCount++;
     }
     updateLock.unlock();
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"UpdateRecords End");}
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"updateRecords End");}
     return 0;
 }
 
@@ -1563,7 +1563,7 @@ int caseCleanup()
     {
         char sqlOutputPath[4096]= {0};
         sprintf(sqlOutputPath,"%ls%ls",extractOpt.errorReportPath, caseTitle);
-        if (!DirExists(sqlOutputPath))
+        if (!dirExists(sqlOutputPath))
         {
             CreateDirectory(sqlOutputPath,NULL);
         }
@@ -1913,7 +1913,7 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaRecord Start");}
     VICSMedia currentRecord;
-    InitializeMediaRecord(currentRecord);
+    initializeMediaRecord(currentRecord);
     //set up VICSMedia record variables
     wcscpy(currentRecord.MD5,hashVals.MD5);
     if (SHA1Hash !=0)
@@ -2172,7 +2172,7 @@ void writeSQLMediaFileRecord(LONG nItemID,wchar_t MD5Hash[33], int picture)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaFileRecord Start");}
     VICSMediaFile currentMedia;
-    InitializeMediaFileRecord(currentMedia);
+    initializeMediaFileRecord(currentMedia);
     extractMediaFileRecordDetails(nItemID, MD5Hash, picture, &currentMedia);
     insertMediaFileRecord(vicsDB,currentMedia, picture);
     //clear up memory
@@ -2258,7 +2258,7 @@ bool replaceOriginalItem(LONG origID, LONG newID)
  * @param hashVals Hash values for the item.
  * @return 0 always.
  *
- * @see UpdateRecords
+ * @see updateRecords
  */
 
 int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
@@ -2280,7 +2280,7 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Duplicate Item Located - to be replaced");}
             errorRaised(duplicateItemID,REPORT_EXCLUDED_DUPLICATE);
             VICSMediaFile recUpdate;
-            InitializeMediaFileRecord(recUpdate);
+            initializeMediaFileRecord(recUpdate);
             int rc = extractMediaFileRecordDetails(nItemID,hashVals.MD5,picture,&recUpdate);
             updateMediaFileRecord(vicsDB,&recUpdate,picture,hashVals.MD5, duplicateItemID);
         }
@@ -2337,7 +2337,7 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
  * @param MD5Hash  MD5 hex string for the item.
  * @return 0 always.
  *
- * @see UpdateRecords
+ * @see updateRecords
  */
 
 int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
@@ -2349,25 +2349,25 @@ int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
     picFile.createdTime = XWF_GetItemInformation(nItemID,32,&done);
     if (picFile.createdTime != 0)
     {
-            picFile.createdTime = Filetime2Unix(picFile.createdTime);
+            picFile.createdTime = filetime2Unix(picFile.createdTime);
     }
     done = FALSE;
     picFile.modifiedTime = XWF_GetItemInformation(nItemID,33,&done);
     if (picFile.modifiedTime != 0)
     {
-            picFile.modifiedTime = Filetime2Unix(picFile.modifiedTime);
+            picFile.modifiedTime = filetime2Unix(picFile.modifiedTime);
     }
     done = FALSE;
     picFile.accessedTime = XWF_GetItemInformation(nItemID,34,&done);
     if (picFile.accessedTime != 0)
     {
-            picFile.accessedTime = Filetime2Unix(picFile.accessedTime);
+            picFile.accessedTime = filetime2Unix(picFile.accessedTime);
     }
     done = FALSE;
     picFile.deletionTime = XWF_GetItemInformation(nItemID,36,&done);
     if (picFile.deletionTime != 0)
     {
-            picFile.deletionTime = Filetime2Unix(picFile.deletionTime);
+            picFile.deletionTime = filetime2Unix(picFile.deletionTime);
     }
     done = FALSE;
     //get description

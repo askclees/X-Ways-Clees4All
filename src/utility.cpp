@@ -15,7 +15,7 @@
  * @param szPath Null-terminated path to check.
  * @return       TRUE if the path exists and is a directory, FALSE otherwise.
  */
-BOOL DirExists(LPCTSTR szPath)
+BOOL dirExists(LPCTSTR szPath)
 {
     DWORD dwAttrib = GetFileAttributes(szPath);
     return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
@@ -39,7 +39,7 @@ BOOL ifFileExists(const char* path)
  * @param szPath Null-terminated wide path to check.
  * @return       TRUE if the path exists and is a directory, FALSE otherwise.
  */
-BOOL DirExistsW(LPCWSTR szPath)
+BOOL dirExistsW(LPCWSTR szPath)
 {
     DWORD dwAttrib = GetFileAttributesW(szPath);
     return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
@@ -63,7 +63,7 @@ BOOL ifFileExistsW(const wchar_t* path)
  * @param fTime FILETIME value expressed as a 64-bit integer.
  * @return      Equivalent Unix timestamp in seconds since the Unix epoch.
  */
-INT64 Filetime2Unix(INT64 fTime)
+INT64 filetime2Unix(INT64 fTime)
 {
     INT64 temp;
     temp = fTime / Nano2Seconds;
@@ -124,7 +124,7 @@ wchar_t* extendBuffer(wchar_t* currBuffer, INT64 currSize, INT64 newSize)
  * @param filePath Null-terminated path to the file.
  * @return         File size in bytes, or -1 if the attributes could not be retrieved.
  */
-INT64 FileSize(const char* filePath)
+INT64 getFileSize(const char* filePath)
 {
     WIN32_FILE_ATTRIBUTE_DATA fad;
     if (!GetFileAttributesExA(filePath, GetFileExInfoStandard, &fad))

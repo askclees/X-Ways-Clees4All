@@ -83,9 +83,14 @@ fptr_XWF_GetSearchTerm XWF_GetSearchTerm;
 fptr_XWF_GetCellText XWF_GetCellText;
 fptr_XWF_GetColumnTitle XWF_GetColumnTitle;
 
-///////////////////////////////////////////////////////////////////////////////
-// XT_RetrieveFunctionPointers - call this function before calling anything else
-
+/**
+ * @brief Loads all X-Ways Forensics API function pointers via GetProcAddress.
+ *
+ * Must be called before any XWF_* API function is used. Resolves every function pointer
+ * from the X-Ways host process module.
+ *
+ * @return 1 on completion.
+ */
 LONG __stdcall XT_RetrieveFunctionPointers()
 {
 	HMODULE Hdl = GetModuleHandle(NULL);

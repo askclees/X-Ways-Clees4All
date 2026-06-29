@@ -8,18 +8,17 @@
 
 static unsigned char BOM[]={0xFF,0xFE};
 
-/* Section: XML File Management
-*/
-
-/*Function: createXML
-
-    Function that creates and XML file at the path provided as a parameter
-
-    Currently no error checking for if file cannot be created.
-
-
-*/
-
+/**
+ * @brief Creates a new XML output file and writes the UTF-16 header and root element opening tag.
+ *
+ * Currently no error checking is performed if the file cannot be created beyond returning NULL.
+ *
+ * @param filePath    NULL-terminated path for the file to be created.
+ * @param progVersion Wide string containing the program version to embed in the root element.
+ * @return FILE pointer to the opened XML file, or NULL on failure.
+ *
+ * @see closeXML
+ */
 FILE* createXML(const char* filePath, const wchar_t* progVersion)
 {
     FILE* newFile;
@@ -31,43 +30,30 @@ FILE* createXML(const char* filePath, const wchar_t* progVersion)
     return newFile;
 }
 
-/*Function: closeXML
-
-    Function that closes a file that has previously been created using <createXML> function.
-
-    See Also:
-        <createXML>
-*/
-
+/**
+ * @brief Writes the XML root element closing tag and closes the file.
+ *
+ * @param xmlFile FILE pointer previously opened by createXML.
+ *
+ * @see createXML
+ */
 void closeXML(FILE* xmlFile)
 {
     fwprintf(xmlFile,L"</ReportIndex>\r\n");
     fclose(xmlFile);
 }
 
-/* Section: XML Writing
-*/
-
-
-/*Function: writeXML
-
-    Writes an XML record to the provided output FILE*
-
-    Parameters:
-
-        FileRecord &fr  -   File Record to be written
-        int picture     -   Flag for record relating to Picture
-        FILE* tmpOutput -   Pointer to FILE for data output
-        INT64 counter   -   The number relating to the media, to be its ID in XML
-
-    Returns:
-        0   -   Always
-
-    See Also:
-        Called by   -   <createC4AllRecord>
-
-*/
-
+/**
+ * @brief Writes a single XML record for a picture or video file to the output FILE.
+ *
+ * @param fr        Reference to the FileRecord containing the metadata to write.
+ * @param picture   1 if the record is for a picture, 0 for a video.
+ * @param tmpOutput FILE pointer to the XML output file.
+ * @param counter   Numeric ID to assign to this media entry.
+ * @return 0 always.
+ *
+ * @see createC4AllRecord
+ */
 LONG writeXML(FileRecord &fr,int picture, FILE* tmpOutput, INT64 counter)
 {
     if (picture==1){
@@ -114,25 +100,19 @@ LONG writeXML(FileRecord &fr,int picture, FILE* tmpOutput, INT64 counter)
 
 }
 
-/* Section: XML String Replacement
-*/
-
-/*Function: strReplaceChar
-
-    Replace a character in a wide string with multiple characters.
-
-    Parameters:
-
-        wchar_t* strIn  - Pointer to wide character string that needs character replacing
-
-    Returns:
-        wchar_t*    -   Pointer to wide character string with characters replaced
-
-    See Also:
-        Called by   -   <replaceInvalidXMLChars>
-
-*/
-
+/**
+ * @brief Replaces the character at a given position in a wide string with a replacement string.
+ *
+ * Frees the original buffer and returns a newly allocated buffer. The caller becomes responsible
+ * for the returned pointer.
+ *
+ * @param strIn      Pointer to the wide character string to modify (freed by this function).
+ * @param position   Zero-based index of the character to replace.
+ * @param replaceStr Wide string to substitute in place of the character at position.
+ * @return Pointer to a newly allocated wide string with the replacement applied.
+ *
+ * @see replaceInvalidXMLChars
+ */
 wchar_t* strReplaceChar(wchar_t* strIn, int position, const wchar_t* replaceStr)
 {
     wchar_t* retStr = strIn;
@@ -148,24 +128,18 @@ wchar_t* strReplaceChar(wchar_t* strIn, int position, const wchar_t* replaceStr)
     return retStr;
 }
 
-/*Function: replaceInvalidXMLChars
-
-    Function that takes a wide character string and replaces characters that are not valid in an xml file
-
-    The Symbols replaced are <>"'&
-
-    Parameters:
-
-        wchar_t* strIn  - Pointer to wide character string that needs checking for invalid characters
-
-    Returns:
-        wchar_t*    -   Pointer to wide character string with characters replaced with XML safe versions
-
-    See Also:
-        Called by   -   <createC4AllRecord>
-
-*/
-
+/**
+ * @brief Replaces characters that are invalid in XML with their entity references.
+ *
+ * Handles the five XML special characters: &lt; &gt; &quot; &apos; &amp;.
+ * Already-escaped entities beginning with &amp; are not double-escaped.
+ *
+ * @param strIn Pointer to a wide character string to process (may be reallocated).
+ * @return Pointer to a wide character string with XML-invalid characters replaced.
+ *
+ * @see createC4AllRecord
+ * @see strReplaceChar
+ */
 wchar_t* replaceInvalidXMLChars(wchar_t* strIn)
 {
     wchar_t* retStr = strIn;
@@ -220,19 +194,16 @@ wchar_t* replaceInvalidXMLChars(wchar_t* strIn)
 }
 
 
-/*Function: removeInvalidChars
-
-    Function that creates an XML record and writes it to the relevant XML file
-
-    Parameters:
-
-        wchar_t* strIn  - Pointer to wide character string that needs checking for invalid characters
-
-    See Also:
-        Called by   -   <createC4AllRecord>
-
-*/
-
+/**
+ * @brief Replaces non-printable and quote characters in a wide string with underscores, in place.
+ *
+ * Iterates through the string and substitutes any non-printable character or single/double
+ * quote with an underscore.
+ *
+ * @param strIn Pointer to the wide character string to sanitise in place.
+ *
+ * @see createC4AllRecord
+ */
 void removeInvalidChars(wchar_t* strIn)
 {
     int length = wcslen(strIn);

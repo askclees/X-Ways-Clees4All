@@ -51,189 +51,191 @@ extern const wchar_t* const errorValues[];
 #define NoErrorTypes 5
 
 
-/*Struct: FileRecord
-
-Struct used for XML output in <createC4AllRecord>.
-
-Fields:
-    INT64 fileID                - Auto Incrementing ID
-    wchar_t* fullPath           - Path of file (including filename)
-    INT64 createdTime           - Recorded Created Time
-    INT64 modifiedTime          - Recorded Modified Time
-    INT64 accessedTime          - Recorded Accessed Time
-    INT64 deletionTime          - Recorded Deleted Time
-    wchar_t hashValue[64]       - MD5 hash value
-    wchar_t description[128]    - Text based description, includes things like deleted etc
-    INT64 fileSize              - Recorded size of file
-    INT64 fileOffset            - Recorded offset of file
-    INT64 physicalSector        - Recorded physical sector of file
-
-*/
-
+/**
+ * @brief Record used for XML output in createC4AllRecord.
+ *
+ * Holds per-file metadata written to the C4All XML report.
+ */
 struct FileRecord{
+    /** @brief Auto-incrementing record ID. */
     INT64 fileID;
+    /** @brief Full path of the file including filename. */
     wchar_t* fullPath;
+    /** @brief Recorded creation timestamp. */
     INT64 createdTime;
+    /** @brief Recorded last-modified timestamp. */
     INT64 modifiedTime;
+    /** @brief Recorded last-accessed timestamp. */
     INT64 accessedTime;
+    /** @brief Recorded deletion timestamp. */
     INT64 deletionTime;
+    /** @brief MD5 hash value of the file. */
     wchar_t hashValue[64];
+    /** @brief Text description including status flags such as "deleted". */
     wchar_t description[128];
+    /** @brief Recorded size of the file in bytes. */
     INT64 fileSize;
+    /** @brief Recorded byte offset of the file. */
     INT64 fileOffset;
+    /** @brief Recorded physical sector of the file. */
     INT64 physicalSector;
 };
 
-/*Struct: EvidenceObjects
-
-Struct used to contain details of a single evidence object
-
-Fields:
-    wchar_t longName[2048];     - Long name of Evidence object
-    DWORD objID                 - X-Ways ID of evidence object
-    DWORD parentID              - X-Ways ID of parent evidence object
-
-*/
-
+/**
+ * @brief Contains details of a single evidence object.
+ */
 struct EvidenceObjects{
+    /** @brief Long display name of the evidence object. */
     wchar_t longName[2048];
+    /** @brief X-Ways ID of the evidence object. */
     DWORD objID;
+    /** @brief X-Ways ID of the parent evidence object. */
     DWORD parentID;
 };
 
 
-/*Struct: outputDetails
-
-Struct used to contain details of output files for XML output
-
-Fields:
-    wchar_t longName[2048]      - Long name of Evidence object
-    DWORD objID                 - X-Ways ID of evidence object
-    FILE* picOutput             - Handle to File for picture output
-    INT64 picCounter            - Integer for number of records currently stored
-    FILE* vidOutput             - Handle to File for Video output
-    INT64 vidCounter            - Integer for number of records currently stored
-
-*/
-
+/**
+ * @brief Contains details of XML output files associated with an evidence object.
+ */
 struct outputDetails{
+    /** @brief Name of the evidence object. */
     wchar_t evidenceObj[2048];
+    /** @brief X-Ways ID of the evidence object. */
     DWORD objID;
+    /** @brief FILE handle for picture XML output. */
     FILE* picOutput;
+    /** @brief Number of picture records written. */
     INT64 picCounter;
+    /** @brief FILE handle for video XML output. */
     FILE* vidOutput;
+    /** @brief Number of video records written. */
     INT64 vidCounter;
 };
 
-/*Struct: ObjectNames
-
-Struct used to contain detauils of the Evidence objects and the preferred output names.
-
-The preferred names are used as the source ID in the JSON VICS export.
-
-Fields:
-    DWORD objectID              - DWORD of X-Ways reference to Object
-    wchar_t actualName[1024]    - Actual name of evidence object (as shown in X-Ways forensics)
-    wchar_t prefName[1024]      - Name that is to be displayed as source ID in JSON VICS output
-
-*/
-
+/**
+ * @brief Contains the actual and preferred output names for an evidence object.
+ *
+ * The preferred name is used as the SourceID in the Project VICS JSON export.
+ */
 struct ObjectNames{
+    /** @brief X-Ways reference ID for the evidence object. */
     DWORD objectID;
+    /** @brief Actual name of the evidence object as shown in X-Ways Forensics. */
     wchar_t actualName[1024];
+    /** @brief Name to display as SourceID in the VICS JSON output. */
     wchar_t prefName[1024];
 };
 
-/*Struct: ExtractionDetails
-
-Struct that contains details of extraction options
-
-Fields:
-    wchar_t* C4PPath                - Pointer to path of output for C4P XML file
-    wchar_t* C4MPath                - Pointer to path of output for C4M XML file
-    BOOL extractPictures            - Flag for exporting Pictures
-    BOOL extractVideos              - Flag for exporting Videos
-    outputDetails outputFiles[32]   - Array of object details
-    int outputFileCounter           - Integer that contains number of Output Files in arrya
-    ObjectNames* nameList           - Array of Object Names, should be of size noNames
-    int noNames                     - Integer that stores number of name objects in Array
-    BOOL VICExport                  - Flag for project VICS export
-    BOOL C4ALLExport                - Flag for C4All (XML) setting
-    BOOL debugSet                   - Debug Flag
-    BOOL processStart               - Has process started
-    BOOL createGriffeye             - Option to create Griffeye case
-    BOOL checkParent                - Added in 1.40
-    BOOL VICSCompressed             - Added in 1.50
-    BOOL ocrScreenshot              - Added in 1.50
-    BOOL extractText                - Added in 1.50
-    wchar_t* GriffeyeCaseLocation   - Pointer to Griffeye Case Creation Path
-    wchar_t* GriffeyeCaseName       - Pointer to Griffeye Case Name
-    wchar_t* GriffeyeSettingsName   - Pointer to Griffeye Settings Name Added in 1.51
-    HINSTANCE thisDLL
-*/
-
+/**
+ * @brief Contains the full set of extraction options and runtime state for a processing run.
+ */
 struct ExtractionDetails{
+    /** @brief Path for the C4P (picture) XML output file. */
     wchar_t* C4PPath;
+    /** @brief Path for the C4M (movie/video) XML output file. */
     wchar_t* C4MPath;
+    /** @brief Flag to extract pictures. */
     BOOL extractPictures;
+    /** @brief Flag to extract videos. */
     BOOL extractVideos;
+    /** @brief Array of per-evidence-object output file details (up to 32 objects). */
     outputDetails outputFiles[32];
+    /** @brief Number of active entries in outputFiles. */
     int outputFileCounter;
+    /** @brief Array of evidence object name mappings. */
     ObjectNames* nameList;
+    /** @brief Number of entries in nameList. */
     int noNames;
+    /** @brief Flag to enable Project VICS JSON export. */
     BOOL VICExport;
+    /** @brief Flag to enable C4All (XML) export. */
     BOOL C4ALLExport;
+    /** @brief Debug logging flag. */
     BOOL debugSet;
+    /** @brief Indicates whether processing has started. */
     BOOL processStart;
+    /** @brief Flag to create a Griffeye case. */
     BOOL createGriffeye;
-//1.40 add variable for ensuring frames are not extracted from videos
-//1.50 set default value to true
+    /** @brief Ignore files whose parent has already been processed (added in v1.40, default true). */
     BOOL checkParent=true;
-//1.50 added option for compressed VICS export
+    /** @brief Enable compressed (zip) VICS export (added in v1.50). */
     BOOL VICSCompressed=false;
-//1.50 add variables for OCR on screenshots and extracting any OCR text
+    /** @brief Enable OCR on screenshots (added in v1.50, currently unused). */
     BOOL ocrScreenshot=false;
+    /** @brief Enable extraction of OCR text (added in v1.50, currently unused). */
     BOOL extractText=false;
-//1.50 added extract report tables and ignore thumbnails
+    /** @brief Ignore thumbnail files. */
     BOOL ignoreThumbs=false;
+    /** @brief Except thumbnail-mismatch items from the thumbnail filter. */
     BOOL exceptMismatch=false;
+    /** @brief Export report table associations. */
     BOOL exportReportTables=false;
+    /** @brief Path to the Griffeye case creation directory. */
     wchar_t* GriffeyeCaseLocation;
+    /** @brief Name for the Griffeye case. */
     wchar_t* GriffeyeCaseName;
+    /** @brief Name for the Griffeye settings profile (added in v1.51). */
     wchar_t* GriffeyeSettingsName = nullptr;
+    /** @brief Handle to this DLL module. */
     HINSTANCE thisDLL;
 };
 
+/**
+ * @brief Properties of a single evidence object used for SQLite record insertion.
+ */
 struct EvidenceProps
 {
+    /** @brief X-Ways evidence object ID. */
     DWORD ID;
+    /** @brief Display name of the evidence object. */
     wchar_t* Name;
+    /** @brief Source identifier string. */
     wchar_t* SourceID;
+    /** @brief X-Ways ID of the parent evidence object. */
     DWORD parentID;
+    /** @brief Index of the associated XML output file. */
     int fileID;
+    /** @brief 1 if the evidence object is selected for processing, 0 otherwise. */
     int selected;
 };
 
+/**
+ * @brief Stores MD5, SHA1, and PhotoDNA hash values for a file.
+ */
 struct hashValueStruct
 {
+    /** @brief MD5 hash as a 32-character wide string. */
     wchar_t MD5[33]={0};
+    /** @brief SHA1 hash as a 40-character wide string. */
     wchar_t SHA1[41]={0};
+    /** @brief Number of PhotoDNA hash values present. */
     int noPhotoDNAHash = 0;
+    /** @brief PhotoDNA hash value. */
     wchar_t photoDNA[256]={0};
 };
 
+/**
+ * @brief Persistent extraction options loaded from and saved to the options SQLite database.
+ */
 struct ExtractOptions
 {
+    /** @brief Maximum picture file size in bytes to process (0 = no limit). */
     INT64 maxPictureSize;
+    /** @brief Maximum video file size in bytes to process (0 = no limit). */
     INT64 maxMovieSize;
+    /** @brief Overwrite existing output files if true. */
     BOOL overwriteFiles;
-    //1.50 allow for minimum file size as well
+    /** @brief Minimum picture file size in bytes to process (added in v1.50). */
     INT64 minPictureSize;
+    /** @brief Minimum video file size in bytes to process (added in v1.50). */
     INT64 minMovieSize;
-    //1.51 added file type fields
+    /** @brief Bitmask of X-Ways type status flags to include (added in v1.51). */
     int TypeStatusFlags;
+    /** @brief Bitmask of X-Ways file format status flags to include (added in v1.51). */
     int FileTypeFlag;
+    /** @brief Path for the error report output directory. */
     wchar_t errorReportPath[2048];
+    /** @brief Path to the Griffeye Analyze installation directory. */
     wchar_t GriffeyePath[2048];
 
 };
@@ -258,4 +260,3 @@ LONG DLL_EXPORT XT_Init(CallerInfo info, DWORD nFlags, HANDLE hMainWnd,
 #endif
 
 #endif // __MAIN_H__
-

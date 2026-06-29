@@ -97,7 +97,7 @@ void createOptions(char path[]);
  * @param filename Null-terminated path to the file.
  * @return true if the file exists and is accessible, false otherwise.
  */
-bool file_exists(const char* filename)
+bool fileExists(const char* filename)
 {
     if (FILE* file = fopen(filename,"r"))
     {
@@ -121,9 +121,9 @@ static const char* findGriffeyeExe(const char* folder)
     char check[MAX_PATH];
     bool hasSlash = (folder[strlen(folder)-1] == '\\');
     snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", folder);
-    if (file_exists(check)) return "analyze-cli.exe";
+    if (fileExists(check)) return "analyze-cli.exe";
     snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", folder);
-    if (file_exists(check)) return "magnet-griffeye-cli.exe";
+    if (fileExists(check)) return "magnet-griffeye-cli.exe";
     return NULL;
 }
 
@@ -226,7 +226,7 @@ bool detailsValid()
     char buffer[1024];
     int length = GetWindowTextLength(ReportOutput);
     GetWindowText(ReportOutput,buffer,1024);
-    if(!DirExists(buffer)){
+    if(!dirExists(buffer)){
         MessageBox(NULL,"Report Output Path does not exist or cannot be accessed","Error ",MB_ICONERROR);
         return false;
     }
@@ -861,12 +861,12 @@ char* createOptionsFolderString()
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strncat(appdataPath,"\\X-Ways\\",MAX_PATH);
-        if (!DirExists(appdataPath))
+        if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (!DirExists(appdataPath))
+        if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
@@ -912,7 +912,7 @@ ExtractOptions loadOrCreateOptions(BOOL* success)
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     strcpy(optionsDatabasePath, optPath);
-    if (SQLDatabaseExists(optPath))
+    if (sqlDatabaseExists(optPath))
     {
         //database there
         retOpt = loadOptions(optPath);
