@@ -8,6 +8,14 @@ ReportTableDetails reportEntries;
 #define THUMBNAIL_DISCREPANCY   1
 #define THUMBNAIL_NOTABLE       2
 
+/**
+ * @brief Adds a report table entry to the global reportEntries list.
+ *
+ * @param tblName    Wide string containing the name of the report table.
+ * @param tblID      X-Ways report table ID.
+ * @param userCreated True if the table was created by the user, false for system tables.
+ * @return 0 always.
+ */
 int addReportTableEntry(wchar_t* tblName, LONG tblID, bool userCreated)
 {
     reportEntries.entries[reportEntries.numTables].reportTableName = new wchar_t[wcslen(tblName)+1];
@@ -18,6 +26,12 @@ int addReportTableEntry(wchar_t* tblName, LONG tblID, bool userCreated)
     return 0;
 }
 
+/**
+ * @brief Stores the table ID for a thumbnail-related report table by type.
+ *
+ * @param tblID X-Ways report table ID to store.
+ * @param type  THUMBNAIL_DISCREPANCY or THUMBNAIL_NOTABLE indicating which slot to populate.
+ */
 void setThumbnailReportTableNumber(LONG tblID, int type)
 {
     if (type==THUMBNAIL_DISCREPANCY){
@@ -28,6 +42,15 @@ void setThumbnailReportTableNumber(LONG tblID, int type)
     }
 }
 
+/**
+ * @brief Checks whether a report table name matches a known thumbnail mismatch table and records its ID.
+ *
+ * @param tblName    Wide string containing the report table name to test.
+ * @param tblID      X-Ways report table ID.
+ * @param userCreated Whether the table was user-created (unused; retained for API symmetry).
+ *
+ * @see setThumbnailReportTableNumber
+ */
 void checkReportTableThumbnailMismatch(wchar_t* tblName, LONG tblID, bool userCreated)
 {
     if (wcscmp(tblName,L"Thumbnail discrepancy")==0){
@@ -39,6 +62,9 @@ void checkReportTableThumbnailMismatch(wchar_t* tblName, LONG tblID, bool userCr
 }
 
 
+/**
+ * @brief Frees all dynamically allocated report table name strings and resets the global reportEntries list.
+ */
 void clearReportTableDetails()
 {
     for (int i=0;i<reportEntries.numTables;i++){
@@ -51,6 +77,12 @@ void clearReportTableDetails()
     reportEntries.thumbnailDiscrepancy = -1;
 }
 
+/**
+ * @brief Checks whether a given report table ID matches one of the known thumbnail mismatch tables.
+ *
+ * @param tblID X-Ways report table ID to test.
+ * @return true if the ID matches a thumbnail mismatch table, false otherwise.
+ */
 bool isReportTableIDThumbnailMismatch(LONG tblID)
 {
     if (tblID == reportEntries.thumbnailDamaged || tblID == reportEntries.thumbnailDiscrepancy){
@@ -59,6 +91,13 @@ bool isReportTableIDThumbnailMismatch(LONG tblID)
     return false;
 }
 
+/**
+ * @brief Parses a comma-separated wide string of report table names into a ReportTableList.
+ *
+ * @param buffer    Wide character buffer containing the comma-separated table names.
+ * @param bufferLen Length of the buffer in characters.
+ * @return ReportTableList populated with the individual table name entries.
+ */
 ReportTableList stringToEntryList(wchar_t* buffer, int bufferLen)
 {
     ReportTableList retVal;
@@ -81,6 +120,15 @@ ReportTableList stringToEntryList(wchar_t* buffer, int bufferLen)
 }
 
 
+/**
+ * @brief Returns true if the comma-separated report table string contains a thumbnail mismatch table name.
+ *
+ * @param buffer    Wide character buffer containing the comma-separated report table names.
+ * @param bufferLen Length of the buffer in characters.
+ * @return true if a thumbnail mismatch table is present, false otherwise.
+ *
+ * @see stringToEntryList
+ */
 bool containsThumbnailMismatchTable(wchar_t* buffer, int bufferLen)
 {
     ReportTableList entries = stringToEntryList(buffer, bufferLen);
@@ -94,19 +142,15 @@ bool containsThumbnailMismatchTable(wchar_t* buffer, int bufferLen)
     return false;
 }
 
-/*Function: identifyReportTables
-    Setup case when X-Tension is first run. Only called on first XT_Prepare call of run.
-
-    Created in 1.50, split from <XT_Prepare>
-
-    Returns:
-        0 - No Error
-        <0 - Error
-
-    See Also:
-        Called by   -   <firstRunSetup>
-*/
-
+/**
+ * @brief Enumerates all X-Ways report tables, records user-created tables, and identifies thumbnail mismatch tables.
+ *
+ * @return 0 on success, negative on error.
+ *
+ * @see addReportTableEntry
+ * @see checkReportTableThumbnailMismatch
+ * @see firstRunSetup
+ */
 int identifyReportTables()
 {
     LONG maxTableNumber=0;
@@ -129,6 +173,14 @@ int identifyReportTables()
 }
 
 
+/**
+ * @brief Returns whether a report table with the given name was user-created.
+ *
+ * Searches the global reportEntries list for a name match.
+ *
+ * @param tableName Wide string containing the report table name to look up.
+ * @return true if a matching user-created table is found, false otherwise.
+ */
 bool isUserCreatedReportTable(wchar_t* tableName)
 {
     for (int i=0;i<reportEntries.numTables;i++){
@@ -140,6 +192,21 @@ bool isUserCreatedReportTable(wchar_t* tableName)
     return false;
 }
 
+/**
+ * @brief Retrieves the user-created report table associations for a given X-Ways item.
+ *
+ * Queries X-Ways for all report table associations of the item, then filters to only those
+ * tables that are user-created. Returns NULL if no user-created associations exist.
+ *
+ * The returned buffer is allocated with new[] and must be freed by the caller using delete[].
+ *
+ * @param nItemID X-Ways item ID to query.
+ * @return Newly allocated wide string containing comma-separated user-created table names,
+ *         or NULL if the item has no user-created report table associations.
+ *
+ * @see stringToEntryList
+ * @see isUserCreatedReportTable
+ */
 wchar_t* retrieveUserReportTableAssociations(LONG nItemID)
 {
     int bufferLen = 1024;

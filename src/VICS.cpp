@@ -17,28 +17,19 @@ const DWORD minTime = 0x015fffff;
 
 
 
-/*  Section: VICS File Functions  */
-
-/*Function: openVICSFile
-    Function to create new file and write VICS case information to start of file.
-
-    Parameters are a valid file path for the file output and the program version
-
-    Output is not complete (valid) VICS JSON entry as it requires closing via <closeVICSFile>
-
-    Parameters:
-        char* filePath              - NULL terminated string containing filepath for file to be created
-        const wchar_t* progVersion  - Program version provided in Wide character text format
-
-    Returns:
-        FILE* of opened VICS file
-
-    See Also:
-        Related Functions   - <closeVICSFile>
-        Called by           - <setupVicsExport>
-
-*/
-
+/**
+ * @brief Creates a new VICS JSON output file and writes the case header information.
+ *
+ * The output is not a complete VICS JSON entry until closeVICSFile is called to write
+ * the closing brackets.
+ *
+ * @param filePath    NULL-terminated path for the file to be created.
+ * @param progVersion Wide string containing the program version to embed in the header.
+ * @return FILE pointer to the opened VICS file, or NULL on failure.
+ *
+ * @see closeVICSFile
+ * @see setupVicsExport
+ */
 FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
 {
 	FILE* newFile = fopen(filePath,"wb");
@@ -80,22 +71,16 @@ FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
 	return newFile;
 }
 
-/*Function: closeVICSFile
-    Writes data to VICS file that closes the entries and then closes the file.
-
-    Requires valid FILE* as parameter, should have been opened using openVICSFile
-
-    Parameters:
-        FILE* vFile -   Valid VICS output FILE
-
-    Returns:
-        Int result of fclose function on FILE parameter
-
-    See Also:
-        Related function    -   <openVICSFile>
-        Called by           -   <writeRecords>
-*/
-
+/**
+ * @brief Writes the closing JSON brackets to a VICS file and then closes it.
+ *
+ * @param vFile Valid FILE pointer previously opened by openVICSFile.
+ * @return 0 on success, 1 if vFile is NULL, 2 if writing the closing brackets fails,
+ *         or the result of fclose on error.
+ *
+ * @see openVICSFile
+ * @see writeRecords
+ */
 int closeVICSFile(FILE* vFile)
 {
 	if (vFile == NULL) { return 1;}
@@ -107,7 +92,11 @@ int closeVICSFile(FILE* vFile)
 	return fclose(vFile);
 }
 
-//initialisation records
+/**
+ * @brief Initialises all fields of a VICSMedia record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSMedia struct to initialise.
+ */
 void initializeMediaRecord(VICSMedia& record)
 {
     record.Category = 0;
@@ -135,6 +124,11 @@ void initializeMediaRecord(VICSMedia& record)
     record.DateUpdated.dwLowDateTime = 0;
 }
 
+/**
+ * @brief Initialises all fields of a VICSAltHash record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSAltHash struct to initialise.
+ */
 void initializeAltHashRecord(VICSAltHash& record)
 {
     record.hashName = NULL;
@@ -142,6 +136,11 @@ void initializeAltHashRecord(VICSAltHash& record)
     record.MD5[0] = L'\0';
 }
 
+/**
+ * @brief Initialises all fields of a VICSMediaFile record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSMediaFile struct to initialise.
+ */
 void initializeMediaFileRecord(VICSMediaFile& record)
 {
     record.deleted = FALSE;
@@ -166,6 +165,13 @@ void initializeMediaFileRecord(VICSMediaFile& record)
     record.physicalLocation = 0;
 }
 
+/**
+ * @brief Initialises a VICSRecord and its embedded VICSMedia sub-record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSRecord struct to initialise.
+ *
+ * @see initializeMediaRecord
+ */
 void initializeVICSRecord(VICSRecord& record)
 {
     record.noMediaFiles = 0;
@@ -177,12 +183,22 @@ void initializeVICSRecord(VICSRecord& record)
     initializeMediaRecord(record.vMedia);
 }
 
+/**
+ * @brief Initialises all fields of a VICSRepository record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSRepository struct to initialise.
+ */
 void initializeRepositoryRecord(VICSRepository& record)
 {
     record.repositoryName = NULL;
     record.MD5[0] = L'\0';
 }
 
+/**
+ * @brief Initialises all fields of a VICSExif record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSExif struct to initialise.
+ */
 void initializeExifRecord(VICSExif& record)
 {
     record.propertyName = NULL;
@@ -190,6 +206,11 @@ void initializeExifRecord(VICSExif& record)
     record.MD5 =  NULL;
 }
 
+/**
+ * @brief Initialises all fields of a VICSSegment record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSSegment struct to initialise.
+ */
 void initializeSegmentRecord(VICSSegment& record)
 {
     record.Start = NULL;
@@ -200,8 +221,15 @@ void initializeSegmentRecord(VICSSegment& record)
     record.category = 0;
 }
 
-/*Section: VICS Record Deallocation Functions*/
-
+/**
+ * @brief Frees all dynamically allocated memory within a VICSRecord, including its MediaFiles and MediaMetadata.
+ *
+ * @param record The VICSRecord to deallocate (passed by value; sub-records are freed in place).
+ *
+ * @see deallocateMediaRecord
+ * @see deallocateMediaFileRecord
+ * @see deallocateMediaMetadataRecord
+ */
 void deallocateVICSRecord(VICSRecord record)
 {
     deallocateMediaRecord(record.vMedia);
@@ -224,6 +252,11 @@ void deallocateVICSRecord(VICSRecord record)
     }
 }
 
+/**
+ * @brief Frees all dynamically allocated pointer fields within a VICSMedia record.
+ *
+ * @param record Reference to the VICSMedia struct whose fields are to be freed.
+ */
 void deallocateMediaRecord(VICSMedia &record)
 {
     if (record.Comments != NULL) {delete[] record.Comments;}
@@ -234,12 +267,22 @@ void deallocateMediaRecord(VICSMedia &record)
     if (record.Tags != NULL) {delete[] record.Tags;}
 }
 
+/**
+ * @brief Frees the PropertyName and PropertyValue fields within a VICSMediaMetadata record.
+ *
+ * @param record Reference to the VICSMediaMetadata struct whose fields are to be freed.
+ */
 void deallocateMediaMetadataRecord(VICSMediaMetadata &record)
 {
     if (record.PropertyName != NULL) {delete[] record.PropertyName;}
     if (record.PropertyValue != NULL) {delete[] record.PropertyValue;}
 }
 
+/**
+ * @brief Frees all dynamically allocated pointer fields within a VICSMediaFile record.
+ *
+ * @param record Reference to the VICSMediaFile struct whose fields are to be freed.
+ */
 void deallocateMediaFileRecord(VICSMediaFile &record)
 {
     if (record.fileName != NULL) {delete[] record.fileName;}
@@ -249,6 +292,9 @@ void deallocateMediaFileRecord(VICSMediaFile &record)
     if (record.sourceID != NULL) {delete[] record.sourceID;}
 }
 
+/**
+ * @brief Frees all dynamically allocated string fields in the global VICSCaseData struct.
+ */
 void freeVicsCaseData()
 {
     if (vCaseData.CaseNumber != nullptr)    { delete[] vCaseData.CaseNumber; }
@@ -259,15 +305,16 @@ void freeVicsCaseData()
     if (vCaseData.ContactTitle != nullptr)  { delete[] vCaseData.ContactTitle; }
 }
 
-/*Section: VICS Record Size Functions*/
-
-/*Function: getMediaFileRecordSize
-    Returns the total character count of all variable-length wchar_t* fields in a VICSMediaFile record.
-    Used by insertMediaFileRecord to size the SQL query buffer.
-
-    See Also: <insertMediaFileRecord>
-*/
-
+/**
+ * @brief Returns the total character count of all variable-length wide string fields in a VICSMediaFile record.
+ *
+ * Used by insertMediaFileRecord to determine the required SQL query buffer size.
+ *
+ * @param record Reference to the VICSMediaFile struct to measure.
+ * @return Total character count of all non-null wchar_t* fields.
+ *
+ * @see insertMediaFileRecord
+ */
 INT64 getMediaFileRecordSize(VICSMediaFile &record)
 {
     INT64 retSize=0;
@@ -279,13 +326,16 @@ INT64 getMediaFileRecordSize(VICSMediaFile &record)
     return retSize;
 }
 
-/*Function: getMediaRecordSize
-    Returns the total character count of all variable-length wchar_t* fields in a VICSMedia record.
-    Used by insertMediaRecord to size the SQL query buffer.
-
-    See Also: <insertMediaRecord>
-*/
-
+/**
+ * @brief Returns the total character count of all variable-length wide string fields in a VICSMedia record.
+ *
+ * Used by insertMediaRecord to determine the required SQL query buffer size.
+ *
+ * @param record Reference to the VICSMedia struct to measure.
+ * @return Total character count of all non-null wchar_t* fields.
+ *
+ * @see insertMediaRecord
+ */
 INT64 getMediaRecordSize(VICSMedia &record)
 {
     INT64 retSize=0;
@@ -297,8 +347,6 @@ INT64 getMediaRecordSize(VICSMedia &record)
     if (record.MimeType!= NULL) {retSize = retSize + wcslen(record.MimeType);}
     return retSize;
 }
-
-/*Section: cJSON Helper Functions*/
 
 /* Add an INT64 field to a cJSON object as a JSON integer (no double conversion). */
 static void cjsonAddInt64(cJSON* obj, const char* key, INT64 value)
@@ -446,23 +494,18 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     return obj;
 }
 
-/*Section: VICS Writing Functions*/
-
-/*Function: writeMediaRecord
-    Writes a single VICS Media record (with its MediaFiles array) to a FILE previously opened
-    with openVICSFile. Uses cJSON to build and serialise the record — all string escaping is
-    handled automatically.
-
-    Returns:
-         0  - success
-        -1  - NULL vicFile or record pointer, or mandatory MD5 absent
-        -2  - cJSON serialisation failure
-
-    See Also:
-        <openVICSFile>
-        <VICSRecord>
-*/
-
+/**
+ * @brief Writes a single VICS Media record (with its MediaFiles array) to an open VICS file.
+ *
+ * Uses cJSON to build and serialise the record; all string escaping is handled automatically.
+ *
+ * @param vicFile FILE pointer previously opened by openVICSFile.
+ * @param record  Pointer to the VICSRecord to write.
+ * @return 0 on success, -1 if vicFile or record is NULL or the mandatory MD5 field is absent,
+ *         -2 if cJSON serialisation fails.
+ *
+ * @see openVICSFile
+ */
 int writeMediaRecord(FILE* vicFile, VICSRecord* record)
 {
     if (vicFile == NULL || record == NULL) return -1;
@@ -493,15 +536,14 @@ int writeMediaRecord(FILE* vicFile, VICSRecord* record)
     return 0;
 }
 
-/*Section: VICS SQL Extraction Functions*/
-
-/*Function: extractVICSMediaSQL
-    Functions takes a pointer a VICSMedia record and a sqlite3_stmt
-    Fills in the details from the SQL results into the VICSMedia record
-
-    See also: <VICSMedia>
-*/
-
+/**
+ * @brief Populates a VICSMedia record from the current row of an SQLite statement.
+ *
+ * @param recMedia  Reference to the VICSMedia struct to populate.
+ * @param statement Prepared and stepped SQLite statement positioned on a valid row.
+ *
+ * @see VICSMedia
+ */
 void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
 {
     recMedia.MediaID = sqlite3_column_int64(statement,0);
@@ -566,13 +608,14 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
         }
 }
 
-/*Function: extractVICSMediaFileSQL
-    Functions takes a pointer a VICSMediaFile record and a sqlite3_stmt
-    Fills in the details from the SQL results into the VICSMediaFile record
-
-    See also: <VICSMediaFile>
-*/
-
+/**
+ * @brief Populates a VICSMediaFile record from the current row of an SQLite statement.
+ *
+ * @param recMediaFile Reference to the VICSMediaFile struct to populate.
+ * @param statement    Prepared and stepped SQLite statement positioned on a valid row.
+ *
+ * @see VICSMediaFile
+ */
 void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement)
 {
     wcscpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0));
@@ -636,13 +679,14 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
     recMediaFile.parentPhysLoc = sqlite3_column_int(statement,13);
 }
 
-/*Function: extractVICSMediaMetadataSQL
-    Functions takes a pointer a VICSMediaMetadata record and a sqlite3_stmt
-    Fills in the details from the SQL results into the VICSMediaMetadata record
-
-    See also: <VICSMediaMetadata>
-*/
-
+/**
+ * @brief Populates a VICSMediaMetadata record from the current row of an SQLite statement.
+ *
+ * @param record    Pointer to the VICSMediaMetadata struct to populate.
+ * @param statement Prepared and stepped SQLite statement positioned on a valid row.
+ *
+ * @see VICSMediaMetadata
+ */
 void extractVICSMediaMetadataSQL(VICSMediaMetadata* record,sqlite3_stmt* statement)
 {
     wcscpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0));
@@ -654,15 +698,15 @@ void extractVICSMediaMetadataSQL(VICSMediaMetadata* record,sqlite3_stmt* stateme
     wcscpy(record->PropertyValue, (wchar_t*)sqlite3_column_text16(statement,2));
 }
 
-/*  Section: VICS Validation Functions  */
-
-/*Function: validFiletime
-    Validates a FILETIME: rejects zero, values below minTime, and timestamps more than
-    2 years in the future.  Added in 1.50.
-
-    Returns: true if valid, false otherwise
-*/
-
+/**
+ * @brief Validates a FILETIME value, rejecting zero, implausibly old, and future timestamps.
+ *
+ * Rejects timestamps that are zero, below the minTime constant, or more than two years
+ * in the future relative to the current system time.
+ *
+ * @param timestamp The FILETIME value to validate.
+ * @return true if the timestamp is valid, false otherwise.
+ */
 bool validFiletime(FILETIME timestamp)
 {
     if (timestamp.dwHighDateTime == 0 && timestamp.dwLowDateTime ==0)
