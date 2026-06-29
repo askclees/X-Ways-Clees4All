@@ -38,7 +38,7 @@ static char* readTmp(FILE* f)
 static VICSRecord makeRecord()
 {
     VICSRecord rec;
-    InitializeVICSRecord(rec);
+    initializeVICSRecord(rec);
     wcscpy(rec.vMedia.MD5, L"AABBCCDDEEFF00112233445566778899");
     return rec;
 }
@@ -47,7 +47,7 @@ static VICSRecord makeRecord()
 static VICSMediaFile* makeMediaFile(const wchar_t* md5, const wchar_t* name, const wchar_t* path)
 {
     VICSMediaFile* f = new VICSMediaFile;
-    InitializeMediaFileRecord(*f);
+    initializeMediaFileRecord(*f);
     wcscpy(f->MD5, md5);
     f->fileName = new wchar_t[wcslen(name) + 1];
     wcscpy(f->fileName, name);
@@ -83,8 +83,8 @@ static void test_empty_md5_rejected()
 {
     FILE* f = openTmp();
     VICSRecord rec;
-    InitializeVICSRecord(rec);
-    // MD5 left empty by InitializeVICSRecord — mandatory field absent
+    initializeVICSRecord(rec);
+    // MD5 left empty by initializeVICSRecord — mandatory field absent
     CHECK(writeMediaRecord(f, &rec) == -1);
     fclose(f);
 }
@@ -206,7 +206,7 @@ static void test_sha1_absent_when_empty()
 {
     FILE* f = openTmp();
     VICSRecord rec = makeRecord();
-    // SHA1[0] == L'\0' from InitializeVICSRecord
+    // SHA1[0] == L'\0' from initializeVICSRecord
     writeMediaRecord(f, &rec);
     char* json = readTmp(f);
     CHECK_NOT_CONTAINS(json, "\"SHA1\"");
@@ -347,7 +347,7 @@ static void test_mediafiles_array_absent_when_none()
 {
     FILE* f = openTmp();
     VICSRecord rec = makeRecord();
-    // noMediaFiles == 0 from InitializeVICSRecord
+    // noMediaFiles == 0 from initializeVICSRecord
     writeMediaRecord(f, &rec);
     char* json = readTmp(f);
     CHECK_NOT_CONTAINS(json, "\"MediaFiles\"");
@@ -359,7 +359,7 @@ static void test_mediafile_skipped_when_md5_empty()
     FILE* f = openTmp();
     VICSRecord rec = makeRecord();
     rec.vMediaFiles = new VICSMediaFile[1];
-    InitializeMediaFileRecord(rec.vMediaFiles[0]);
+    initializeMediaFileRecord(rec.vMediaFiles[0]);
     // MD5 left empty — should be rejected by buildMediaFileCJSON
     rec.vMediaFiles[0].fileName = new wchar_t[16];
     wcscpy(rec.vMediaFiles[0].fileName, L"bad.jpg");
@@ -385,7 +385,7 @@ static void test_mediafile_skipped_when_filename_null()
     FILE* f = openTmp();
     VICSRecord rec = makeRecord();
     rec.vMediaFiles = new VICSMediaFile[1];
-    InitializeMediaFileRecord(rec.vMediaFiles[0]);
+    initializeMediaFileRecord(rec.vMediaFiles[0]);
     wcscpy(rec.vMediaFiles[0].MD5, L"AABBCCDDEEFF00112233445566778899");
     // fileName left NULL — should be rejected
     rec.vMediaFiles[0].filePath = new wchar_t[16];

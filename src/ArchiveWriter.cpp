@@ -265,7 +265,7 @@ struct archive* selectArchiveObject(bool picFile)
  * @return           SUCCESS on success, or ERROR_OPEN if the file size could
  *                   not be determined or the file could not be opened.
  *
- * @see fileSize, createZipArchiveEntry
+ * @see getFileSize, createZipArchiveEntry
  */
 int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
 {
@@ -273,7 +273,7 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
     struct archive_entry *entry;
     size_t bytesRead=0;
 
-    INT64 fSize = fileSize(inFilePath);
+    INT64 fSize = getFileSize(inFilePath);
     if (fSize < 0)
         return ERROR_OPEN;
     int result = createZipArchiveEntry(&outa,&entry,filename,fSize);

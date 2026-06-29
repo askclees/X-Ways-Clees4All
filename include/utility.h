@@ -16,6 +16,6 @@ INT64 Filetime2INT64(FILETIME &inFT);
 /** @brief Reallocates a wide-character buffer to a larger size, copying existing content. */
 wchar_t* extendBuffer(wchar_t* currBuffer, INT64 currSize, INT64 newSize);
 /** @brief Returns the size in bytes of the file at the given path, or -1 on error. */
-INT64 fileSize(const char* filePath);
+INT64 getFileSize(const char* filePath);
 
 #endif // UTILITY_H_INCLUDED

@@ -1263,7 +1263,7 @@ int readExtractionSettings(sqlite3* db, ExtractionDetails *record)
     {
         //actual data
         record->extractPictures = intToBool(sqlite3_column_int(stmt,2));
-        record->extractPictures = intToBool(sqlite3_column_int(stmt,3));
+        record->extractVideos = intToBool(sqlite3_column_int(stmt,3));
         record->checkParent = intToBool(sqlite3_column_int(stmt,4));
         record->ignoreThumbs = intToBool(sqlite3_column_int(stmt,5));
         record->exceptMismatch = intToBool(sqlite3_column_int(stmt,6));

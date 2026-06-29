@@ -124,7 +124,7 @@ wchar_t* extendBuffer(wchar_t* currBuffer, INT64 currSize, INT64 newSize)
  * @param filePath Null-terminated path to the file.
  * @return         File size in bytes, or -1 if the attributes could not be retrieved.
  */
-INT64 fileSize(const char* filePath)
+INT64 getFileSize(const char* filePath)
 {
     WIN32_FILE_ATTRIBUTE_DATA fad;
     if (!GetFileAttributesExA(filePath, GetFileExInfoStandard, &fad))

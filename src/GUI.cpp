@@ -205,7 +205,7 @@ int createWindow(WORD version)
 
 //button click functions
 /** @brief Disables and clears the Griffeye-related controls when the Griffeye checkbox is unchecked. */
-void BTN_GRIFFCHK_UNSELECT()
+void btnGriffchkUnselect()
 {
     EnableWindow(txtGriffeyeCaseLocation,FALSE);
     EnableWindow(GriffeyePath,FALSE);
@@ -409,7 +409,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 SendDlgItemMessage(hwnd,IDC_BTN_VICCHK,BM_SETCHECK,0,0);
                                 SendDlgItemMessage(hwnd,IDC_BTN_C4PCHK,BM_SETCHECK,0,0);
                                 SendDlgItemMessage(hwnd,IDC_BTN_GRIFFCHK,BM_SETCHECK,0,0);
-                                BTN_GRIFFCHK_UNSELECT();
+                                btnGriffchkUnselect();
                             }
                             else
                             {
@@ -471,7 +471,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                             else{
                                 //not checked
-                                BTN_GRIFFCHK_UNSELECT();
+                                btnGriffchkUnselect();
                             }
                         break;
                     }

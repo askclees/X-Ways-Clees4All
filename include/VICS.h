@@ -4,6 +4,7 @@
 #include <windows.h>
 #include "sqlite3.h"
 #include "X-Tension.h"
+#include "utility.h"
 
 
 /**
@@ -233,9 +234,9 @@ struct VICSRecord
     int currentMaxMediaMetadata=0;
 };
 
-/** @brief Opens a VICS JSON output file and writes the case header. @see openVICSFile */
+/** @brief Opens a VICS JSON output file and writes the case header. @see closeVICSFile */
 FILE* openVICSFile(char* filePath, const wchar_t* progVersion);
-/** @brief Writes the closing JSON brackets and closes the VICS output file. @see closeVICSFile */
+/** @brief Writes the closing JSON brackets and closes the VICS output file. @see openVICSFile */
 int closeVICSFile(FILE* vFile);
 
 /** @brief Initialises all fields of a VICSMedia record to zero/null defaults. */
@@ -281,9 +282,6 @@ void extractVICSMediaMetadataSQL(VICSMediaMetadata* record, sqlite3_stmt* statem
 
 /** @brief Validates a FILETIME, rejecting zero, implausibly old, and future timestamps. */
 bool validFiletime(FILETIME timestamp);
-
-/** @brief Converts a wide string to a newly allocated UTF-8 char buffer. */
-char* convertWideToChar(const wchar_t* wString);
 
 extern VICSCaseData vCaseData;
 
