@@ -18,7 +18,7 @@
 #endif*/
 
 #define C4A_NAME      "Clees4All"
-#define C4A_VERSION   "1.60"
+#define C4A_VERSION   "1.61"
 #define C4A_TITLE     C4A_NAME " " C4A_VERSION
 
 #define _C4A_WIDE(s)  L##s
