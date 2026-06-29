@@ -108,7 +108,7 @@ int closeVICSFile(FILE* vFile)
 }
 
 //initialisation records
-void InitializeMediaRecord(VICSMedia& record)
+void initializeMediaRecord(VICSMedia& record)
 {
     record.Category = 0;
     record.MediaID = 0;
@@ -135,14 +135,14 @@ void InitializeMediaRecord(VICSMedia& record)
     record.DateUpdated.dwLowDateTime = 0;
 }
 
-void InitializeAltHashRecord(VICSAltHash& record)
+void initializeAltHashRecord(VICSAltHash& record)
 {
     record.hashName = NULL;
     record.hashValue = NULL;
     record.MD5[0] = L'\0';
 }
 
-void InitializeMediaFileRecord(VICSMediaFile& record)
+void initializeMediaFileRecord(VICSMediaFile& record)
 {
     record.deleted = FALSE;
     record.unallocated = FALSE;
@@ -166,7 +166,7 @@ void InitializeMediaFileRecord(VICSMediaFile& record)
     record.physicalLocation = 0;
 }
 
-void InitializeVICSRecord(VICSRecord& record)
+void initializeVICSRecord(VICSRecord& record)
 {
     record.noMediaFiles = 0;
     record.noAltHash = 0;
@@ -174,23 +174,23 @@ void InitializeVICSRecord(VICSRecord& record)
     record.noSegments = 0;
     record.noRepository = 0;
 
-    InitializeMediaRecord(record.vMedia);
+    initializeMediaRecord(record.vMedia);
 }
 
-void InitializeRepositoryRecord(VICSRepository& record)
+void initializeRepositoryRecord(VICSRepository& record)
 {
     record.repositoryName = NULL;
     record.MD5[0] = L'\0';
 }
 
-void InitializeExifRecord(VICSExif& record)
+void initializeExifRecord(VICSExif& record)
 {
     record.propertyName = NULL;
     record.propertyValue = NULL;
     record.MD5 =  NULL;
 }
 
-void InitializeSegmentRecord(VICSSegment& record)
+void initializeSegmentRecord(VICSSegment& record)
 {
     record.Start = NULL;
     record.End = NULL;

@@ -94,9 +94,9 @@ char* CaseDir;
 static HBRUSH hBrush = CreateSolidBrush(RGB(240,240,240));
 WORD versionNumber;
 //prototyping
-void CreateControls(HWND hwnd);
+void createControls(HWND hwnd);
 LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam);
-LPWSTR GetFolderPath();
+LPWSTR getFolderPath();
 int startProcess();
 void fillCaseDetails();
 int getGriffeyeDetails();
@@ -111,7 +111,7 @@ const wchar_t* GriffeyeConfigPath = L"C:\\ProgramData\\Griffeye Technologies\\Gr
  * @param pszText Text to display in the tooltip.
  * @return Handle to the created tooltip window, or NULL on failure.
  */
-HWND CreateToolTip(int toolID, HWND hDlg, PTSTR pszText)
+HWND createToolTip(int toolID, HWND hDlg, PTSTR pszText)
 {
     if (!toolID || !hDlg || !pszText)
     {
@@ -205,7 +205,7 @@ int createWindow(WORD version)
 
 //button click functions
 /** @brief Disables and clears the Griffeye-related controls when the Griffeye checkbox is unchecked. */
-void btn_griffchk_unselect()
+void BTN_GRIFFCHK_UNSELECT()
 {
     EnableWindow(txtGriffeyeCaseLocation,FALSE);
     EnableWindow(GriffeyePath,FALSE);
@@ -228,7 +228,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg)
     {
         case WM_CREATE:
-            CreateControls(hwnd);
+            createControls(hwnd);
             return 0;
         case WM_COMMAND:
             switch(LOWORD(wParam))
@@ -409,7 +409,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 SendDlgItemMessage(hwnd,IDC_BTN_VICCHK,BM_SETCHECK,0,0);
                                 SendDlgItemMessage(hwnd,IDC_BTN_C4PCHK,BM_SETCHECK,0,0);
                                 SendDlgItemMessage(hwnd,IDC_BTN_GRIFFCHK,BM_SETCHECK,0,0);
-                                btn_griffchk_unselect();
+                                BTN_GRIFFCHK_UNSELECT();
                             }
                             else
                             {
@@ -426,7 +426,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         case BN_CLICKED:
                             {
-                                LPWSTR outputFolder = GetFolderPath();
+                                LPWSTR outputFolder = getFolderPath();
                                 if (outputFolder != NULL) {
                                     SetWindowTextW(VideoPath,outputFolder);
                                     CoTaskMemFree(outputFolder);
@@ -442,7 +442,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         case BN_CLICKED:
                             {
-                                LPWSTR outputFolder = GetFolderPath();
+                                LPWSTR outputFolder = getFolderPath();
                                 if (outputFolder != NULL) {
                                     SetWindowTextW(GriffeyePath,outputFolder);
                                     CoTaskMemFree(outputFolder);
@@ -471,7 +471,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                             else{
                                 //not checked
-                                btn_griffchk_unselect();
+                                BTN_GRIFFCHK_UNSELECT();
                             }
                         break;
                     }
@@ -483,7 +483,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         case BN_CLICKED:
                             {
-                                LPWSTR outputFolder = GetFolderPath();
+                                LPWSTR outputFolder = getFolderPath();
                                 if (outputFolder != NULL) {
                                     SetWindowTextW(PicturePath,outputFolder);
                                     CoTaskMemFree(outputFolder);
@@ -995,7 +995,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
  * @brief Creates all controls in the main dialog by calling the individual control-group creators.
  * @param hwnd Parent window handle.
  */
-void CreateControls(HWND hwnd)
+void createControls(HWND hwnd)
 {
     createOuputControls(hwnd,outputStart);
     createOptionsControls(hwnd);
@@ -1088,7 +1088,7 @@ void CreateControls(HWND hwnd)
  * @return Wide-character string allocated by the shell containing the chosen folder path,
  *         or NULL if the user cancelled. Caller must free with CoTaskMemFree().
  */
-LPWSTR GetFolderPath()
+LPWSTR getFolderPath()
 {
     // CoCreate the File Open Dialog object.
     IFileDialog *pfd = NULL;
@@ -1160,7 +1160,7 @@ int startProcess()
         }
         length = GetWindowTextLength(GriffeyePath);
         GetWindowText(GriffeyePath,buffer,1024);
-        if(!DirExists(buffer))
+        if(!dirExists(buffer))
         {
             MessageBox(NULL,"Griffeye Case Location does not exist","Error!! ",MB_ICONERROR);
             return 1;
@@ -1194,7 +1194,7 @@ int startProcess()
     {
         int length = GetWindowTextLength(PicturePath);
         GetWindowText(PicturePath,buffer,1024);
-        if(!DirExists(buffer))
+        if(!dirExists(buffer))
         {
             if (strcmp(buffer,CaseDir)==0)
             {
@@ -1230,7 +1230,7 @@ int startProcess()
     {
         int length = GetWindowTextLength(VideoPath);
         GetWindowText(VideoPath,buffer,1024);
-        if(!DirExists(buffer))
+        if(!dirExists(buffer))
         {
             if (strcmp(buffer,CaseDir)==0)
             {
@@ -1328,12 +1328,12 @@ int getGriffeyeDetails()
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
-        if (!DirExists(appdataPath))
+        if (!dirExists(appdataPath))
         {
             CreateDirectoryA(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (DirExists(appdataPath))
+        if (dirExists(appdataPath))
         {
             //folder exists, check if options database does!
             char optPath[MAX_PATH];
@@ -1402,12 +1402,12 @@ int saveGriffeyeDetails()
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
-        if (!DirExists(appdataPath))
+        if (!dirExists(appdataPath))
         {
             CreateDirectoryA(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (DirExists(appdataPath))
+        if (dirExists(appdataPath))
         {
             //folder exists, check if options database does!
             char optPath[MAX_PATH];

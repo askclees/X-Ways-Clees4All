@@ -226,13 +226,13 @@ FILE* openVICSFile(char* filePath, const wchar_t* progVersion);
 int closeVICSFile(FILE* vFile);
 
 //initialize records
-void InitializeMediaRecord(VICSMedia& record);
-void InitializeAltHashRecord(VICSAltHash& record);
-void InitializeMediaFileRecord(VICSMediaFile& record);
-void InitializeVICSRecord(VICSRecord& record);
-void InitializeRepositoryRecord(VICSRepository& record);
-void InitializeExifRecord(VICSExif& record);
-void InitializeSegmentRecord(VICSSegment& record);
+void initializeMediaRecord(VICSMedia& record);
+void initializeAltHashRecord(VICSAltHash& record);
+void initializeMediaFileRecord(VICSMediaFile& record);
+void initializeVICSRecord(VICSRecord& record);
+void initializeRepositoryRecord(VICSRepository& record);
+void initializeExifRecord(VICSExif& record);
+void initializeSegmentRecord(VICSSegment& record);
 
 //deallocation routines
 void deallocateVICSRecord(VICSRecord record);

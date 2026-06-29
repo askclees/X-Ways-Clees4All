@@ -26,7 +26,7 @@ int getFileNumber(sqlite3* sqlDB,DWORD objID);
 DWORD getRootObj(sqlite3* sqlDB,DWORD objID);
 int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText);
 int sqlCreateOptions(char path[]);
-BOOL SQLDatabaseExists(char path[]);
+BOOL sqlDatabaseExists(char path[]);
 ExtractOptions loadOptions(char path[]);
 int saveOptions(char path[], ExtractOptions opt);
 void outputErrorStats(sqlite3* sqlDB,WORD versionNo);
@@ -215,10 +215,10 @@ const char* sqlCreateLastRun = "CREATE TABLE lastSettings (PicPath TEXT, VidPath
 
     Outputs message with error code to X-Ways messages window
 
-    Called from <SQLInit>
+    Called from <sqlInit>
 
     See Also:
-        <SQLInit>
+        <sqlInit>
 */
 
 static void errorLogCallback(void *, int iErrCode, const char *zMsg)
@@ -229,7 +229,7 @@ static void errorLogCallback(void *, int iErrCode, const char *zMsg)
     XWF_OutputMessage(errMsg,0);
 }
 
-/*Function: SQLInit
+/*Function: sqlInit
     Initializes SQLite and generates and error log callback procedure
 
     Called from <XT_Prepare>
@@ -244,7 +244,7 @@ static void errorLogCallback(void *, int iErrCode, const char *zMsg)
         <XT_Prepare>
 */
 
-int SQLInit()
+int sqlInit()
 {
     //setup SQLite Config Options
     int checkLog = sqlite3_config(SQLITE_CONFIG_SERIALIZED);
@@ -1683,7 +1683,7 @@ void outputErrorStats(sqlite3* sqlDB,WORD versionNo)
 
 /*Section: Database Functions */
 
-/*Function: SQLDatabaseExists
+/*Function: sqlDatabaseExists
 
     Function that checks if a valid SQLite database exists at the path provided as a parameter
 
@@ -1699,7 +1699,7 @@ void outputErrorStats(sqlite3* sqlDB,WORD versionNo)
         Called by   -   <loadOrCreateOptions>
 */
 
-BOOL SQLDatabaseExists(char path[])
+BOOL sqlDatabaseExists(char path[])
 {
     sqlite3 *sqlDB;
     int rc = sqlite3_open_v2(path,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READONLY, NULL);

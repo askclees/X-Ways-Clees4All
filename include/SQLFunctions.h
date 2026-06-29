@@ -18,12 +18,12 @@ extern int getFileNumber(sqlite3* sqlDB,DWORD objID);
 extern DWORD getRootObj(sqlite3* sqlDB,DWORD objID);
 extern int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText);
 extern int sqlCreateOptions(char path[]);
-extern BOOL SQLDatabaseExists(char path[]);
+extern BOOL sqlDatabaseExists(char path[]);
 extern ExtractOptions loadOptions(char path[]);
 int saveOptions(char path[], ExtractOptions opt);
 void outputErrorStats(sqlite3* sqlDB,WORD versionNo);
 int loadOrSaveDb(sqlite3 *pInMemory, const char *zFilename, int isSave);
-int SQLInit();
+int sqlInit();
 
 //inserting records
 int insertMediaFileRecord(sqlite3* vicsDB, VICSMediaFile &record, int picture);
