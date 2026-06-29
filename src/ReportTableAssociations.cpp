@@ -14,10 +14,12 @@ ReportTableDetails reportEntries;
  * @param tblName    Wide string containing the name of the report table.
  * @param tblID      X-Ways report table ID.
  * @param userCreated True if the table was created by the user, false for system tables.
- * @return 0 always.
+ * @return 0 on success, -1 if the entry list is full.
  */
 int addReportTableEntry(wchar_t* tblName, LONG tblID, bool userCreated)
 {
+    if (reportEntries.numTables >= reportEntries.maxTables)
+        return -1;
     reportEntries.entries[reportEntries.numTables].reportTableName = new wchar_t[wcslen(tblName)+1];
     wcsncpy(reportEntries.entries[reportEntries.numTables].reportTableName, tblName,wcslen(tblName)+1);
     reportEntries.entries[reportEntries.numTables].reportTableID = tblID;

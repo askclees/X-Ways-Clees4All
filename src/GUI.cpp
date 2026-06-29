@@ -53,8 +53,12 @@
 #define IDC_BTN_EMBMISCHK           124
 #define IDC_LBL_EXTRACTOPT          125
 
-#define IDC_TEXT_EVNAME 300
-#define IDC_TEXT_NEW_NAME 600
+#define IDC_TEXT_EVNAME         300
+#define IDC_ENTRY_PANEL         400
+#define IDC_ENTRY_SCROLLBAR     401
+#define IDC_TEXT_NEW_NAME       600
+
+#define MAX_VISIBLE_ENTRIES 10
 
 //windows form sizes
 #define MainWindowWidth 900
@@ -81,6 +85,8 @@
 #define boxMultiplier   25
 
 HWND mainHwnd;
+HWND entryPanel = NULL;
+HWND entryScrollBar = NULL;
 HWND PicturePath,VideoPath, btnOK,picChkBox,vidChkBox,parentChkBox,cmdVidSelect,cmdPicSelect,dbgChkBox, compChkBox, vicChkBox, C4PChkBox, GriffeyeCase, GriffeyePath;
 HWND* TxtActualName, *TxtNewName, *lblActual, *lblNew;
 HWND txtPicOutput,txtVidOutput, txtGriffeyeCaseName, txtGriffeyeCaseLocation, cmdGriffeyePath, griffChkBox;
@@ -96,6 +102,7 @@ WORD versionNumber;
 //prototyping
 void createControls(HWND hwnd);
 LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam);
+LRESULT CALLBACK EntryPanelProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LPWSTR getFolderPath();
 int startProcess();
 void fillCaseDetails();
@@ -169,8 +176,19 @@ int createWindow(WORD version)
     wc.lpszClassName = CLASS_NAME;
     wc.hInstance = extractInfo.thisDLL;
 
+    WNDCLASSEX ep = {};
+    ep.cbSize = sizeof(WNDCLASSEX);
+    ep.lpfnWndProc = EntryPanelProc;
+    ep.hbrBackground = hBrush;
+    ep.hCursor = LoadCursor(NULL, IDC_ARROW);
+    ep.style = CS_HREDRAW | CS_VREDRAW;
+    ep.lpszClassName = "EntryScrollPanel";
+    ep.hInstance = extractInfo.thisDLL;
+    RegisterClassEx(&ep);
+
     RegisterClassEx(&wc);
 
+    int panelRows = extractInfo.noNames > MAX_VISIBLE_ENTRIES ? MAX_VISIBLE_ENTRIES : extractInfo.noNames;
     mainHwnd =CreateWindowEx(
         0, //dwexstyle
         CLASS_NAME, //class name
@@ -179,7 +197,7 @@ int createWindow(WORD version)
         100,//x
         100,//y
         MainWindowWidth,//width
-        MainWindowLength + (extractInfo.noNames * (boxMultiplier+5)),//height
+        MainWindowLength + (panelRows * (boxMultiplier+5)),//height
         NULL, //parent
         NULL,//hmenu
         NULL,//hinstance
@@ -201,6 +219,22 @@ int createWindow(WORD version)
         }
     }
     return 0;
+}
+
+/**
+ * @brief Window procedure for the scrollable evidence entry panel.
+ *
+ * Handles vertical scrolling of the entry controls when there are more than
+ * MAX_VISIBLE_ENTRIES evidence objects.
+ */
+LRESULT CALLBACK EntryPanelProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    if (uMsg == WM_CTLCOLORSTATIC)
+    {
+        SetBkColor((HDC)wParam, RGB(240, 240, 240));
+        return (LRESULT)hBrush;
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 //button click functions
@@ -566,6 +600,57 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 break;
             }
             return 0;
+        case WM_MOUSEWHEEL:
+            if (entryScrollBar != NULL)
+            {
+                POINT screenPt;
+                screenPt.x = (int)(short)LOWORD(lParam);
+                screenPt.y = (int)(short)HIWORD(lParam);
+                RECT panelRect, sbRect;
+                GetWindowRect(entryPanel, &panelRect);
+                GetWindowRect(entryScrollBar, &sbRect);
+                if (PtInRect(&panelRect, screenPt) || PtInRect(&sbRect, screenPt))
+                {
+                    int wheelDelta = (int)(short)HIWORD(wParam);
+                    SCROLLINFO si = {};
+                    si.cbSize = sizeof(si);
+                    si.fMask = SIF_ALL;
+                    GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                    int oldPos = si.nPos;
+                    si.nPos -= (wheelDelta / WHEEL_DELTA) * 3 * boxMultiplier;
+                    si.fMask = SIF_POS;
+                    SetScrollInfo(entryScrollBar, SB_CTL, &si, TRUE);
+                    GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                    if (si.nPos != oldPos)
+                        ScrollWindow(entryPanel, 0, oldPos - si.nPos, NULL, NULL);
+                }
+            }
+            return 0;
+        case WM_VSCROLL:
+            if (entryScrollBar != NULL && (HWND)lParam == entryScrollBar)
+            {
+                SCROLLINFO si = {};
+                si.cbSize = sizeof(si);
+                si.fMask = SIF_ALL;
+                GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                int oldPos = si.nPos;
+                switch (LOWORD(wParam))
+                {
+                    case SB_LINEUP:        si.nPos -= boxMultiplier; break;
+                    case SB_LINEDOWN:      si.nPos += boxMultiplier; break;
+                    case SB_PAGEUP:        si.nPos -= (int)si.nPage; break;
+                    case SB_PAGEDOWN:      si.nPos += (int)si.nPage; break;
+                    case SB_THUMBTRACK:
+                    case SB_THUMBPOSITION: si.nPos = (int)HIWORD(wParam); break;
+                    default: break;
+                }
+                si.fMask = SIF_POS;
+                SetScrollInfo(entryScrollBar, SB_CTL, &si, TRUE);
+                GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                if (si.nPos != oldPos)
+                    ScrollWindow(entryPanel, 0, oldPos - si.nPos, NULL, NULL);
+            }
+            return 0;
         case WM_DESTROY:
             DestroyWindow(PicturePath);
             DestroyWindow(VideoPath);
@@ -594,9 +679,10 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         case WM_GETMINMAXINFO:
             {
                 MINMAXINFO FAR *mInfo = (MINMAXINFO FAR *)lParam;
-                mInfo->ptMinTrackSize.y = (MainWindowLength+(extractInfo.noNames * boxMultiplier));//+(extractInfo.noNames * 30);
+                int panelRows = extractInfo.noNames > MAX_VISIBLE_ENTRIES ? MAX_VISIBLE_ENTRIES : extractInfo.noNames;
+                mInfo->ptMinTrackSize.y = MainWindowLength + (panelRows * boxMultiplier);
                 mInfo->ptMinTrackSize.x = MainWindowWidth;
-                mInfo->ptMaxTrackSize.y = (MainWindowLength+(extractInfo.noNames * boxMultiplier));
+                mInfo->ptMaxTrackSize.y = MainWindowLength + (panelRows * boxMultiplier);
                 mInfo->ptMaxTrackSize.x = MainWindowWidth * 2;
             }
         break;
@@ -997,11 +1083,17 @@ bool createGriffeyeEntries(HWND hwnd, int start)
  */
 void createControls(HWND hwnd)
 {
+    int panelRows = extractInfo.noNames > MAX_VISIBLE_ENTRIES ? MAX_VISIBLE_ENTRIES : extractInfo.noNames;
+    int panelHeight = panelRows * boxMultiplier;
+    RECT clientRect = {};
+    GetClientRect(hwnd, &clientRect);
+    int clientW = clientRect.right;
+
     createOuputControls(hwnd,outputStart);
     createOptionsControls(hwnd);
-    createGriffeyeEntries(hwnd,MainWindowLength - 280 + (extractInfo.noNames*boxMultiplier));
+    createGriffeyeEntries(hwnd,MainWindowLength - 280 + panelHeight);
 
-    btnOK= CreateWindowEx(0,"BUTTON","&OK",WS_CHILD|WS_VISIBLE|WS_TABSTOP,(MainWindowWidth / 2)-20,MainWindowLength - 80 + (extractInfo.noNames*boxMultiplier),40,40,hwnd,(HMENU)IDC_BTN_OK,GetModuleHandle(NULL),NULL);
+    btnOK= CreateWindowEx(0,"BUTTON","&OK",WS_CHILD|WS_VISIBLE|WS_TABSTOP,(MainWindowWidth / 2)-20,MainWindowLength - 80 + panelHeight,40,40,hwnd,(HMENU)IDC_BTN_OK,GetModuleHandle(NULL),NULL);
     if (!btnOK)
     {
         int result=GetLastError();
@@ -1009,7 +1101,7 @@ void createControls(HWND hwnd)
         sprintf(message,"OK Button Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
     }
-    vicChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 200 + (extractInfo.noNames*boxMultiplier),200,40,hwnd,(HMENU)IDC_BTN_VICCHK,GetModuleHandle(NULL),NULL);
+    vicChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 200 + panelHeight,200,40,hwnd,(HMENU)IDC_BTN_VICCHK,GetModuleHandle(NULL),NULL);
     if (!vicChkBox)
     {
         int result=GetLastError();
@@ -1017,7 +1109,7 @@ void createControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
-    compChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format (Compressed)",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 170 + (extractInfo.noNames*boxMultiplier),300,40,hwnd,(HMENU)IDC_BTN_VICSZIP,GetModuleHandle(NULL),NULL);
+    compChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format (Compressed)",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 170 + panelHeight,300,40,hwnd,(HMENU)IDC_BTN_VICSZIP,GetModuleHandle(NULL),NULL);
     if (!compChkBox)
     {
         int result=GetLastError();
@@ -1025,7 +1117,7 @@ void createControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
-    C4PChkBox = CreateWindowEx(0,"BUTTON","Export C4P XML",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 140 + (extractInfo.noNames*boxMultiplier),200,40,hwnd,(HMENU)IDC_BTN_C4PCHK,GetModuleHandle(NULL),NULL);
+    C4PChkBox = CreateWindowEx(0,"BUTTON","Export C4P XML",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 140 + panelHeight,200,40,hwnd,(HMENU)IDC_BTN_C4PCHK,GetModuleHandle(NULL),NULL);
     if (!C4PChkBox)
     {
         int result=GetLastError();
@@ -1033,6 +1125,26 @@ void createControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
+    int scrollbarWidth = (extractInfo.noNames > MAX_VISIBLE_ENTRIES) ? GetSystemMetrics(SM_CXVSCROLL) : 0;
+    entryPanel = CreateWindowEx(0, "EntryScrollPanel", NULL,
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+        0, evidenceStartY, clientW - scrollbarWidth, panelHeight,
+        hwnd, (HMENU)IDC_ENTRY_PANEL, NULL, NULL);
+    if (extractInfo.noNames > MAX_VISIBLE_ENTRIES)
+    {
+        entryScrollBar = CreateWindowEx(0, "SCROLLBAR", NULL, WS_CHILD | WS_VISIBLE | SBS_VERT,
+            clientW - scrollbarWidth, evidenceStartY, scrollbarWidth, panelHeight,
+            hwnd, (HMENU)IDC_ENTRY_SCROLLBAR, GetModuleHandle(NULL), NULL);
+        SCROLLINFO si = {};
+        si.cbSize = sizeof(si);
+        si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+        si.nMin = 0;
+        si.nMax = extractInfo.noNames * boxMultiplier - 1;
+        si.nPage = panelHeight;
+        si.nPos  = 0;
+        SetScrollInfo(entryScrollBar, SB_CTL, &si, TRUE);
+    }
+
     TxtActualName = new HWND[extractInfo.noNames];
     TxtNewName = new HWND[extractInfo.noNames];
     lblActual = new HWND[extractInfo.noNames];
@@ -1043,7 +1155,7 @@ void createControls(HWND hwnd)
         txtEvCurr = new char[wcslen(extractInfo.nameList[i].actualName)+2];
         txtEvCurr[0] = '\0';
         sprintf(txtEvCurr,"%ls",extractInfo.nameList[i].actualName);
-        lblActual[i] = CreateWindowEx(0,"Static","Evidence Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX - 10,evidenceStartY + (i*boxMultiplier),140,30,hwnd,0,GetModuleHandle(NULL),0);
+        lblActual[i] = CreateWindowEx(0,"Static","Evidence Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX - 10,i*boxMultiplier,140,30,entryPanel,0,GetModuleHandle(NULL),0);
         if (!lblActual[i])
         {
             int result=GetLastError();
@@ -1051,7 +1163,7 @@ void createControls(HWND hwnd)
             sprintf(message,"Static Text Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
         }
-        TxtActualName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"Static",txtEvCurr,WS_CHILD|WS_VISIBLE,lblVidStartX + 140,evidenceStartY + (i*boxMultiplier),210,20,hwnd,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
+        TxtActualName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"Static",txtEvCurr,WS_CHILD|WS_VISIBLE,lblVidStartX + 140,i*boxMultiplier,210,20,entryPanel,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
         if (!TxtActualName[i])
         {
             int result=GetLastError();
@@ -1059,7 +1171,7 @@ void createControls(HWND hwnd)
             sprintf(message,"Textbox Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
         }
-        lblNew[i] = CreateWindowEx(0,"Static","Source ID Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,(MainWindowWidth/2) - 20,evidenceStartY + (i*boxMultiplier),130,20,hwnd,0,GetModuleHandle(NULL),0);
+        lblNew[i] = CreateWindowEx(0,"Static","Source ID Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,(MainWindowWidth/2) - 20,i*boxMultiplier,130,20,entryPanel,0,GetModuleHandle(NULL),0);
         if (!lblNew[i])
         {
             int result=GetLastError();
@@ -1067,7 +1179,7 @@ void createControls(HWND hwnd)
             sprintf(message,"Static Text Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
         }
-        TxtNewName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",txtEvCurr,WS_CHILD|WS_VISIBLE,(MainWindowWidth/2)+120,evidenceStartY + (i*boxMultiplier),190,20,hwnd,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
+        TxtNewName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",txtEvCurr,WS_CHILD|WS_VISIBLE,(MainWindowWidth/2)+120,i*boxMultiplier,190,20,entryPanel,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
         if (!TxtNewName[i])
         {
             int result=GetLastError();
