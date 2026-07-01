@@ -806,7 +806,7 @@ int updateFileNumber(sqlite3* sqlDB,DWORD objID,int fileNo)
  *
  * @param sqlDB Handle to the in-memory SQLite database.
  * @param objID X-Ways ID of the evidence object to look up.
- * @return The XML output file index (>0) on success, -1 on error.
+ * @return The XML output file index (>=0) on success, -1 on error.
  *
  * @see XT_Prepare
  */
@@ -1134,7 +1134,7 @@ ExtractOptions getDefaultOptions()
  * @brief Inserts the default extraction options into the ExtractionOptions table.
  *
  * @param sqlDB Handle to the options SQLite database.
- * @param path  Path to the options database file (unused beyond being passed to getDefaultOptions context).
+ * @param path  Path to the options database file (unused; present for API consistency).
  * @return The result of insertOptionsExtraction.
  *
  * @see getDefaultOptions
@@ -1868,7 +1868,7 @@ int loadOrSaveDb(sqlite3 *pInMemory, const char *zFilename, int isSave)
  * @param picture  1 if the file is a picture, 0 for video.
  * @param MD5      Wide string containing the MD5 hash of the existing record to update.
  * @param dupItemID X-Ways item ID of the duplicate item to update.
- * @return 0 on success, -2 if the update statement fails to execute, -3 if a bind fails.
+ * @return 0 on success, -2 if the update statement fails to execute, -3 if preparation or a bind fails.
  *
  * @see writeSQLMediaRecord
  */

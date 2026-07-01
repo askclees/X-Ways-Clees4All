@@ -83,13 +83,13 @@ int endDebugLog()
 }
 
 /**
- * @brief Writes a message to a debug log file, falling back to the X-Ways output window.
+ * @brief Writes a message to a debug log file.
  *
- * If @p f is NULL the message is sent to the X-Ways output window instead.
+ * If @p f is NULL the message is silently discarded and 1 is returned.
  *
- * @param f       File to write to, or NULL to write to the X-Ways output window.
+ * @param f       File to write to, or NULL.
  * @param message Null-terminated message string.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */
@@ -120,7 +120,7 @@ int debugWriteDetails(FILE* f, const char* message)
  * Convenience overload that uses the global debugLogFile handle.
  *
  * @param message Null-terminated message string.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */
@@ -132,10 +132,13 @@ int debugWriteDetails(const char* message)
 /**
  * @brief Writes item ID, item name and module name to a debug log file.
  *
+ * If @p nItemID is 0 only the module name is written (XWF_GetItemName is
+ * not called, as it is invalid outside an active case context).
+ *
  * @param f       File to write to.
- * @param nItemID X-Ways item ID the message relates to.
+ * @param nItemID X-Ways item ID the message relates to, or 0 to omit item details.
  * @param module  Name of the Clees4All module generating the message.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */
@@ -163,10 +166,11 @@ int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module)
  * @brief Writes item ID, item name and module name to the default debug log file.
  *
  * Convenience overload that uses the global debugLogFile handle.
+ * If @p nItemID is 0 only the module name is written.
  *
- * @param nItemID X-Ways item ID the message relates to.
+ * @param nItemID X-Ways item ID the message relates to, or 0 to omit item details.
  * @param module  Name of the Clees4All module generating the message.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */

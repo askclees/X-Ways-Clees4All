@@ -139,7 +139,7 @@ BOOL APIENTRY DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpvReserved)
  *
  * Checks the X-Ways version and decides if the DLL can be used. Also loads options from SQLite database.
  *
- * @return -1 to prevent use of DLL, 1 if X-Tension is thread-safe, 2 if not thread-safe.
+ * @return -1 to prevent use of DLL, 2 if X-Tension is not thread-safe (always returned on success).
  *
  * @see loadOrCreateOptions
  */
@@ -228,7 +228,7 @@ LONG DLL_EXPORT XT_About(HANDLE hParentWnd, PVOID lpReserved)
  *
  * Displays the configuration window on first call, then prepares hash types and volume state.
  *
- * @return -4 if VICS setup fails, -3 if not run from RVS, 3 (XT_PREPARE_CALLPI | XT_PREPARE_CALLPILATE) on success.
+ * @return -4 if VICS setup fails, -3 if not run from RVS or MD5 hash type not configured or getCaseOptions fails, 3 (XT_PREPARE_CALLPI | XT_PREPARE_CALLPILATE) on success.
  *
  * @see determineHashTypes
  * @see getCaseOptions
