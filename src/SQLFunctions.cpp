@@ -576,36 +576,35 @@ int checkDuplicateFile(sqlite3* sqlDB, INT64 offset, wchar_t* MD5, wchar_t* curr
     if (extractInfo.debugSet){debugWriteDetails(*nItemID, L"checkDuplicateFile Start");}
     //Select * from VICSPicsRecords where PhysicalLocation = offset and MD5Hash = MD5
     sqlite3_stmt *statement;
-    char* tableName;
-    if (picture ==1) { tableName = "VICSPicsRecords";}
-    else { tableName = "VICSMoviesRecords";}
-    char sqlQuery[256]={0};
-    sprintf(sqlQuery,"Select itemID from %s where MD5Hash = \'%ls\' and SourceID = \'%ls\' and PhysicalLocation = %llu;",tableName,MD5,currSrcID,offset);
-    if (extractInfo.debugSet){debugWriteDetails(sqlQuery);}
-    int rc = sqlite3_prepare_v2(sqlDB,sqlQuery,strlen(sqlQuery)+1,&statement,NULL);
+    const char* tableName = (picture == 1) ? "VICSPicsRecords" : "VICSMoviesRecords";
+    char sqlQuery[128] = {0};
+    snprintf(sqlQuery, sizeof(sqlQuery), "SELECT itemID FROM %s WHERE MD5Hash = ? AND SourceID = ? AND PhysicalLocation = ?;", tableName);
+    int rc = sqlite3_prepare_v2(sqlDB, sqlQuery, -1, &statement, NULL);
     if (rc == SQLITE_OK)
     {
-        rc = sqlite3_step(statement);
-        if (rc == SQLITE_ROW)
-        {
-            //data here
-            *nItemID = sqlite3_column_int(statement,0);
-            sqlite3_finalize(statement);
-            if (extractInfo.debugSet){debugWriteDetails(*nItemID, L"checkDuplicateFile End - Duplicate located");}
-            return 1;
-        }
-        else
-        {
-            //no data
-            sqlite3_finalize(statement);
-            if (extractInfo.debugSet){debugWriteDetails(*nItemID, L"checkDuplicateFile End - No Duplicate located");}
-            return 0;
-        }
+        rc = sqlite3_bind_text16(statement, 1, MD5,       -1, SQLITE_STATIC);
+        if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement, 2, currSrcID, -1, SQLITE_STATIC);
+        if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,  3, offset);
+    }
+    if (rc != SQLITE_OK)
+    {
+        sqlite3_finalize(statement);
+        if (extractInfo.debugSet){debugWriteDetails(*nItemID, L"checkDuplicateFile END - Error");}
+        return -1;
+    }
+    rc = sqlite3_step(statement);
+    if (rc == SQLITE_ROW)
+    {
+        *nItemID = sqlite3_column_int(statement, 0);
+        sqlite3_finalize(statement);
+        if (extractInfo.debugSet){debugWriteDetails(*nItemID, L"checkDuplicateFile End - Duplicate located");}
+        return 1;
     }
     else
     {
-        if (extractInfo.debugSet){debugWriteDetails(*nItemID, L"checkDuplicateFile END - Error");}
-        return -1;
+        sqlite3_finalize(statement);
+        if (extractInfo.debugSet){debugWriteDetails(*nItemID, L"checkDuplicateFile End - No Duplicate located");}
+        return 0;
     }
 }
 
@@ -622,35 +621,20 @@ int checkDuplicateFile(sqlite3* sqlDB, INT64 offset, wchar_t* MD5, wchar_t* curr
 INT64 getVicsRecord(sqlite3* sqlDB, wchar_t* MD5, int picture)
 {
     sqlite3_stmt *statement;
-    char sqlQuery[256]={0};
-    if (picture == 1)
+    const char* sqlQuery = (picture == 1)
+        ? "SELECT MD5Hash FROM VICSPics WHERE MD5Hash = ?;"
+        : "SELECT MD5Hash FROM VICSMovies WHERE MD5Hash = ?;";
+    int rc = sqlite3_prepare_v2(sqlDB, sqlQuery, -1, &statement, NULL);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement, 1, MD5, -1, SQLITE_STATIC);
+    if (rc != SQLITE_OK)
     {
-        sprintf(sqlQuery,"Select MD5Hash from VICSPics where MD5Hash = \'%ls\';",MD5);
-    }
-    else
-    {
-        sprintf(sqlQuery,"Select MD5Hash from VICSMovies where MD5Hash = \'%ls\';",MD5);
-    }
-    int rc = sqlite3_prepare_v2(sqlDB,sqlQuery,strlen(sqlQuery)+1,&statement,NULL);
-    if (rc == SQLITE_OK)
-    {
-        rc = sqlite3_step(statement);
-        if (rc == SQLITE_ROW)
-        {
-            //data here
-            sqlite3_finalize(statement);
-            return 1;
-        }
-        else
-        {
-            sqlite3_finalize(statement);
-            return 0;
-        }
-    }
-    else
-    {
+        sqlite3_finalize(statement);
         return -1;
     }
+    rc = sqlite3_step(statement);
+    sqlite3_finalize(statement);
+    if (rc == SQLITE_ROW) return 1;
+    return 0;
 }
 
 static int countCallback(void *valCount,int argc, char **argv, char **azColName)
