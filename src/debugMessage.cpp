@@ -70,9 +70,11 @@ int startDebugLog(const char* filePath)
  */
 int endDebugLog()
 {
-    if (debugLogFile !=NULL)
+    if (debugLogFile != NULL)
     {
-        return fclose(debugLogFile);
+        int rc = fclose(debugLogFile);
+        debugLogFile = NULL;
+        return rc;
     }
     else
     {
@@ -107,9 +109,6 @@ int debugWriteDetails(FILE* f, const char* message)
     }
     else
     {
-        //no file yet, output to log window.
-        //may be used for debugging case window data.
-        XWF_OutputMessage((wchar_t*)message,0x04);
         dbgMessage.unlock();
         return 1;
     }
@@ -142,10 +141,19 @@ int debugWriteDetails(const char* message)
  */
 int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module)
 {
-    LPWSTR ItemName;
-    ItemName = (LPWSTR)XWF_GetItemName(nItemID);
     char* buffer = new char[1024];
-    snprintf(buffer, 1024, "ItemID: %ld ItemName: %ls Module: %ls\r\n", nItemID, ItemName, module);
+    if (nItemID == 0)
+    {
+        snprintf(buffer, 1024, "Module: %ls\r\n", module);
+    }
+    else
+    {
+        LPWSTR ItemName = (LPWSTR)XWF_GetItemName(nItemID);
+        if (ItemName != NULL)
+            snprintf(buffer, 1024, "ItemID: %ld ItemName: %ls Module: %ls\r\n", nItemID, ItemName, module);
+        else
+            snprintf(buffer, 1024, "ItemID: %ld ItemName: (null) Module: %ls\r\n", nItemID, module);
+    }
     int result = debugWriteDetails(f,buffer);
     delete[] buffer;
     return result;
