@@ -1040,30 +1040,41 @@ int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText)
     int rc = sqlite3_prepare16_v2(sqlDB , sqlQuery,(wcslen(sqlQuery)+1)*sizeof(wchar_t) ,&statement, NULL);
     if (rc != SQLITE_OK)
     {
-        //do error stuff here
         XWF_OutputMessage(sqlQuery,0);
+        delete[] filePath;
+        delete[] sqlQuery;
         return -1;
     }
     rc = sqlite3_bind_text16(statement,1,xName,(nameLen+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
         XWF_OutputMessage(L"Error Binding file name",0);
+        sqlite3_finalize(statement);
+        delete[] filePath;
+        delete[] sqlQuery;
         return -3;
     }
-    rc = sqlite3_bind_text16(statement,2,filePath ,(pathLen+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,2,filePath,(pathLen+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
         XWF_OutputMessage(L"Error Binding file path",0);
+        sqlite3_finalize(statement);
+        delete[] filePath;
+        delete[] sqlQuery;
         return -4;
     }
     rc = sqlite3_step(statement);
     if (rc != SQLITE_DONE)
     {
-        //do error stuff here
         XWF_OutputMessage(sqlQuery,0);
+        sqlite3_finalize(statement);
+        delete[] filePath;
+        delete[] sqlQuery;
         return -2;
     }
     sqlite3_finalize(statement);
+    delete[] filePath;
+    delete[] sqlQuery;
     return 0;
 
 }
