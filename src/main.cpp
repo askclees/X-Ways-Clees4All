@@ -2519,12 +2519,12 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"%ls\\\\%ls",newName,retValue);
+                        swprintf(temp,L"%ls\\%ls",newName,retValue);
                     }
                     else
                     {
                         //if retValue is "" creates an error.
-                        swprintf(temp,L"%ls\\\\",newName);
+                        swprintf(temp,L"%ls\\",newName);
                     }
                     delete[] newName;
                 }
@@ -2540,11 +2540,11 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"\\\\%ls",retValue);
+                        swprintf(temp,L"\\%ls",retValue);
                     }
                     else
                     {
-                        swprintf(temp,L"\\\\");
+                        swprintf(temp,L"\\");
                     }
                 }
                 else
