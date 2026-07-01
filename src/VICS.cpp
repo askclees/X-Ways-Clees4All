@@ -525,6 +525,21 @@ int writeMediaRecord(FILE* vicFile, VICSRecord* record)
         cJSON_AddItemToObject(mediaObj, "MediaFiles", filesArray);
     }
 
+    if (record->noMediaMetadata > 0)
+    {
+        cJSON* metaArray = cJSON_CreateArray();
+        for (int i = 0; i < record->noMediaMetadata; i++)
+        {
+            VICSMediaMetadata* m = &record->vMediaMetaData[i];
+            if (m->PropertyName == NULL || m->PropertyValue == NULL) continue;
+            cJSON* metaObj = cJSON_CreateObject();
+            cjsonAddWide(metaObj, "PropertyName",  m->PropertyName);
+            cjsonAddWide(metaObj, "PropertyValue", m->PropertyValue);
+            cJSON_AddItemToArray(metaArray, metaObj);
+        }
+        cJSON_AddItemToObject(mediaObj, "MediaMetadata", metaArray);
+    }
+
     char* jsonStr = cJSON_Print(mediaObj);
     cJSON_Delete(mediaObj);
 

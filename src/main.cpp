@@ -1550,10 +1550,6 @@ int caseCleanup()
     }
     if (picResults) { fclose(picResults); picResults = NULL; }
     if (vidResults) { fclose(vidResults); vidResults = NULL; }
-    if (extractInfo.debugSet)
-    {
-        endDebugLog();
-    }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
         outputVICSFile();
@@ -1561,16 +1557,19 @@ int caseCleanup()
     //used for debug
     if (extractInfo.debugSet)
     {
-        char sqlOutputPath[4096]= {0};
-        sprintf(sqlOutputPath,"%ls%ls",extractOpt.errorReportPath, caseTitle);
-        if (!dirExists(sqlOutputPath))
+        wchar_t wSqlOutputPath[4096] = {0};
+        swprintf(wSqlOutputPath, 4096, L"%ls%ls", extractOpt.errorReportPath, caseTitle);
+        if (!dirExistsW(wSqlOutputPath))
         {
-            CreateDirectory(sqlOutputPath,NULL);
+            CreateDirectoryW(wSqlOutputPath, NULL);
         }
-        //sprintf(sqlOutputPath,"%s\\errorOutput.sqlite",sqlOutputPath);
-        //this is not called?
-        strncat(sqlOutputPath,"\\errorOutput.sqlite",4095);
-        loadOrSaveDb(vicsDB,sqlOutputPath,1);
+        wcsncat(wSqlOutputPath, L"\\errorOutput.sqlite", 4095);
+        char sqlOutputPath[4096] = {0};
+        WideCharToMultiByte(CP_UTF8, 0, wSqlOutputPath, -1, sqlOutputPath, sizeof(sqlOutputPath), NULL, NULL);
+        char dbPathMsg[4096+32] = {0};
+        snprintf(dbPathMsg, sizeof(dbPathMsg), "Debug SQLite path: %s\r\n", sqlOutputPath);
+        debugWriteDetails(dbPathMsg);
+        loadOrSaveDb(vicsDB, sqlOutputPath, 1);
     }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
@@ -1631,7 +1630,11 @@ int caseCleanup()
     clearReportTableDetails();
     if (currSrcID != NULL) { delete[] currSrcID; currSrcID = NULL; }
     cleanupGUI();
-    if (extractInfo.debugSet){debugWriteDetails(0, L"caseCleanup End");}
+    if (extractInfo.debugSet)
+    {
+        debugWriteDetails(0, L"caseCleanup End");
+        endDebugLog();
+    }
     return 0;
 }
 
@@ -2300,17 +2303,26 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
         //check if device type column is blank
         wchar_t buffer[128] ={0};
         LONG result = XWF_GetCellText(nItemID,NULL,0,DeviceTypeCol,(wchar_t*)&buffer,127);
+        if (extractInfo.debugSet)
+        {
+            wchar_t dbgMsg[200] = {0};
+            swprintf(dbgMsg, 200, L"Device Type value: '%ls'", buffer);
+            debugWriteDetails(nItemID, dbgMsg);
+        }
         if (result < 0)
         {
             //error
             outputErrorMessage(L"Unable to get Device Type Column Data for Item: ",nItemID);
         }
         else{
-            if (wcsncmp(L"",buffer,127)!=0 && wcsncmp(L"unknown",buffer,127)!=0)
+            if (buffer[0] != L'\0' &&
+                _wcsicmp(buffer, L"unknown")      != 0 &&
+                _wcsicmp(buffer, L"undetermined") != 0 &&
+                _wcsicmp(buffer, L"no device")    != 0)
             {
                 writeSQLMediaMetadataRecord(nItemID, hashVals.MD5, L"Device Type",(wchar_t*)buffer);
             }
-            else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type either blank or unknown");}
+            else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type blank or non-informative value, skipping");}
         }
     }
     else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type column unidentified");}
@@ -2620,10 +2632,11 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
     sqlite3_finalize(statement);
 
     //add any media metadata records
-    result = returnMediaMetadataRecords(database, &statement, hashValue);
+    sqlite3_stmt* metaStatement;
+    result = returnMediaMetadataRecords(database, &metaStatement, hashValue);
     if (result < 0){
         //error
-        sqlite3_finalize(statement);
+        sqlite3_finalize(metaStatement);
         return -1;
     }
     //set up space for records
@@ -2634,9 +2647,10 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
     for (int i = 0;i<result;i++)
     {
         //cycle through the records and add them to main record
-        extractVICSMediaMetadataSQL(&record->vMediaMetaData[i],statement);
-        sqlResult = sqlite3_step(statement);
+        extractVICSMediaMetadataSQL(&record->vMediaMetaData[i],metaStatement);
+        sqlResult = sqlite3_step(metaStatement);
     }
+    if (result > 0) sqlite3_finalize(metaStatement);
 
     return 0;
 }

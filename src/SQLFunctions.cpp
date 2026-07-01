@@ -2101,33 +2101,32 @@ int insertMediaRecord(sqlite3* vicsDB, VICSMedia &record, int picture)
  */
 int insertMediaMetadataRecord(sqlite3* vicsDB, VICSMediaMetadata record)
 {
-    //figure length that data needs to be. MD5 is 32 bytes add 128 bytes to include query as well.
-    int dataLen = wcslen(record.PropertyName) + wcslen(record.PropertyValue)+ 128;
-    wchar_t* sqlQuery = new wchar_t[dataLen];
-    swprintf(sqlQuery,L"INSERT INTO MediaMetadata VALUES (\'%ls\',\'%ls\',\'%ls\');", record.MD5,record.PropertyName, record.PropertyValue );
-
-    //run query
-    sqlite3_stmt *statement;
-    int rc = sqlite3_prepare16_v2(vicsDB , sqlQuery,(wcslen(sqlQuery)+1)*sizeof(wchar_t),&statement, NULL);
+    const char* sqlQuery = "INSERT INTO MediaMetadata VALUES (?,?,?);";
+    sqlite3_stmt* statement;
+    int rc = sqlite3_prepare_v2(vicsDB, sqlQuery, -1, &statement, NULL);
     if (rc != SQLITE_OK)
     {
-        //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
-        delete[] sqlQuery;
+        XWF_OutputMessage(L"Error preparing MediaMetadata insert",0);
+        return -1;
+    }
+    rc = sqlite3_bind_text16(statement, 1, record.MD5,          -1, SQLITE_STATIC);
+    if (rc == SQLITE_OK)
+        rc = sqlite3_bind_text16(statement, 2, record.PropertyName,  -1, SQLITE_STATIC);
+    if (rc == SQLITE_OK)
+        rc = sqlite3_bind_text16(statement, 3, record.PropertyValue, -1, SQLITE_STATIC);
+    if (rc != SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error binding MediaMetadata values",0);
+        sqlite3_finalize(statement);
         return -1;
     }
     rc = sqlite3_step(statement);
+    sqlite3_finalize(statement);
     if (rc != SQLITE_DONE)
     {
-        //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
-        sqlite3_finalize(statement);
-        delete[] sqlQuery;
+        XWF_OutputMessage(L"Error inserting MediaMetadata record",0);
         return -2;
     }
-    //cleanup
-    sqlite3_finalize(statement);
-    delete[] sqlQuery;
     return 0;
 }
 
@@ -2141,32 +2140,28 @@ int insertMediaMetadataRecord(sqlite3* vicsDB, VICSMediaMetadata record)
  */
 int existsMediaMetadata(sqlite3* database, wchar_t* MD5, wchar_t* PropertyName)
 {
-    char sqlQuery[512]={0};
-    int retVal = 0;
+    const char* sqlQuery = "SELECT count(*) FROM MediaMetadata WHERE MD5Hash = ? AND PropertyName = ?;";
     sqlite3_stmt* statement;
-    snprintf(sqlQuery,512, "Select count(*) from MediaMetadata where MD5Hash = \'%ls\' and PropertyName = \'%ls\';",MD5,PropertyName);
-    int rc = sqlite3_prepare_v2(database,sqlQuery,strlen(sqlQuery)+1,&statement,NULL);
+    int rc = sqlite3_prepare_v2(database, sqlQuery, -1, &statement, NULL);
+    if (rc != SQLITE_OK)
+        return -2;
+    rc = sqlite3_bind_text16(statement, 1, MD5,          -1, SQLITE_STATIC);
     if (rc == SQLITE_OK)
+        rc = sqlite3_bind_text16(statement, 2, PropertyName, -1, SQLITE_STATIC);
+    if (rc != SQLITE_OK)
     {
-        rc = sqlite3_step(statement);
-        if (rc == SQLITE_ROW)
-        {
-            retVal = sqlite3_column_int(statement,0);
-        }
-        else
-        {
-            sqlite3_finalize(statement);
-            return -1;
-        }
-    }
-    else
-    {
+        sqlite3_finalize(statement);
         return -2;
     }
+    int retVal = 0;
+    rc = sqlite3_step(statement);
+    if (rc == SQLITE_ROW)
+        retVal = sqlite3_column_int(statement, 0);
+    else
+        retVal = -1;
     sqlite3_finalize(statement);
-    if (retVal == 0) {return 0;}
+    if (retVal <= 0) return retVal;
     return 1;
-
 }
 
 
@@ -2384,7 +2379,7 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
         return 0;
     }
     snprintf(sqlQuery,256, "Select * from MediaMetadata where MD5hash = \'%ls\';",hashValue);
-    int rc = sqlite3_prepare_v2(database,sqlQuery,(strlen(sqlQuery)+1)*sizeof(wchar_t),statement,NULL);
+    int rc = sqlite3_prepare_v2(database,sqlQuery,-1,statement,NULL);
     if (rc == SQLITE_OK)
     {
         rc = sqlite3_step(*statement);
