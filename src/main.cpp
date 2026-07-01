@@ -375,7 +375,11 @@ int firstRunSetup()
     int result = getCaseOptions();
     if (result !=0) { return -3;}
     INT64 strLen = XWF_GetCaseProp(NULL, 1, &caseTitle,64);
-    if (strLen > 64)
+    if (strLen < 0)
+    {
+        outputErrorMessage(L"XWF_GetCaseProp failed in firstRunSetup");
+    }
+    else if (strLen > 64)
     {
         XWF_OutputMessage(L"Case Title is bigger than 64 chars, truncated",0);
     }
@@ -774,6 +778,11 @@ int getCommandLineOptions()
     {
         vCaseData.CaseNumber = new wchar_t[128];
         INT64 result = XWF_GetCaseProp(NULL,1,vCaseData.CaseNumber,128);
+        if (result < 0)
+        {
+            outputErrorMessage(L"XWF_GetCaseProp failed in getCommandLineOptions");
+            vCaseData.CaseNumber[0] = L'\0';
+        }
     }
     extractInfo.processStart = TRUE;
     LocalFree(argv);
@@ -917,7 +926,15 @@ int volumePrepare(HANDLE hEvidence)
     if (versionNo >= 2030){
         DeviceTypeCol = determineColumnNumber(L"Device type");
     }
-    XWF_OutputMessage((LPWSTR)XWF_GetEvObjProp(hEvidence,6,NULL),0);
+    LPWSTR evObjName = (LPWSTR)XWF_GetEvObjProp(hEvidence,6,NULL);
+    if (evObjName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetEvObjProp failed in volumePrepare");
+    }
+    else
+    {
+        XWF_OutputMessage(evObjName,0);
+    }
     //need to fill target value
     DWORD target = getRootObj(vicsDB,currEvidence);
 
@@ -1176,7 +1193,13 @@ bool validType(LONG nItemID, int* picture)
 bool isThumbnailObject(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - Start of Function");}
-    if (wcscmp(XWF_GetItemName(nItemID),L"Thumbnail.jpg")!=0){
+    const wchar_t* itemName = XWF_GetItemName(nItemID);
+    if (itemName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", nItemID);
+        return false;
+    }
+    if (wcscmp(itemName, L"Thumbnail.jpg") != 0){
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return False");}
         return false;
     }
@@ -1189,7 +1212,12 @@ bool isThumbnailObject(LONG nItemID)
         if (extractInfo.exceptMismatch){
             //need to add code to check for report table association here
             buffer[0] = L'\0';
-            DWORD numTables = XWF_GetReportTableAssocs(parentID,buffer,1024);
+            LONG numTables = XWF_GetReportTableAssocs(parentID,buffer,1024);
+            if (numTables < 0)
+            {
+                outputErrorMessage(L"XWF_GetReportTableAssocs failed in isThumbnailObject for itemID: ", nItemID);
+                return true;
+            }
             //return false if its contains mismatch table (i.e. include file), true if not (exclude)
             if (containsThumbnailMismatchTable(buffer,1024)){
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return False");}
@@ -1261,30 +1289,30 @@ bool isSelectedFileTypeStatus(LONG nItemID)
 bool isSelectedFileFormatStatus(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isSelectedFileFormatStatus - Start of Function");}
-    LONG fileFormat = XWF_GetItemType(nItemID,NULL,0x80000000);
-    fileFormat = (fileFormat & 0xff00) >> 8;
-    if (fileFormat != -1){
-        int typeVal=0;
-        switch(fileFormat){
-        case 0:
-            typeVal = UNKNOWN;
-            break;
-        case 1:
-            typeVal = OK;
-            break;
-        case 2:
-            typeVal = IRREGULAR;
-            break;
-        case 3:
-            typeVal = CORRUPT;
-            break;
-        }
-        if (!(typeVal & extractOpt.FileTypeFlag)){
-            return false;
-        }
+    LONG rawFileFormat = XWF_GetItemType(nItemID,NULL,0x80000000);
+    if (rawFileFormat == -1)
+    {
+        outputErrorMessage(L"XWF_GetItemType returned error in isSelectedFileFormatStatus for itemID: ", nItemID);
+        return true;
     }
-    else{
-        debugWriteDetails(nItemID,L"Error determining File Format Status");
+    LONG fileFormat = (rawFileFormat & 0xff00) >> 8;
+    int typeVal=0;
+    switch(fileFormat){
+    case 0:
+        typeVal = UNKNOWN;
+        break;
+    case 1:
+        typeVal = OK;
+        break;
+    case 2:
+        typeVal = IRREGULAR;
+        break;
+    case 3:
+        typeVal = CORRUPT;
+        break;
+    }
+    if (!(typeVal & extractOpt.FileTypeFlag)){
+        return false;
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isSelectedFileFormatStatus - End of Function");}
     return true;
@@ -1318,7 +1346,10 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
         }
     }
     *fileSize = XWF_GetItemSize(nItemID);
-    if (*fileSize == -1){
+    if (*fileSize < 0){
+        wchar_t errMsg[256];
+        swprintf(errMsg, 256, L"XWF_GetItemSize returned %lld in checkItemExport for itemID: %ld", *fileSize, nItemID);
+        outputErrorMessage(errMsg);
         errorRaised(nItemID,REPORT_UNKNOWN_FILESIZE);
         return false;
     }
@@ -1785,6 +1816,11 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
     INT64 flags;
     BOOL complete=FALSE;
     flags = XWF_GetItemInformation(nItemID,3,&complete);
+    if (!complete)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in returnHashValue for itemID: ", nItemID);
+        return 4;
+    }
     if (flags & 0x00040000)
     {
         //extract primary hash value
@@ -1835,7 +1871,11 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
     }
     //look at returning PhotoDNA hash here
     flags = XWF_GetItemInformation(nItemID,2,&complete);
-    if (flags & 0x80000000)
+    if (!complete)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in returnHashValue (PhotoDNA check) for itemID: ", nItemID);
+    }
+    else if (flags & 0x80000000)
     {
         //photoDNA Computed
         wchar_t tempBuffer[145]={0};
@@ -1941,7 +1981,15 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
     int retVal = generateRelativeFilePath(&relativeBuffer[0],128,currentRecord.MD5,false);
     //merge paths
     swprintf(currentRecord.RelativeFilePath,L"%s\\%ls",relativeBuffer,currentRecord.MD5);
-    currentRecord.MediaSize = XWF_GetItemSize(nItemID);
+    INT64 sizeResult = XWF_GetItemSize(nItemID);
+    if (sizeResult < 0)
+    {
+        wchar_t errMsg[256];
+        swprintf(errMsg, 256, L"XWF_GetItemSize returned %lld in writeSQLMediaRecord for itemID: %ld", sizeResult, nItemID);
+        outputErrorMessage(errMsg);
+        sizeResult = 0;
+    }
+    currentRecord.MediaSize = sizeResult;
     insertMediaRecord(vicsDB,currentRecord, picture);
     deallocateMediaRecord(currentRecord);
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaRecord End");}
@@ -2062,6 +2110,11 @@ bool getDeletedStatus(long nItemID, BOOL* unallocated)
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getDeletedStatus Start");}
     BOOL boolCheck=0;
     INT64 delStatus = XWF_GetItemInformation(nItemID,4,&boolCheck);
+    if (!boolCheck)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in getDeletedStatus for itemID: ", nItemID);
+        return false;
+    }
     if (delStatus == 0)
     {
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getDeletedStatus return false");}
@@ -2236,8 +2289,19 @@ void writeSQLMediaMetadataRecord(LONG nItemID,wchar_t MD5Hash[33], wchar_t* Prop
 bool replaceOriginalItem(LONG origID, LONG newID)
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"replaceOriginalItem Start");}
-    INT64 originalDeletedFlags = XWF_GetItemInformation(origID,XWF_ITEM_INFO_DELETION, NULL);
-    INT64 newDeletedFlags = XWF_GetItemInformation(newID,XWF_ITEM_INFO_DELETION, NULL);
+    BOOL origSuccess = FALSE, newSuccess = FALSE;
+    INT64 originalDeletedFlags = XWF_GetItemInformation(origID, XWF_ITEM_INFO_DELETION, &origSuccess);
+    INT64 newDeletedFlags = XWF_GetItemInformation(newID, XWF_ITEM_INFO_DELETION, &newSuccess);
+    if (!origSuccess)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in replaceOriginalItem for itemID: ", origID);
+        return false;
+    }
+    if (!newSuccess)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in replaceOriginalItem for itemID: ", newID);
+        return false;
+    }
     if (originalDeletedFlags > newDeletedFlags)
     {
         if (extractInfo.debugSet){debugWriteDetails(0, L"replaceOriginalItem End - True");}
@@ -2410,7 +2474,15 @@ int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
     //get physical location and offset
     INT64 ds;
     XWF_GetItemOfs(nItemID,(INT64*)&ds,(INT64*)&picFile.physicalSector);
-    picFile.fileSize=XWF_GetItemSize(nItemID);
+    INT64 fileSizeResult = XWF_GetItemSize(nItemID);
+    if (fileSizeResult < 0)
+    {
+        wchar_t errMsg[256];
+        swprintf(errMsg, 256, L"XWF_GetItemSize returned %lld in createC4AllRecord for itemID: %ld", fileSizeResult, nItemID);
+        outputErrorMessage(errMsg);
+        fileSizeResult = 0;
+    }
+    picFile.fileSize = fileSizeResult;
     if (picture == 1)
     {
         writeXML(picFile,picture,currPicFile,picCount);
@@ -2450,6 +2522,12 @@ int getFileName(LPWSTR evObject,LONG nItemID, wchar_t* retValue,long bufferSize)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of getFileName Function Output");}
     LPWSTR fileName = (LPWSTR)XWF_GetItemName(nItemID);
+    if (fileName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", nItemID);
+        swprintf(retValue, bufferSize, L"*NoName*");
+        return 0;
+    }
     int nameLen = wcslen(fileName);
     if (nameLen == 0)
     {
@@ -2510,6 +2588,11 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
         if (parent != -1)
         {
             LPWSTR nameParent = (LPWSTR)XWF_GetItemName(parent);
+            if (nameParent == NULL)
+            {
+                outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", parent);
+                nameParent = L"(Unknown)";
+            }
             if (wcscmp(nameParent,L"(Root directory)")!=0)
             {
                 if (isVic)
@@ -2570,6 +2653,12 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
     } while (parent != -1);
     //prepend with evidence object name
     HANDLE hEvidence = XWF_GetEvObj(currEvidence);
+    if (hEvidence == NULL)
+    {
+        outputErrorMessage(L"XWF_GetEvObj returned NULL in getFullPath for itemID: ", nItemID);
+        delete[] temp;
+        return retValue;
+    }
     LPWSTR partName = (LPWSTR)XWF_GetEvObjProp(hEvidence,6,NULL);
     if (partName != NULL)
     {

@@ -1,6 +1,7 @@
 #include "ReportTableAssociations.h"
 #include <wchar.h>
 #include "X-Tension.h"
+#include "debugMessage.h"
 
 //1.50 added report table structure
 ReportTableDetails reportEntries;
@@ -214,7 +215,13 @@ wchar_t* retrieveUserReportTableAssociations(LONG nItemID)
     int bufferLen = 1024;
     wchar_t* retVal = new wchar_t[bufferLen];
     retVal[0] = '\0';
-    DWORD numTables = XWF_GetReportTableAssocs(nItemID,retVal,bufferLen);
+    LONG numTables = XWF_GetReportTableAssocs(nItemID,retVal,bufferLen);
+    if (numTables < 0)
+    {
+        outputErrorMessage(L"XWF_GetReportTableAssocs failed in retrieveUserReportTableAssociations for itemID: ", nItemID);
+        delete[] retVal;
+        return nullptr;
+    }
     if (numTables == 0) {
         delete[] retVal;
         return nullptr;

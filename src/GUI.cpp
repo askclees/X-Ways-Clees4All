@@ -931,6 +931,10 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     wchar_t caseNameW[128] = {0};
     char caseName[128]={0};
     INT64 result = XWF_GetCaseProp(NULL,1,&caseNameW,128);
+    if (result < 0)
+    {
+        XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving case name",0);
+    }
     sprintf(caseName,"%ls",caseNameW);
     GriffeyeCase = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",caseName,WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_GROUP,lblVidStartX + 160,start,150,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYECASE,GetModuleHandle(NULL),NULL);
     if (!GriffeyeCase)
@@ -985,6 +989,10 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     wchar_t NameW[128] = {0};
     char Name[128]={0};
     result = XWF_GetCaseProp(NULL,3,&NameW,128);
+    if (result < 0)
+    {
+        XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving investigator name",0);
+    }
     sprintf(Name,"%ls",NameW);
     GriffeyeInvName = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",Name,WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+50,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYEINVNAME,GetModuleHandle(NULL),NULL);
     if (!GriffeyeInvName)
