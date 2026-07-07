@@ -82,6 +82,15 @@ static HBRUSH hBrush = CreateSolidBrush(RGB(240,240,240));
 //globals
 char optionsDatabasePath[MAX_PATH];
 
+/** @brief Releases GDI resources allocated during options GUI creation. Call when the X-Tension is unloaded. */
+void cleanupOptions()
+{
+    if (hBrush != NULL) {
+        DeleteObject(hBrush);
+        hBrush = NULL;
+    }
+}
+
 
 //prototyping
 void CreateOptionsControls(HWND hwnd);

@@ -412,6 +412,7 @@ BOOL checkParentSelected(sqlite3* sqlDB, DWORD parentID)
     {
         sqlite3_step(statement);
         int result = sqlite3_column_int(statement,0);
+        sqlite3_finalize(statement);
         if (result == 0)
         {
             return false;
@@ -842,6 +843,7 @@ int getFileNumber(sqlite3* sqlDB,DWORD objID)
         if (rc != SQLITE_ROW)
         {
             //error
+            sqlite3_finalize(statement);
             return -1;
         }
         result = sqlite3_column_int(statement,0);

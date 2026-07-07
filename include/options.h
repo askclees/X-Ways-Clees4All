@@ -17,3 +17,6 @@ int writeExtractionDetails(ExtractionDetails record);
 
 /** @brief Reads the last-run extraction settings from the options database into the provided record. */
 int loadLastExtractionSettings(ExtractionDetails* record);
+
+/** @brief Releases GDI resources allocated during options GUI creation. Call when the X-Tension is unloaded. */
+void cleanupOptions();

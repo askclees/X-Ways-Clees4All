@@ -1574,4 +1574,8 @@ void cleanupGUI()
         delete[] CaseDir;
         CaseDir = NULL;
     }
+    if (hBrush != NULL) {
+        DeleteObject(hBrush);
+        hBrush = NULL;
+    }
 }

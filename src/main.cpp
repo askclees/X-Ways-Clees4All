@@ -1691,6 +1691,7 @@ int caseCleanup()
     clearReportTableDetails();
     if (currSrcID != NULL) { delete[] currSrcID; currSrcID = NULL; }
     cleanupGUI();
+    cleanupOptions();
     if (extractInfo.debugSet)
     {
         debugWriteDetails(0, L"caseCleanup End");

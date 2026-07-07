@@ -239,6 +239,7 @@ void deallocateVICSRecord(VICSRecord record)
         {
             deallocateMediaFileRecord(record.vMediaFiles[i]);
         }
+        delete[] record.vMediaFiles;
         record.noMediaFiles= 0;
     }
     //1.41 add cleaning of media metadata records
@@ -248,7 +249,8 @@ void deallocateVICSRecord(VICSRecord record)
         {
             deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
         }
-        record.noMediaFiles= 0;
+        delete[] record.vMediaMetaData;
+        record.noMediaMetadata= 0;
     }
 }
 
