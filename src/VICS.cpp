@@ -696,7 +696,7 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
             recMediaFile.parentFilePath = new wchar_t[CheckSize + 2];
             wcscpy(recMediaFile.parentFilePath, (wchar_t*)sqlite3_column_text16(statement,12));
         }
-    recMediaFile.parentPhysLoc = sqlite3_column_int(statement,13);
+    recMediaFile.parentPhysLoc = sqlite3_column_int64(statement,13);
 }
 
 /**

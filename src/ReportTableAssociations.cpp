@@ -233,9 +233,9 @@ wchar_t* retrieveUserReportTableAssociations(LONG nItemID)
     for (int i=0;i< entries.numEntries;i++){
         if (isUserCreatedReportTable(entries.entries[i])){
             if (wcscmp(L"",retVal)!=0){
-                wcsncat(retVal,L",", bufferLen);
+                wcsncat(retVal,L",", bufferLen - wcslen(retVal) - 1);
             }
-            wcsncat(retVal,entries.entries[i], bufferLen);
+            wcsncat(retVal,entries.entries[i], bufferLen - wcslen(retVal) - 1);
         }
     }
     if (wcscmp(L"",retVal)==0) {

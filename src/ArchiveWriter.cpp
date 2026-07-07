@@ -267,8 +267,9 @@ struct archive* selectArchiveObject(bool picFile)
  * @param inFilePath Path to the source file on disk.
  * @param filename   Path for the file within the archive.
  * @param picFile    True if the file is a picture.
- * @return           SUCCESS on success, or ERROR_OPEN if the file size could
- *                   not be determined or the file could not be opened.
+ * @return           SUCCESS on success, ERROR_OPEN if the file size could not
+ *                   be determined or the file could not be opened, or
+ *                   ERROR_WRITE if the archive entry header could not be written.
  *
  * @see getFileSize, createZipArchiveEntry
  */
@@ -281,17 +282,21 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
     INT64 fSize = getFileSize(inFilePath);
     if (fSize < 0)
         return ERROR_OPEN;
-    int result = createZipArchiveEntry(&outa,&entry,filename,fSize);
-    unsigned char* buffer = new unsigned char[max_read+1];
     FILE* inputFile = fopen(inFilePath,"rb");
-    if (inputFile != NULL)
+    if (inputFile == NULL)
+        return ERROR_OPEN;
+    int result = createZipArchiveEntry(&outa,&entry,filename,fSize);
+    if (result != SUCCESS)
     {
-        while ((bytesRead = fread(buffer,1,max_read, inputFile)) > 0)
-        {
-            archive_write_data(outa,buffer,bytesRead);
-        }
         fclose(inputFile);
+        return result;
     }
+    unsigned char* buffer = new unsigned char[max_read+1];
+    while ((bytesRead = fread(buffer,1,max_read, inputFile)) > 0)
+    {
+        archive_write_data(outa,buffer,bytesRead);
+    }
+    fclose(inputFile);
     closeZipArchiveEntry(&outa, entry);
     delete[] buffer;
     return SUCCESS;

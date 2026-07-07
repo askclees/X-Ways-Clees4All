@@ -1471,6 +1471,11 @@ int getGriffeyeDetails()
             {
                 //file exists, read lines
                 FILE* detailsFile = fopen(optPath,"r");
+                if (detailsFile == NULL)
+                {
+                    XWF_OutputMessage(L"Error opening Griffeye details file for reading",0);
+                    return 0;
+                }
                 char line[256];
                 int len;
                 //currently working on 4 lines
@@ -1542,6 +1547,11 @@ int saveGriffeyeDetails()
             char optPath[MAX_PATH + 64];
             snprintf(optPath,sizeof(optPath),"%s\\%s",appdataPath,"griffeyeDetails.txt");
             FILE* details = fopen(optPath,"w");
+            if (details == NULL)
+            {
+                XWF_OutputMessage(L"Error opening Griffeye details file for writing",0);
+                return 0;
+            }
             char item[256];
             GetWindowText(GriffeyeInvTitle,item,256);
             fprintf(details,"%s\n",item);

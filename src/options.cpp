@@ -207,6 +207,9 @@ INT64 getSizeInBytes(HWND hwnCmbo, HWND hwndTxt)
         case 3:
             multiplier = 1024*1024*1024;
         break;
+        default:
+            multiplier = 1;
+        break;
     }
     return (strtoll(numVal,NULL,10)*multiplier);
 
@@ -955,6 +958,7 @@ int writeExtractionDetails(ExtractionDetails record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
+    if (path == nullptr) {return SQLITE_ERROR;}
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);
@@ -982,6 +986,7 @@ int loadLastExtractionSettings(ExtractionDetails* record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
+    if (path == nullptr) {return SQLITE_ERROR;}
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);

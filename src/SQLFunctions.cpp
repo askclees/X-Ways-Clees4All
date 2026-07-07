@@ -1936,14 +1936,14 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     timestamp.LowPart = record->accessed.dwLowDateTime;
     sqlite3_bind_int64(statement,5,timestamp.QuadPart);
     //bind other attributes
-    if (record->unallocated) { sqlite3_bind_int,6,1;} else {sqlite3_bind_int,6,0;}
+    if (record->unallocated) { sqlite3_bind_int(statement,6,1);} else {sqlite3_bind_int(statement,6,0);}
     rc = sqlite3_bind_text16(statement,7,record->sourceID,-1,SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding Source ID",0);
         return -3;
     }
     sqlite3_bind_int64(statement,8,record->physicalLocation);
-    if (record->deleted) { sqlite3_bind_int,9,1;} else {sqlite3_bind_int,9,0;}
+    if (record->deleted) { sqlite3_bind_int(statement,9,1);} else {sqlite3_bind_int(statement,9,0);}
     //bind parent attributes
     if (record->parentMD5[0] != '\0') { sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC); } else { sqlite3_bind_text16(statement,10,"",-1,SQLITE_TRANSIENT); }
     if (record->parentName != NULL) { sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,11,"",-1,SQLITE_TRANSIENT); }
