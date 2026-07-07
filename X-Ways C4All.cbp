@@ -33,7 +33,7 @@
 					<Add option="-static-libgcc" />
 					<Add option="-static" />
 					<Add option="-m64" />
-					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
+					<Add option="-Wl,-Map=mem.map" />
 					<Add library="user32" />
 					<Add library="gdi32" />
 					<Add library="comdlg32" />
@@ -78,7 +78,7 @@
 					<Add option="-static-libgcc" />
 					<Add option="-static" />
 					<Add option="-m64" />
-					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
+					<Add option="-Wl,-Map=mem.map" />
 					<Add library="user32" />
 					<Add library="gdi32" />
 					<Add library="comdlg32" />
@@ -118,7 +118,7 @@
 					<Add option="-static-libgcc" />
 					<Add option="-static" />
 					<Add option="-m64" />
-					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
+					<Add option="-Wl,-Map=mem.map" />
 					<Add library="user32" />
 					<Add library="gdi32" />
 					<Add library="comdlg32" />
@@ -158,7 +158,7 @@
 					<Add option="-static-libgcc" />
 					<Add option="-static" />
 					<Add option="-m64" />
-					<Add option="-Wl,-Map=mem.map -Bstatic -lstdc++ -lwinpthread -lpthread" />
+					<Add option="-Wl,-Map=mem.map" />
 					<Add library="ole32" />
 					<Add library="user32" />
 					<Add library="uuid" />

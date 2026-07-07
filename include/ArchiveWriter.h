@@ -47,4 +47,7 @@ void cleanupArchivePaths();
 /** @brief Writes an existing file from disk into the zip archive. */
 int writeJSONFile(const char* inFilePath, const char* filename, bool picFile);
 
+void initArchiveLocks();
+void destroyArchiveLocks();
+
 #endif // ARCHIVEWRITER_H_INCLUDED

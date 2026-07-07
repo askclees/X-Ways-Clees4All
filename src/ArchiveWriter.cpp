@@ -1,6 +1,6 @@
 
 //standard libraries
-#include <mutex>
+#include <windows.h>
 #include <set>
 #include <string>
 
@@ -35,7 +35,10 @@ struct archive* ArchAll=nullptr;
 std::set<std::string> hashList;
 
 /** @brief Mutex preventing simultaneous writes to a zip archive. */
-std::mutex archiveLock;
+CRITICAL_SECTION archiveLock;
+
+void initArchiveLocks()    { InitializeCriticalSection(&archiveLock); }
+void destroyArchiveLocks() { DeleteCriticalSection(&archiveLock); }
 
 
 /**
@@ -312,7 +315,7 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
  */
 int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,HANDLE hdlCurrVol)
 {
-    archiveLock.lock();
+    EnterCriticalSection(&archiveLock);
     char* filePath = generateCompressedPath(fileName);
     bool fileFound = false;
     std::wstring wFileName(fileName);
@@ -321,7 +324,7 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
 
     if (fileFound)
     {
-        archiveLock.unlock();
+        LeaveCriticalSection(&archiveLock);
         delete[] filePath;
         return SUCCESS;
     }
@@ -332,7 +335,7 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
     {
         errorRaised(nItemID,REPORT_FILEOPEN_ERROR);
         //clear file lock to prevent deadlock
-        archiveLock.unlock();
+        LeaveCriticalSection(&archiveLock);
         delete[] filePath;
         return 1;
     }
@@ -341,7 +344,7 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
     if (createZipArchiveEntry(&outa,&entry,filePath,fileSize) != SUCCESS)
     {
         XWF_Close(hItem);
-        archiveLock.unlock();
+        LeaveCriticalSection(&archiveLock);
         delete[] filePath;
         return ERROR_WRITE;
     }
@@ -373,7 +376,7 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
     closeZipArchiveEntry(&outa, entry);
     hashList.insert(hashValue);
     //end of function, unlock file
-    archiveLock.unlock();
+    LeaveCriticalSection(&archiveLock);
     delete[] filePath;
     return SUCCESS;
 }

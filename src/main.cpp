@@ -6,12 +6,10 @@
 #include <ctime>
 #include <string>
 #include <windows.h>
-#include <mutex>
 #include <shlobj.h>
 #include <climits>
 #include <map>
 #include <excpt.h>
-#include <synchapi.h>
 
 //project headers
 #include "sqlite3.h"
@@ -55,7 +53,7 @@ wchar_t caseTitle[64];
 INT64 noErrorHash;
 int firstTime = 0,currentFileObject,itemCompleted=0, noNames=0;
 LONG lastItemID;
-std::mutex lockC4All, lockVics, updateLock, xwfOutputLock;
+CRITICAL_SECTION lockC4All, lockVics, updateLock, xwfOutputLock;
 //VICSRecord* VICSPics, *VICSMovie;
 
 HANDLE MainWnd, hdlCurrVol;
@@ -126,8 +124,29 @@ INT64 getPhysicalOffset(DWORD nItemID, BOOL* unallocated, BOOL* deleted);
  */
 BOOL APIENTRY DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-	extractInfo.thisDLL = hInstDLL;
-	GetModuleFileNameW(hInstDLL, XT_PATH, MAX_PATH);
+    switch (fdwReason)
+    {
+    case DLL_PROCESS_ATTACH:
+        extractInfo.thisDLL = hInstDLL;
+        GetModuleFileNameW(hInstDLL, XT_PATH, MAX_PATH);
+        InitializeCriticalSection(&lockC4All);
+        InitializeCriticalSection(&lockVics);
+        InitializeCriticalSection(&updateLock);
+        InitializeCriticalSection(&xwfOutputLock);
+        initFileOutputLocks();
+        initArchiveLocks();
+        initDebugLocks();
+        break;
+    case DLL_PROCESS_DETACH:
+        DeleteCriticalSection(&lockC4All);
+        DeleteCriticalSection(&lockVics);
+        DeleteCriticalSection(&updateLock);
+        DeleteCriticalSection(&xwfOutputLock);
+        destroyFileOutputLocks();
+        destroyArchiveLocks();
+        destroyDebugLocks();
+        break;
+    }
     return TRUE;
 }
 
@@ -1441,17 +1460,17 @@ int updateRecords(int picture, long nItemID, hashValueStruct currHash)
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"updateRecords Start");}
     if (extractInfo.C4ALLExport)
     {
-        lockC4All.lock();
+        EnterCriticalSection(&lockC4All);
         createC4AllRecord(nItemID,picture,currHash.MD5);
-        lockC4All.unlock();
+        LeaveCriticalSection(&lockC4All);
     }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
-        lockVics.lock();
+        EnterCriticalSection(&lockVics);
         createVICSRecord(nItemID,picture,currHash);
-        lockVics.unlock();
+        LeaveCriticalSection(&lockVics);
     }
-    updateLock.lock();
+    EnterCriticalSection(&updateLock);
     if (picture == 1)
     {
         pictureCount++;
@@ -1462,7 +1481,7 @@ int updateRecords(int picture, long nItemID, hashValueStruct currHash)
         tmpVidCount++;
         movieCount++;
     }
-    updateLock.unlock();
+    LeaveCriticalSection(&updateLock);
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"updateRecords End");}
     return 0;
 }
@@ -1828,9 +1847,9 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         if (retVal !=0)
         {
             outputErrorMessage(L"Unable to retrieve primary hash for itemID: ",nItemID);
-            xwfOutputLock.lock();
+            EnterCriticalSection(&xwfOutputLock);
             recordError(vicsDB,ERROR_NO_MD5_HASH, nItemID, currSrcID);
-            xwfOutputLock.unlock();
+            LeaveCriticalSection(&xwfOutputLock);
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 1");}
             return 1;
         }
@@ -1842,9 +1861,9 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         if (retVal !=0)
         {
             outputErrorMessage(L"Unable to retrieve secondary hash for itemID: ",nItemID);
-            xwfOutputLock.lock();
+            EnterCriticalSection(&xwfOutputLock);
             recordError(vicsDB,ERROR_NO_MD5_HASH, nItemID, currSrcID);
-            xwfOutputLock.unlock();
+            LeaveCriticalSection(&xwfOutputLock);
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 2");}
             return 2;
         }
@@ -1858,9 +1877,9 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
             //still failed
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"GetFileDetails - No hash computed for file");}
             errorRaised(nItemID,REPORT_NOHASH);
-            xwfOutputLock.lock();
+            EnterCriticalSection(&xwfOutputLock);
             recordError(vicsDB, ERROR_HASH_NOT_COMPUTED,nItemID,L"No hash computed for item");
-            xwfOutputLock.unlock();
+            LeaveCriticalSection(&xwfOutputLock);
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 3");}
             return 3;
         }

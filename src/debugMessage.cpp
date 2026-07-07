@@ -1,17 +1,19 @@
 //standard includes
 #include <cstdio>
 #include <windows.h>
-#include <mutex>
 
 //project headers
 #include "X-Tension.h"
 #include "debugMessage.h"
 
 /** @brief Mutex serialising writes to the debug log and X-Ways output window. */
-std::mutex dbgMessage;
+CRITICAL_SECTION dbgMessage;
 
 /** @brief Mutex serialising increments to the per-error-type counters. */
-std::mutex errorTotal;
+CRITICAL_SECTION errorTotal;
+
+void initDebugLocks()    { InitializeCriticalSection(&dbgMessage); InitializeCriticalSection(&errorTotal); }
+void destroyDebugLocks() { DeleteCriticalSection(&dbgMessage);     DeleteCriticalSection(&errorTotal); }
 
 /** @brief Handle to the open debug log file, or NULL if no log is active. */
 FILE* debugLogFile;
@@ -95,7 +97,7 @@ int endDebugLog()
  */
 int debugWriteDetails(FILE* f, const char* message)
 {
-    dbgMessage.lock();
+    EnterCriticalSection(&dbgMessage);
     if (f !=NULL)
     {
         int check  = fprintf(f, "%s",message);
@@ -104,12 +106,12 @@ int debugWriteDetails(FILE* f, const char* message)
             XWF_OutputMessage(L"Fprintf error",0);
         }
         fflush(f);
-        dbgMessage.unlock();
+        LeaveCriticalSection(&dbgMessage);
         return 0;
     }
     else
     {
-        dbgMessage.unlock();
+        LeaveCriticalSection(&dbgMessage);
         return 1;
     }
 }
@@ -252,9 +254,9 @@ void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
 {
     wchar_t errorMessage[2048];
     swprintf(errorMessage,2048,L"%ls %lu",errMsg, nItemID);
-    dbgMessage.lock();
+    EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage(errorMessage,0);
-    dbgMessage.unlock();
+    LeaveCriticalSection(&dbgMessage);
 }
 
 /**
@@ -264,9 +266,9 @@ void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
  */
 void outputErrorMessage(const wchar_t* errMsg)
 {
-    dbgMessage.lock();
+    EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage((wchar_t*)errMsg,0);
-    dbgMessage.unlock();
+    LeaveCriticalSection(&dbgMessage);
 }
 
 /**
@@ -279,9 +281,9 @@ void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail)
 {
     wchar_t errorMessage[2048];
     swprintf(errorMessage,2048,L"%ls%ls",errMsg,detail);
-    dbgMessage.lock();
+    EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage(errorMessage,0);
-    dbgMessage.unlock();
+    LeaveCriticalSection(&dbgMessage);
 }
 
 /**
@@ -301,9 +303,9 @@ void errorRaised(LONG nItemID,int errorCode)
     {
         outputErrorMessage(L"Unable to set report table for itemID: ",nItemID);
     }
-    errorTotal.lock();
+    EnterCriticalSection(&errorTotal);
     errorLog[errorCode]++;
-    errorTotal.unlock();
+    LeaveCriticalSection(&errorTotal);
 }
 
 /**

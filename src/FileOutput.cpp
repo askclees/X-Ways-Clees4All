@@ -1,7 +1,6 @@
 //standard libraries
 #include <windows.h>
 #include <cstdint>
-#include <mutex>
 #include <shlobj.h>
 
 //local functions
@@ -17,10 +16,13 @@
 #define max_read 4194304LL
 
 /** @brief Mutex serialising file creation to prevent simultaneous writes of the same file. */
-std::mutex lockFile;
+CRITICAL_SECTION lockFile;
 
 /** @brief Mutex serialising directory creation to prevent duplicate mkdir calls. */
-std::mutex lockFolder;
+CRITICAL_SECTION lockFolder;
+
+void initFileOutputLocks()    { InitializeCriticalSection(&lockFile); InitializeCriticalSection(&lockFolder); }
+void destroyFileOutputLocks() { DeleteCriticalSection(&lockFile);     DeleteCriticalSection(&lockFolder); }
 
 /**
  * @brief Generates a relative folder path from an MD5 hash filename.
@@ -83,7 +85,7 @@ static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool pi
     int written = snprintf(buffer + pos, maxSize - pos, "%s", tempBuffer);
     if (written > 0) pos += written;
     //lock folder mutex to stop folder being created twice.
-    lockFolder.lock();
+    EnterCriticalSection(&lockFolder);
     if (!ifFileExists(buffer))
     {
         //create directory
@@ -93,7 +95,7 @@ static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool pi
             outputErrorMessage(L"Error creating directory, Error Code:",retVal);
         }
     }
-    lockFolder.unlock();
+    LeaveCriticalSection(&lockFolder);
     written = snprintf(buffer + pos, maxSize - pos, "\\%ls", fileName);
     return 0;
 }
@@ -301,7 +303,7 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
             return SUCCESS;
         }
     }
-    lockFile.lock();
+    EnterCriticalSection(&lockFile);
     HANDLE hItem;
 
     hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
@@ -309,11 +311,11 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
     {
         errorRaised(nItemID,REPORT_FILEOPEN_ERROR);
         //clear file lock to prevent deadlock
-        lockFile.unlock();
+        LeaveCriticalSection(&lockFile);
         return ERROR_FILE_OPEN;
     }
     outputFile = fopen(outputPath,"wb");
-    lockFile.unlock();
+    LeaveCriticalSection(&lockFile);
     if (outputFile == NULL)
     {
         XWF_Close(hItem);
