@@ -118,7 +118,11 @@ INT64 getPhysicalOffset(DWORD nItemID);
 INT64 getPhysicalOffset(DWORD nItemID, BOOL* unallocated, BOOL* deleted);
 
 /**
- * @brief DLL entry point — stores the DLL instance handle and module path.
+ * @brief DLL entry point.
+ *
+ * On DLL_PROCESS_ATTACH, stores the DLL instance handle and module path, and
+ * initialises all CRITICAL_SECTION locks used across the DLL. On
+ * DLL_PROCESS_DETACH, releases those same locks.
  *
  * @return TRUE always.
  */

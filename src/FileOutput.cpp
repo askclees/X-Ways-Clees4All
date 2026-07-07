@@ -15,13 +15,15 @@
 /** @brief Maximum number of bytes read from an item in a single pass (4 MiB). */
 #define max_read 4194304LL
 
-/** @brief Mutex serialising file creation to prevent simultaneous writes of the same file. */
+/** @brief Critical section serialising file creation to prevent simultaneous writes of the same file. */
 CRITICAL_SECTION lockFile;
 
-/** @brief Mutex serialising directory creation to prevent duplicate mkdir calls. */
+/** @brief Critical section serialising directory creation to prevent duplicate mkdir calls. */
 CRITICAL_SECTION lockFolder;
 
+/** @brief Initialises lockFile and lockFolder. Must be called before any output files are written. */
 void initFileOutputLocks()    { InitializeCriticalSection(&lockFile); InitializeCriticalSection(&lockFolder); }
+/** @brief Releases the resources held by lockFile and lockFolder. */
 void destroyFileOutputLocks() { DeleteCriticalSection(&lockFile);     DeleteCriticalSection(&lockFolder); }
 
 /**
@@ -84,7 +86,7 @@ static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool pi
     generateRelativeFilePath(tempBuffer, 128, fileName, false);
     int written = snprintf(buffer + pos, maxSize - pos, "%s", tempBuffer);
     if (written > 0) pos += written;
-    //lock folder mutex to stop folder being created twice.
+    //lock folder critical section to stop folder being created twice.
     EnterCriticalSection(&lockFolder);
     if (!ifFileExists(buffer))
     {

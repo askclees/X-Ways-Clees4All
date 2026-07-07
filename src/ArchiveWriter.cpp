@@ -34,10 +34,12 @@ struct archive* ArchAll=nullptr;
 /** @brief Set of MD5 hash strings for files already written to the archive, used for deduplication. */
 std::set<std::string> hashList;
 
-/** @brief Mutex preventing simultaneous writes to a zip archive. */
+/** @brief Critical section preventing simultaneous writes to a zip archive. */
 CRITICAL_SECTION archiveLock;
 
+/** @brief Initialises archiveLock. Must be called before any archive writes are attempted. */
 void initArchiveLocks()    { InitializeCriticalSection(&archiveLock); }
+/** @brief Releases the resources held by archiveLock. */
 void destroyArchiveLocks() { DeleteCriticalSection(&archiveLock); }
 
 

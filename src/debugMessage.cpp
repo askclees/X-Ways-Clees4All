@@ -6,13 +6,15 @@
 #include "X-Tension.h"
 #include "debugMessage.h"
 
-/** @brief Mutex serialising writes to the debug log and X-Ways output window. */
+/** @brief Critical section serialising writes to the debug log and X-Ways output window. */
 CRITICAL_SECTION dbgMessage;
 
-/** @brief Mutex serialising increments to the per-error-type counters. */
+/** @brief Critical section serialising increments to the per-error-type counters. */
 CRITICAL_SECTION errorTotal;
 
+/** @brief Initialises dbgMessage and errorTotal. Must be called before any debug/error logging is attempted. */
 void initDebugLocks()    { InitializeCriticalSection(&dbgMessage); InitializeCriticalSection(&errorTotal); }
+/** @brief Releases the resources held by dbgMessage and errorTotal. */
 void destroyDebugLocks() { DeleteCriticalSection(&dbgMessage);     DeleteCriticalSection(&errorTotal); }
 
 /** @brief Handle to the open debug log file, or NULL if no log is active. */
