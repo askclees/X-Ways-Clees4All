@@ -857,21 +857,22 @@ static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARA
  */
 char* createOptionsFolderString()
 {
-    char* appdataPath = new char[MAX_PATH];
+    char* appdataPath = new char[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
-        strncat(appdataPath,"\\X-Ways\\",MAX_PATH);
+        strncat(appdataPath,"\\X-Ways\\",31);
         if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
-        strcat(appdataPath,"Clees4All\\");
+        strncat(appdataPath,"Clees4All\\",31);
         if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
     }
     else{
+        delete[] appdataPath;
         return nullptr;
     }
     return appdataPath;
@@ -886,12 +887,13 @@ char* createOptionsFolderString()
  */
 char* generateOptionsFolderString()
 {
-    char* appdataPath = new char[MAX_PATH];
+    char* appdataPath = new char[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
-        strncat(appdataPath,"\\X-Ways\\Clees4All\\",MAX_PATH);
+        strncat(appdataPath,"\\X-Ways\\Clees4All\\",31);
     }
     else{
+        delete[] appdataPath;
         return nullptr;
     }
     return appdataPath;

@@ -570,9 +570,11 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
     }
     else
     {
-        wcscpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2));
+        wcsncpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2), 40);
+        recMedia.SHA1[40] = L'\0';
     }
-    wcscpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3));
+    wcsncpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3), 32);
+    recMedia.MD5[32] = L'\0';
     recMedia.VictimID = sqlite3_column_int(statement,4);
     recMedia.OffenderID = sqlite3_column_int(statement,5);
     recMedia.IsDistributed = sqlite3_column_int(statement,6);
@@ -619,7 +621,8 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
     CheckSize = sqlite3_column_bytes16(statement,17);
     if (CheckSize == 0) { recMedia.PhotoDNA[0] = '\0'; }
         else {
-            wcscpy((wchar_t*)recMedia.PhotoDNA, (wchar_t*)sqlite3_column_text16(statement,17));
+            wcsncpy((wchar_t*)recMedia.PhotoDNA, (wchar_t*)sqlite3_column_text16(statement,17), 255);
+            recMedia.PhotoDNA[255] = L'\0';
         }
 }
 
@@ -633,7 +636,8 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
  */
 void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement)
 {
-    wcscpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0));
+    wcsncpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+    recMediaFile.MD5[32] = L'\0';
     //Filename
     int CheckSize = sqlite3_column_bytes16(statement,1);
     recMediaFile.fileName =  new wchar_t[CheckSize + 2];
@@ -675,7 +679,8 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
     CheckSize = sqlite3_column_bytes16(statement,10);
     if (CheckSize == 0) { recMediaFile.parentMD5[0] = L'\0'; }
     else {
-            wcscpy(recMediaFile.parentMD5, (wchar_t*)sqlite3_column_text16(statement,10));
+            wcsncpy(recMediaFile.parentMD5, (wchar_t*)sqlite3_column_text16(statement,10), 32);
+            recMediaFile.parentMD5[32] = L'\0';
         }
     //parentName
     CheckSize = sqlite3_column_bytes16(statement,11);

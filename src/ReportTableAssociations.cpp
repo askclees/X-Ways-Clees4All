@@ -106,15 +106,17 @@ ReportTableList stringToEntryList(wchar_t* buffer, int bufferLen)
     ReportTableList retVal;
     int length = wcsnlen(buffer,bufferLen);
     int start = 0;
-    for (int i=0;i<length+1;i++)
+    for (int i=0;i<length+1 && retVal.numEntries<128;i++)
     {
         if (buffer[i]==L',' || buffer[i]==L'\0' )
         {
             int itemSize = i - start;
+            if (itemSize > 127) itemSize = 127;
             wcsncpy(retVal.entries[retVal.numEntries],&buffer[start],itemSize);
+            retVal.entries[retVal.numEntries][itemSize] = L'\0';
             retVal.numEntries++;
             start = i+1;
-            if (buffer[start]== L' '){
+            if (start < length && buffer[start]== L' '){
                 start++;
             }
         }

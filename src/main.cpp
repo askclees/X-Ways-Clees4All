@@ -908,12 +908,19 @@ void addCaseDetail(wchar_t* strArg)
         extractInfo.VICExport = false;
         extractInfo.VICSCompressed = true;
     }
-    else if (wcsncmp(L"grfset",strArg,6)==0){
+    else if (wcsncmp(L"grfset:",strArg,7)==0){
         size_t valueLen = wcslen(strArg) - 7;
-        extractInfo.GriffeyeSettingsName = new wchar_t[valueLen + 1];
-        memcpy(extractInfo.GriffeyeSettingsName, strArg + 7, valueLen * sizeof(wchar_t));
-        extractInfo.GriffeyeSettingsName[valueLen] = L'\0';
-        XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
+        if (valueLen == 0)
+        {
+            XWF_OutputMessage(L"Error: grfset value empty",0);
+        }
+        else
+        {
+            extractInfo.GriffeyeSettingsName = new wchar_t[valueLen + 1];
+            memcpy(extractInfo.GriffeyeSettingsName, strArg + 7, valueLen * sizeof(wchar_t));
+            extractInfo.GriffeyeSettingsName[valueLen] = L'\0';
+            XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
+        }
     }
     else if (wcsncmp(L"exthmbs",strArg,7)==0){
         extractInfo.ignoreThumbs = TRUE;
@@ -1534,26 +1541,26 @@ int createGriffeyeCase()
     swprintf(path,32768,L"%ls\\%ls\\%ls.ANCF",extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName,extractInfo.GriffeyeCaseName);
     if (ifFileExistsW((wchar_t*)&path))
     {
-        strncat(cmdOutput, " --add-source",8191);
+        strncat(cmdOutput, " --add-source",sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
 
     if (extractInfo.extractPictures)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Pictures_Results.json\" --source-type vics --include-vics-data all",sourceNo++,extractInfo.C4PPath);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     if (extractInfo.extractVideos)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Movies_Results.json\" --source-type vics --include-vics-data all", sourceNo++,extractInfo.C4MPath);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     if (extractInfo.GriffeyeSettingsName != nullptr)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --import-settings-file %ls", extractInfo.GriffeyeSettingsName);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     XWF_OutputMessage((wchar_t*)cmdOutput,4);
     PROCESS_INFORMATION ProcessInfo;
@@ -2603,7 +2610,7 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
         int error = getFileName(evObject,nItemID,retValue,8192);
     }
     else{
-        swprintf(retValue,L"");
+        swprintf(retValue,8192,L"");
     }
     parent = XWF_GetItemParent(nItemID);
     do
@@ -2637,18 +2644,18 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"%ls\\%ls",newName,retValue);
+                        swprintf(temp,8192,L"%ls\\%ls",newName,retValue);
                     }
                     else
                     {
                         //if retValue is "" creates an error.
-                        swprintf(temp,L"%ls\\",newName);
+                        swprintf(temp,8192,L"%ls\\",newName);
                     }
                     delete[] newName;
                 }
                 else
                 {
-                    swprintf(temp,L"%ls\\%ls",nameParent,retValue);
+                    swprintf(temp,8192,L"%ls\\%ls",nameParent,retValue);
                 }
             }
             else
@@ -2658,19 +2665,19 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"\\%ls",retValue);
+                        swprintf(temp,8192,L"\\%ls",retValue);
                     }
                     else
                     {
-                        swprintf(temp,L"\\");
+                        swprintf(temp,8192,L"\\");
                     }
                 }
                 else
                 {
-                    swprintf(temp,L"\\%ls",retValue);
+                    swprintf(temp,8192,L"\\%ls",retValue);
                 }
             }
-            swprintf(retValue,L"%ls",temp);
+            swprintf(retValue,8192,L"%ls",temp);
             parent = XWF_GetItemParent(parent);
         }
     } while (parent != -1);
@@ -2688,11 +2695,11 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
         if (isVic)
         {
             //swprintf(retValue,L"%ls\\\\%ls%ls",currSrcID,partName,temp);
-            swprintf(retValue,L"%ls%ls",partName,temp);
+            swprintf(retValue,8192,L"%ls%ls",partName,temp);
         }
         else
         {
-            swprintf(retValue,L"%ls\\%ls%ls",currSrcID,partName,temp);
+            swprintf(retValue,8192,L"%ls\\%ls%ls",currSrcID,partName,temp);
         }
     }
     else

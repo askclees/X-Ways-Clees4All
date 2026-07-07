@@ -683,9 +683,16 @@ ObjectNames* retrieveEvidenceNames(sqlite3* sqlDB,int *retCounter)
         {
             if (rc == SQLITE_ROW)
             {
+                if (recCount >= noObjs)
+                {
+                    //more rows than the earlier count query reported; stop rather than overflow retArray
+                    break;
+                }
                 retArray[recCount].objectID = sqlite3_column_int(statement,0);
-                wcscpy(retArray[recCount].actualName, (wchar_t*)sqlite3_column_text16(statement, 1));
-                wcscpy(retArray[recCount].prefName, (wchar_t*)sqlite3_column_text16(statement, 2));
+                wcsncpy(retArray[recCount].actualName, (wchar_t*)sqlite3_column_text16(statement, 1), 1023);
+                retArray[recCount].actualName[1023] = L'\0';
+                wcsncpy(retArray[recCount].prefName, (wchar_t*)sqlite3_column_text16(statement, 2), 1023);
+                retArray[recCount].prefName[1023] = L'\0';
                 rc = sqlite3_step(statement);
                 recCount++;
             }

@@ -770,11 +770,18 @@ bool createOuputControls(HWND hwnd, int startOffset)
 {
     CaseDir = new char[512];
     wchar_t* CaseDirWide = new wchar_t[512];
+    CaseDirWide[0] = L'\0';
     INT64 lenCaseDir = XWF_GetCaseProp(NULL,5,(PVOID)CaseDirWide,512);
     if (lenCaseDir < 0)
     {
         XWF_OutputMessage(L"Error retrieving case directory",0);
+        lenCaseDir = 0;
     }
+    else if (lenCaseDir >= 512)
+    {
+        lenCaseDir = 511;
+    }
+    CaseDirWide[lenCaseDir] = L'\0';
     for (int i = lenCaseDir;i>0;i--)
     {
         if (CaseDirWide[i]==L'\\')
@@ -783,7 +790,7 @@ bool createOuputControls(HWND hwnd, int startOffset)
             break;
         }
     }
-    sprintf(CaseDir,"%ls\\Clees4All\\",CaseDirWide);
+    snprintf(CaseDir,512,"%ls\\Clees4All\\",CaseDirWide);
     delete[] CaseDirWide;
     PicturePath = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",CaseDir,WS_CHILD|WS_VISIBLE,lblPicStartX + lblPicWidth + 20,startOffset,MainWindowWidth - (lblPicStartX + lblPicWidth) - 80,20,hwnd,(HMENU)IDC_TEXT_PICTUREPATH,GetModuleHandle(NULL),NULL);
     if (!PicturePath)
@@ -1312,7 +1319,6 @@ int startProcess()
     }
     if (extractInfo.extractPictures)
     {
-        int length = GetWindowTextLength(PicturePath);
         GetWindowText(PicturePath,buffer,1024);
         if(!dirExists(buffer))
         {
@@ -1334,9 +1340,11 @@ int startProcess()
                 return 1;
             }
         }
-        if (buffer[length-1]!= '\\')
+        size_t pathLen = strlen(buffer);
+        if ((pathLen == 0 || buffer[pathLen-1]!= '\\') && pathLen < sizeof(buffer)-1)
         {
-            strcat(buffer,"\\");
+            buffer[pathLen] = '\\';
+            buffer[pathLen+1] = '\0';
         }
         swprintf(extractInfo.C4PPath,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
@@ -1348,7 +1356,6 @@ int startProcess()
     }
     if (extractInfo.extractVideos)
     {
-        int length = GetWindowTextLength(VideoPath);
         GetWindowText(VideoPath,buffer,1024);
         if(!dirExists(buffer))
         {
@@ -1370,9 +1377,11 @@ int startProcess()
                 return 1;
             }
         }
-        if (buffer[length-1]!= '\\')
+        size_t pathLen = strlen(buffer);
+        if ((pathLen == 0 || buffer[pathLen-1]!= '\\') && pathLen < sizeof(buffer)-1)
         {
-            strcat(buffer,"\\");
+            buffer[pathLen] = '\\';
+            buffer[pathLen+1] = '\0';
         }
         swprintf(extractInfo.C4MPath,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
@@ -1444,7 +1453,7 @@ void fillCaseDetails()
  */
 int getGriffeyeDetails()
 {
-    char appdataPath[MAX_PATH];
+    char appdataPath[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
@@ -1456,8 +1465,8 @@ int getGriffeyeDetails()
         if (dirExists(appdataPath))
         {
             //folder exists, check if options database does!
-            char optPath[MAX_PATH];
-            sprintf(optPath,"%s\\%s",appdataPath,"griffeyeDetails.txt");
+            char optPath[MAX_PATH + 64];
+            snprintf(optPath,sizeof(optPath),"%s\\%s",appdataPath,"griffeyeDetails.txt");
             if (ifFileExists(optPath))
             {
                 //file exists, read lines
@@ -1518,7 +1527,7 @@ int getGriffeyeDetails()
  */
 int saveGriffeyeDetails()
 {
-    char appdataPath[MAX_PATH];
+    char appdataPath[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
@@ -1530,8 +1539,8 @@ int saveGriffeyeDetails()
         if (dirExists(appdataPath))
         {
             //folder exists, check if options database does!
-            char optPath[MAX_PATH];
-            sprintf(optPath,"%s\\%s",appdataPath,"griffeyeDetails.txt");
+            char optPath[MAX_PATH + 64];
+            snprintf(optPath,sizeof(optPath),"%s\\%s",appdataPath,"griffeyeDetails.txt");
             FILE* details = fopen(optPath,"w");
             char item[256];
             GetWindowText(GriffeyeInvTitle,item,256);
