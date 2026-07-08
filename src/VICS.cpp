@@ -490,6 +490,7 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     {
         char photodna[256];
         wcstombs(photodna, m.PhotoDNA, sizeof(photodna));
+        photodna[255] = '\0';
         cJSON_AddStringToObject(obj, "PhotoDNA", photodna);
     }
 
