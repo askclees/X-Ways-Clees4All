@@ -82,6 +82,15 @@ static HBRUSH hBrush = CreateSolidBrush(RGB(240,240,240));
 //globals
 char optionsDatabasePath[MAX_PATH];
 
+/** @brief Releases GDI resources allocated during options GUI creation. Call when the X-Tension is unloaded. */
+void cleanupOptions()
+{
+    if (hBrush != NULL) {
+        DeleteObject(hBrush);
+        hBrush = NULL;
+    }
+}
+
 
 //prototyping
 void CreateOptionsControls(HWND hwnd);
@@ -207,6 +216,9 @@ INT64 getSizeInBytes(HWND hwnCmbo, HWND hwndTxt)
         case 3:
             multiplier = 1024*1024*1024;
         break;
+        default:
+            multiplier = 1;
+        break;
     }
     return (strtoll(numVal,NULL,10)*multiplier);
 
@@ -294,6 +306,7 @@ int getTypeStatus()
             break;
         }
     }
+    delete[] arrItems;
     return retVal;
 }
 
@@ -325,6 +338,7 @@ int getFileTypeStatus()
             break;
         }
     }
+    delete[] arrItems;
     return retVal;
 }
 
@@ -857,21 +871,22 @@ static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARA
  */
 char* createOptionsFolderString()
 {
-    char* appdataPath = new char[MAX_PATH];
+    char* appdataPath = new char[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
-        strncat(appdataPath,"\\X-Ways\\",MAX_PATH);
+        strncat(appdataPath,"\\X-Ways\\",31);
         if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
-        strcat(appdataPath,"Clees4All\\");
+        strncat(appdataPath,"Clees4All\\",31);
         if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
     }
     else{
+        delete[] appdataPath;
         return nullptr;
     }
     return appdataPath;
@@ -886,12 +901,13 @@ char* createOptionsFolderString()
  */
 char* generateOptionsFolderString()
 {
-    char* appdataPath = new char[MAX_PATH];
+    char* appdataPath = new char[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
-        strncat(appdataPath,"\\X-Ways\\Clees4All\\",MAX_PATH);
+        strncat(appdataPath,"\\X-Ways\\Clees4All\\",31);
     }
     else{
+        delete[] appdataPath;
         return nullptr;
     }
     return appdataPath;
@@ -953,6 +969,7 @@ int writeExtractionDetails(ExtractionDetails record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
+    if (path == nullptr) {return SQLITE_ERROR;}
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);
@@ -980,6 +997,7 @@ int loadLastExtractionSettings(ExtractionDetails* record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
+    if (path == nullptr) {return SQLITE_ERROR;}
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);

@@ -106,15 +106,17 @@ ReportTableList stringToEntryList(wchar_t* buffer, int bufferLen)
     ReportTableList retVal;
     int length = wcsnlen(buffer,bufferLen);
     int start = 0;
-    for (int i=0;i<length+1;i++)
+    for (int i=0;i<length+1 && retVal.numEntries<128;i++)
     {
         if (buffer[i]==L',' || buffer[i]==L'\0' )
         {
             int itemSize = i - start;
+            if (itemSize > 127) itemSize = 127;
             wcsncpy(retVal.entries[retVal.numEntries],&buffer[start],itemSize);
+            retVal.entries[retVal.numEntries][itemSize] = L'\0';
             retVal.numEntries++;
             start = i+1;
-            if (buffer[start]== L' '){
+            if (start < length && buffer[start]== L' '){
                 start++;
             }
         }
@@ -158,12 +160,21 @@ int identifyReportTables()
 {
     LONG maxTableNumber=0;
     XWF_GetReportTableInfo(NULL,-1,&maxTableNumber);
+    bool warnedTableLimit = false;
     for (LONG i=0;i<maxTableNumber;i++)
     {
         LONG flags = 0;
         wchar_t* tblName = (wchar_t*)XWF_GetReportTableInfo(NULL, i, &flags);
         if (flags & 0x02){
-            int result = addReportTableEntry(tblName, i,true);
+            if (tblName != NULL)
+            {
+                int result = addReportTableEntry(tblName, i,true);
+                if (result != 0 && !warnedTableLimit)
+                {
+                    XWF_OutputMessage(L"Maximum number of user-created report tables reached; some tables were not processed",0);
+                    warnedTableLimit = true;
+                }
+            }
         }
         else{
             if (tblName != NULL)
@@ -231,9 +242,9 @@ wchar_t* retrieveUserReportTableAssociations(LONG nItemID)
     for (int i=0;i< entries.numEntries;i++){
         if (isUserCreatedReportTable(entries.entries[i])){
             if (wcscmp(L"",retVal)!=0){
-                wcsncat(retVal,L",", bufferLen);
+                wcsncat(retVal,L",", bufferLen - wcslen(retVal) - 1);
             }
-            wcsncat(retVal,entries.entries[i], bufferLen);
+            wcsncat(retVal,entries.entries[i], bufferLen - wcslen(retVal) - 1);
         }
     }
     if (wcscmp(L"",retVal)==0) {

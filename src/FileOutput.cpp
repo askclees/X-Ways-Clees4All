@@ -335,28 +335,25 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
     outputFile = NULL;
     if (retVal !=0 || closeValue !=0)
     {
-        if (retVal == FILE_ERROR_SIZE)
+        //retry with flush option
+        hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
+        if (hItem != 0)
         {
-            //retry with flush option
-            hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
-            if (hItem != 0)
+            outputFile = fopen(outputPath,"wb");
+            if (outputFile != NULL)
             {
-                outputFile = fopen(outputPath,"wb");
-                if (outputFile != NULL)
-                {
-                    if (fileSize <= max_read){
-                        retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
-                    }
-                    else {
-                        retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
-                    }
-                    fclose(outputFile);
-                    outputFile = NULL;
+                if (fileSize <= max_read){
+                    retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
                 }
-                else
-                {
-                    XWF_Close(hItem);
+                else {
+                    retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
                 }
+                fclose(outputFile);
+                outputFile = NULL;
+            }
+            else
+            {
+                XWF_Close(hItem);
             }
         }
         if (retVal !=0){

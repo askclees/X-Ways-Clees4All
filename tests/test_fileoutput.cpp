@@ -30,7 +30,7 @@ static void test_relative_path_full_structure()
     char buffer[256] = {0};
     wchar_t md5[] = L"1234ABCD5678EFGH";
     generateRelativeFilePath(buffer, sizeof(buffer), md5, false);
-    CHECK_CONTAINS(buffer, "Files\\12\\34");
+    CHECK_STR_EQ(buffer, "Files\\12\\34");
 }
 
 static void test_vics_path_uses_escaped_backslashes()

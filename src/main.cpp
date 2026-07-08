@@ -111,7 +111,6 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize);
 //int writeRecords(FILE* vicFile, int picture);
 int outputVICSFile();
 int writeRecords(sqlite3* database,FILE* vicFile, int picture);
-int writeMediaRecord(FILE* vicFile, VICSRecord &record);
 
 int DeviceTypeCol = -1;
 INT64 getPhysicalOffset(DWORD nItemID);
@@ -440,7 +439,7 @@ int createC4POutput()
         }
         if (extractInfo.extractPictures)
         {
-            sprintf(filepath,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput == NULL)
             {
@@ -456,7 +455,7 @@ int createC4POutput()
         }
         if (extractInfo.extractVideos)
         {
-            sprintf(filepath,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput == NULL)
             {
@@ -908,12 +907,19 @@ void addCaseDetail(wchar_t* strArg)
         extractInfo.VICExport = false;
         extractInfo.VICSCompressed = true;
     }
-    else if (wcsncmp(L"grfset",strArg,6)==0){
+    else if (wcsncmp(L"grfset:",strArg,7)==0){
         size_t valueLen = wcslen(strArg) - 7;
-        extractInfo.GriffeyeSettingsName = new wchar_t[valueLen + 1];
-        memcpy(extractInfo.GriffeyeSettingsName, strArg + 7, valueLen * sizeof(wchar_t));
-        extractInfo.GriffeyeSettingsName[valueLen] = L'\0';
-        XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
+        if (valueLen == 0)
+        {
+            XWF_OutputMessage(L"Error: grfset value empty",0);
+        }
+        else
+        {
+            extractInfo.GriffeyeSettingsName = new wchar_t[valueLen + 1];
+            memcpy(extractInfo.GriffeyeSettingsName, strArg + 7, valueLen * sizeof(wchar_t));
+            extractInfo.GriffeyeSettingsName[valueLen] = L'\0';
+            XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
+        }
     }
     else if (wcsncmp(L"exthmbs",strArg,7)==0){
         extractInfo.ignoreThumbs = TRUE;
@@ -1534,26 +1540,26 @@ int createGriffeyeCase()
     swprintf(path,32768,L"%ls\\%ls\\%ls.ANCF",extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName,extractInfo.GriffeyeCaseName);
     if (ifFileExistsW((wchar_t*)&path))
     {
-        strncat(cmdOutput, " --add-source",8191);
+        strncat(cmdOutput, " --add-source",sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
 
     if (extractInfo.extractPictures)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Pictures_Results.json\" --source-type vics --include-vics-data all",sourceNo++,extractInfo.C4PPath);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     if (extractInfo.extractVideos)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Movies_Results.json\" --source-type vics --include-vics-data all", sourceNo++,extractInfo.C4MPath);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     if (extractInfo.GriffeyeSettingsName != nullptr)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --import-settings-file %ls", extractInfo.GriffeyeSettingsName);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     XWF_OutputMessage((wchar_t*)cmdOutput,4);
     PROCESS_INFORMATION ProcessInfo;
@@ -1684,6 +1690,7 @@ int caseCleanup()
     clearReportTableDetails();
     if (currSrcID != NULL) { delete[] currSrcID; currSrcID = NULL; }
     cleanupGUI();
+    cleanupOptions();
     if (extractInfo.debugSet)
     {
         debugWriteDetails(0, L"caseCleanup End");
@@ -2603,7 +2610,7 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
         int error = getFileName(evObject,nItemID,retValue,8192);
     }
     else{
-        swprintf(retValue,L"");
+        swprintf(retValue,8192,L"");
     }
     parent = XWF_GetItemParent(nItemID);
     do
@@ -2637,18 +2644,18 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"%ls\\%ls",newName,retValue);
+                        swprintf(temp,8192,L"%ls\\%ls",newName,retValue);
                     }
                     else
                     {
                         //if retValue is "" creates an error.
-                        swprintf(temp,L"%ls\\",newName);
+                        swprintf(temp,8192,L"%ls\\",newName);
                     }
                     delete[] newName;
                 }
                 else
                 {
-                    swprintf(temp,L"%ls\\%ls",nameParent,retValue);
+                    swprintf(temp,8192,L"%ls\\%ls",nameParent,retValue);
                 }
             }
             else
@@ -2658,19 +2665,19 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"\\%ls",retValue);
+                        swprintf(temp,8192,L"\\%ls",retValue);
                     }
                     else
                     {
-                        swprintf(temp,L"\\");
+                        swprintf(temp,8192,L"\\");
                     }
                 }
                 else
                 {
-                    swprintf(temp,L"\\%ls",retValue);
+                    swprintf(temp,8192,L"\\%ls",retValue);
                 }
             }
-            swprintf(retValue,L"%ls",temp);
+            swprintf(retValue,8192,L"%ls",temp);
             parent = XWF_GetItemParent(parent);
         }
     } while (parent != -1);
@@ -2688,11 +2695,11 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
         if (isVic)
         {
             //swprintf(retValue,L"%ls\\\\%ls%ls",currSrcID,partName,temp);
-            swprintf(retValue,L"%ls%ls",partName,temp);
+            swprintf(retValue,8192,L"%ls%ls",partName,temp);
         }
         else
         {
-            swprintf(retValue,L"%ls\\%ls%ls",currSrcID,partName,temp);
+            swprintf(retValue,8192,L"%ls\\%ls%ls",currSrcID,partName,temp);
         }
     }
     else
@@ -2722,7 +2729,7 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
 
 int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashValue ,int picture)
 {
-    sqlite3_stmt* statement;
+    sqlite3_stmt* statement = NULL;
     //we need to extract media files
     int result = returnMediaFileRecords(database, &statement, picture, hashValue);
     if (result < 0){
@@ -2744,7 +2751,7 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
     sqlite3_finalize(statement);
 
     //add any media metadata records
-    sqlite3_stmt* metaStatement;
+    sqlite3_stmt* metaStatement = NULL;
     result = returnMediaMetadataRecords(database, &metaStatement, hashValue);
     if (result < 0){
         //error

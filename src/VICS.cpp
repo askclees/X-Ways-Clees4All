@@ -239,6 +239,7 @@ void deallocateVICSRecord(VICSRecord record)
         {
             deallocateMediaFileRecord(record.vMediaFiles[i]);
         }
+        delete[] record.vMediaFiles;
         record.noMediaFiles= 0;
     }
     //1.41 add cleaning of media metadata records
@@ -248,7 +249,8 @@ void deallocateVICSRecord(VICSRecord record)
         {
             deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
         }
-        record.noMediaFiles= 0;
+        delete[] record.vMediaMetaData;
+        record.noMediaMetadata= 0;
     }
 }
 
@@ -383,7 +385,7 @@ static void cjsonAddFiletime(cJSON* obj, const char* key, FILETIME ft, int tz)
     }
     else
     {
-        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%07dZ",
+        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03dZ",
                  st.wYear, st.wMonth, st.wDay,
                  st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
     }
@@ -488,6 +490,7 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     {
         char photodna[256];
         wcstombs(photodna, m.PhotoDNA, sizeof(photodna));
+        photodna[255] = '\0';
         cJSON_AddStringToObject(obj, "PhotoDNA", photodna);
     }
 
@@ -570,9 +573,11 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
     }
     else
     {
-        wcscpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2));
+        wcsncpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2), 40);
+        recMedia.SHA1[40] = L'\0';
     }
-    wcscpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3));
+    wcsncpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3), 32);
+    recMedia.MD5[32] = L'\0';
     recMedia.VictimID = sqlite3_column_int(statement,4);
     recMedia.OffenderID = sqlite3_column_int(statement,5);
     recMedia.IsDistributed = sqlite3_column_int(statement,6);
@@ -619,7 +624,8 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
     CheckSize = sqlite3_column_bytes16(statement,17);
     if (CheckSize == 0) { recMedia.PhotoDNA[0] = '\0'; }
         else {
-            wcscpy((wchar_t*)recMedia.PhotoDNA, (wchar_t*)sqlite3_column_text16(statement,17));
+            wcsncpy((wchar_t*)recMedia.PhotoDNA, (wchar_t*)sqlite3_column_text16(statement,17), 255);
+            recMedia.PhotoDNA[255] = L'\0';
         }
 }
 
@@ -633,7 +639,8 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
  */
 void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement)
 {
-    wcscpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0));
+    wcsncpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+    recMediaFile.MD5[32] = L'\0';
     //Filename
     int CheckSize = sqlite3_column_bytes16(statement,1);
     recMediaFile.fileName =  new wchar_t[CheckSize + 2];
@@ -667,15 +674,19 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
     recMediaFile.unallocated = sqlite3_column_int(statement,6);
     //sourceID
     CheckSize = sqlite3_column_bytes16(statement,7);
-    recMediaFile.sourceID =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+    if (CheckSize == 0) { recMediaFile.sourceID = NULL; }
+    else {
+            recMediaFile.sourceID = new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+        }
     recMediaFile.physicalLocation = sqlite3_column_int64(statement,8);
     recMediaFile.deleted = sqlite3_column_int(statement,9);
     //parentMD5
     CheckSize = sqlite3_column_bytes16(statement,10);
     if (CheckSize == 0) { recMediaFile.parentMD5[0] = L'\0'; }
     else {
-            wcscpy(recMediaFile.parentMD5, (wchar_t*)sqlite3_column_text16(statement,10));
+            wcsncpy(recMediaFile.parentMD5, (wchar_t*)sqlite3_column_text16(statement,10), 32);
+            recMediaFile.parentMD5[32] = L'\0';
         }
     //parentName
     CheckSize = sqlite3_column_bytes16(statement,11);
@@ -691,7 +702,7 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
             recMediaFile.parentFilePath = new wchar_t[CheckSize + 2];
             wcscpy(recMediaFile.parentFilePath, (wchar_t*)sqlite3_column_text16(statement,12));
         }
-    recMediaFile.parentPhysLoc = sqlite3_column_int(statement,13);
+    recMediaFile.parentPhysLoc = sqlite3_column_int64(statement,13);
 }
 
 /**

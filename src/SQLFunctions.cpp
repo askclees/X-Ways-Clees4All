@@ -412,6 +412,7 @@ BOOL checkParentSelected(sqlite3* sqlDB, DWORD parentID)
     {
         sqlite3_step(statement);
         int result = sqlite3_column_int(statement,0);
+        sqlite3_finalize(statement);
         if (result == 0)
         {
             return false;
@@ -683,9 +684,16 @@ ObjectNames* retrieveEvidenceNames(sqlite3* sqlDB,int *retCounter)
         {
             if (rc == SQLITE_ROW)
             {
+                if (recCount >= noObjs)
+                {
+                    //more rows than the earlier count query reported; stop rather than overflow retArray
+                    break;
+                }
                 retArray[recCount].objectID = sqlite3_column_int(statement,0);
-                wcscpy(retArray[recCount].actualName, (wchar_t*)sqlite3_column_text16(statement, 1));
-                wcscpy(retArray[recCount].prefName, (wchar_t*)sqlite3_column_text16(statement, 2));
+                wcsncpy(retArray[recCount].actualName, (wchar_t*)sqlite3_column_text16(statement, 1), 1023);
+                retArray[recCount].actualName[1023] = L'\0';
+                wcsncpy(retArray[recCount].prefName, (wchar_t*)sqlite3_column_text16(statement, 2), 1023);
+                retArray[recCount].prefName[1023] = L'\0';
                 rc = sqlite3_step(statement);
                 recCount++;
             }
@@ -835,6 +843,7 @@ int getFileNumber(sqlite3* sqlDB,DWORD objID)
         if (rc != SQLITE_ROW)
         {
             //error
+            sqlite3_finalize(statement);
             return -1;
         }
         result = sqlite3_column_int(statement,0);
@@ -1104,8 +1113,10 @@ int insertOptionsExtraction(sqlite3* sqlDB, ExtractOptions record)
     if (rc!=SQLITE_DONE)
     {
         XWF_OutputMessage(L"Error executing ExtractionOptions Insert Record",0);
+        sqlite3_finalize(stmt);
         return -2;
     }
+    sqlite3_finalize(stmt);
     return 0;
 }
 
@@ -1904,17 +1915,22 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     int rc = sqlite3_prepare16_v2(vicsDB,sqlQuery,-1,&statement,NULL);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
+        delete[] sqlQuery;
         return -3;
     }
     //bind record variables
     rc = sqlite3_bind_text16(statement,1,record->fileName,(wcslen(record->fileName)+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -3;
     }
     rc = sqlite3_bind_text16(statement,2,record->filePath,(wcslen(record->filePath)+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -3;
     }
     //bind filetimes
@@ -1929,14 +1945,16 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     timestamp.LowPart = record->accessed.dwLowDateTime;
     sqlite3_bind_int64(statement,5,timestamp.QuadPart);
     //bind other attributes
-    if (record->unallocated) { sqlite3_bind_int,6,1;} else {sqlite3_bind_int,6,0;}
+    if (record->unallocated) { sqlite3_bind_int(statement,6,1);} else {sqlite3_bind_int(statement,6,0);}
     rc = sqlite3_bind_text16(statement,7,record->sourceID,-1,SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding Source ID",0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -3;
     }
     sqlite3_bind_int64(statement,8,record->physicalLocation);
-    if (record->deleted) { sqlite3_bind_int,9,1;} else {sqlite3_bind_int,9,0;}
+    if (record->deleted) { sqlite3_bind_int(statement,9,1);} else {sqlite3_bind_int(statement,9,0);}
     //bind parent attributes
     if (record->parentMD5[0] != '\0') { sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC); } else { sqlite3_bind_text16(statement,10,"",-1,SQLITE_TRANSIENT); }
     if (record->parentName != NULL) { sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,11,"",-1,SQLITE_TRANSIENT); }
@@ -1952,9 +1970,12 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     {
         //do error stuff here
         XWF_OutputMessage(sqlQuery,0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -2;
     }
     sqlite3_finalize(statement);
+    delete[] sqlQuery;
     return 0;
 }
 
@@ -2283,7 +2304,8 @@ int returnMediaFileRecords(sqlite3* database, sqlite3_stmt** statement, int pict
     }
     else
     {
-        //SQL Error
+        //SQL Error - if prepare succeeded but bind failed, *statement was allocated; release it
+        if (*statement != NULL) { sqlite3_finalize(*statement); *statement = NULL; }
         return -3;
     }
     return retVal;
@@ -2380,7 +2402,7 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
         if (rc == SQLITE_ROW){
             return retVal;
         }
-        else if (rc == SQLITE_OK || rc ==SQLITE_OK){
+        else if (rc == SQLITE_DONE){
             return 0;
         }
         else{
@@ -2389,7 +2411,8 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
     }
     else
     {
-        //SQL Error
+        //SQL Error - if prepare succeeded but bind failed, *statement was allocated; release it
+        if (*statement != NULL) { sqlite3_finalize(*statement); *statement = NULL; }
         return -1;
     }
     return retVal;
