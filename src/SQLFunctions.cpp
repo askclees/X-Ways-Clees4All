@@ -1913,17 +1913,22 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     int rc = sqlite3_prepare16_v2(vicsDB,sqlQuery,-1,&statement,NULL);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
+        delete[] sqlQuery;
         return -3;
     }
     //bind record variables
     rc = sqlite3_bind_text16(statement,1,record->fileName,(wcslen(record->fileName)+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -3;
     }
     rc = sqlite3_bind_text16(statement,2,record->filePath,(wcslen(record->filePath)+1)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -3;
     }
     //bind filetimes
@@ -1942,6 +1947,8 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     rc = sqlite3_bind_text16(statement,7,record->sourceID,-1,SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding Source ID",0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -3;
     }
     sqlite3_bind_int64(statement,8,record->physicalLocation);
@@ -1961,9 +1968,12 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     {
         //do error stuff here
         XWF_OutputMessage(sqlQuery,0);
+        sqlite3_finalize(statement);
+        delete[] sqlQuery;
         return -2;
     }
     sqlite3_finalize(statement);
+    delete[] sqlQuery;
     return 0;
 }
 
