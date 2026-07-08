@@ -2292,7 +2292,8 @@ int returnMediaFileRecords(sqlite3* database, sqlite3_stmt** statement, int pict
     }
     else
     {
-        //SQL Error
+        //SQL Error - if prepare succeeded but bind failed, *statement was allocated; release it
+        if (*statement != NULL) { sqlite3_finalize(*statement); *statement = NULL; }
         return -3;
     }
     return retVal;
@@ -2398,7 +2399,8 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
     }
     else
     {
-        //SQL Error
+        //SQL Error - if prepare succeeded but bind failed, *statement was allocated; release it
+        if (*statement != NULL) { sqlite3_finalize(*statement); *statement = NULL; }
         return -1;
     }
     return retVal;
