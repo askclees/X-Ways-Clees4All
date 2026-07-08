@@ -439,7 +439,7 @@ int createC4POutput()
         }
         if (extractInfo.extractPictures)
         {
-            sprintf(filepath,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput == NULL)
             {
@@ -455,7 +455,7 @@ int createC4POutput()
         }
         if (extractInfo.extractVideos)
         {
-            sprintf(filepath,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput == NULL)
             {
