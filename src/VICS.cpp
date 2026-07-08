@@ -673,8 +673,11 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
     recMediaFile.unallocated = sqlite3_column_int(statement,6);
     //sourceID
     CheckSize = sqlite3_column_bytes16(statement,7);
-    recMediaFile.sourceID =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+    if (CheckSize == 0) { recMediaFile.sourceID = NULL; }
+    else {
+            recMediaFile.sourceID = new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+        }
     recMediaFile.physicalLocation = sqlite3_column_int64(statement,8);
     recMediaFile.deleted = sqlite3_column_int(statement,9);
     //parentMD5
