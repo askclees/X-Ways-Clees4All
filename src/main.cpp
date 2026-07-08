@@ -2730,7 +2730,7 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
 
 int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashValue ,int picture)
 {
-    sqlite3_stmt* statement;
+    sqlite3_stmt* statement = NULL;
     //we need to extract media files
     int result = returnMediaFileRecords(database, &statement, picture, hashValue);
     if (result < 0){
@@ -2752,7 +2752,7 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
     sqlite3_finalize(statement);
 
     //add any media metadata records
-    sqlite3_stmt* metaStatement;
+    sqlite3_stmt* metaStatement = NULL;
     result = returnMediaMetadataRecords(database, &metaStatement, hashValue);
     if (result < 0){
         //error
