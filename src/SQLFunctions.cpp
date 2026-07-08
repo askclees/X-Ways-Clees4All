@@ -2389,7 +2389,7 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
         if (rc == SQLITE_ROW){
             return retVal;
         }
-        else if (rc == SQLITE_OK || rc ==SQLITE_OK){
+        else if (rc == SQLITE_DONE){
             return 0;
         }
         else{
