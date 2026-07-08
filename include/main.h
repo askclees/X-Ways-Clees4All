@@ -29,7 +29,7 @@
 #define ERROR_NO_SHA1_HASH 1
 #define ERROR_CANNOT_READ 2
 #define ERROR_FILESIZE_ZERO 3
-#define ERROR_HASH_NOT_COMPUTED 3
+#define ERROR_HASH_NOT_COMPUTED 4
 
 //1.51 added unique values for type status
 #define NOT_VERIFIED        1
