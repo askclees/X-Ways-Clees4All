@@ -1349,7 +1349,7 @@ int startProcess()
         swprintf(extractInfo.C4PPath,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
+            strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
             CreateDirectoryA(buffer,NULL);
         }
         buffer[0]='\0';
@@ -1386,7 +1386,7 @@ int startProcess()
         swprintf(extractInfo.C4MPath,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
+            strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
             CreateDirectoryA(buffer,NULL);
 
         }
