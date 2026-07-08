@@ -111,7 +111,6 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize);
 //int writeRecords(FILE* vicFile, int picture);
 int outputVICSFile();
 int writeRecords(sqlite3* database,FILE* vicFile, int picture);
-int writeMediaRecord(FILE* vicFile, VICSRecord &record);
 
 int DeviceTypeCol = -1;
 INT64 getPhysicalOffset(DWORD nItemID);
