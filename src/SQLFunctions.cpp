@@ -1113,8 +1113,10 @@ int insertOptionsExtraction(sqlite3* sqlDB, ExtractOptions record)
     if (rc!=SQLITE_DONE)
     {
         XWF_OutputMessage(L"Error executing ExtractionOptions Insert Record",0);
+        sqlite3_finalize(stmt);
         return -2;
     }
+    sqlite3_finalize(stmt);
     return 0;
 }
 
