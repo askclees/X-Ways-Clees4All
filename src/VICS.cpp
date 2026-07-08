@@ -385,7 +385,7 @@ static void cjsonAddFiletime(cJSON* obj, const char* key, FILETIME ft, int tz)
     }
     else
     {
-        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%07dZ",
+        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03dZ",
                  st.wYear, st.wMonth, st.wDay,
                  st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
     }
@@ -490,6 +490,7 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     {
         char photodna[256];
         wcstombs(photodna, m.PhotoDNA, sizeof(photodna));
+        photodna[255] = '\0';
         cJSON_AddStringToObject(obj, "PhotoDNA", photodna);
     }
 
@@ -673,8 +674,11 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
     recMediaFile.unallocated = sqlite3_column_int(statement,6);
     //sourceID
     CheckSize = sqlite3_column_bytes16(statement,7);
-    recMediaFile.sourceID =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+    if (CheckSize == 0) { recMediaFile.sourceID = NULL; }
+    else {
+            recMediaFile.sourceID = new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+        }
     recMediaFile.physicalLocation = sqlite3_column_int64(statement,8);
     recMediaFile.deleted = sqlite3_column_int(statement,9);
     //parentMD5

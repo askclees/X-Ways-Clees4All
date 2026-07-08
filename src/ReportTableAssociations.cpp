@@ -160,12 +160,21 @@ int identifyReportTables()
 {
     LONG maxTableNumber=0;
     XWF_GetReportTableInfo(NULL,-1,&maxTableNumber);
+    bool warnedTableLimit = false;
     for (LONG i=0;i<maxTableNumber;i++)
     {
         LONG flags = 0;
         wchar_t* tblName = (wchar_t*)XWF_GetReportTableInfo(NULL, i, &flags);
         if (flags & 0x02){
-            int result = addReportTableEntry(tblName, i,true);
+            if (tblName != NULL)
+            {
+                int result = addReportTableEntry(tblName, i,true);
+                if (result != 0 && !warnedTableLimit)
+                {
+                    XWF_OutputMessage(L"Maximum number of user-created report tables reached; some tables were not processed",0);
+                    warnedTableLimit = true;
+                }
+            }
         }
         else{
             if (tblName != NULL)

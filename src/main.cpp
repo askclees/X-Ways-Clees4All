@@ -111,7 +111,6 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize);
 //int writeRecords(FILE* vicFile, int picture);
 int outputVICSFile();
 int writeRecords(sqlite3* database,FILE* vicFile, int picture);
-int writeMediaRecord(FILE* vicFile, VICSRecord &record);
 
 int DeviceTypeCol = -1;
 INT64 getPhysicalOffset(DWORD nItemID);
@@ -440,7 +439,7 @@ int createC4POutput()
         }
         if (extractInfo.extractPictures)
         {
-            sprintf(filepath,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput == NULL)
             {
@@ -456,7 +455,7 @@ int createC4POutput()
         }
         if (extractInfo.extractVideos)
         {
-            sprintf(filepath,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput == NULL)
             {
@@ -2730,7 +2729,7 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
 
 int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashValue ,int picture)
 {
-    sqlite3_stmt* statement;
+    sqlite3_stmt* statement = NULL;
     //we need to extract media files
     int result = returnMediaFileRecords(database, &statement, picture, hashValue);
     if (result < 0){
@@ -2752,7 +2751,7 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
     sqlite3_finalize(statement);
 
     //add any media metadata records
-    sqlite3_stmt* metaStatement;
+    sqlite3_stmt* metaStatement = NULL;
     result = returnMediaMetadataRecords(database, &metaStatement, hashValue);
     if (result < 0){
         //error

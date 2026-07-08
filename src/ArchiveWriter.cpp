@@ -294,7 +294,14 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
     unsigned char* buffer = new unsigned char[max_read+1];
     while ((bytesRead = fread(buffer,1,max_read, inputFile)) > 0)
     {
-        archive_write_data(outa,buffer,bytesRead);
+        la_ssize_t written = archive_write_data(outa,buffer,bytesRead);
+        if (written < 0 || (size_t)written != bytesRead)
+        {
+            fclose(inputFile);
+            closeZipArchiveEntry(&outa, entry);
+            delete[] buffer;
+            return ERROR_WRITE;
+        }
     }
     fclose(inputFile);
     closeZipArchiveEntry(&outa, entry);
@@ -373,7 +380,16 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
         DWORD read = XWF_Read(hItem,currOffset,buffer,readSize);
         if (read > 0)
         {
-            archive_write_data(outa,buffer,read);
+            la_ssize_t written = archive_write_data(outa,buffer,read);
+            if (written < 0 || (DWORD)written != read)
+            {
+                XWF_Close(hItem);
+                delete[] buffer;
+                closeZipArchiveEntry(&outa, entry);
+                LeaveCriticalSection(&archiveLock);
+                delete[] filePath;
+                return ERROR_WRITE;
+            }
         }
         currOffset += readSize;
     }

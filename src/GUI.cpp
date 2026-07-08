@@ -1178,7 +1178,7 @@ void createControls(HWND hwnd)
             sprintf(message,"Static Text Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
         }
-        TxtActualName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"Static",txtEvCurr,WS_CHILD|WS_VISIBLE,lblVidStartX + 140,i*boxMultiplier,210,20,entryPanel,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
+        TxtActualName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"Static",txtEvCurr,WS_CHILD|WS_VISIBLE,lblVidStartX + 140,i*boxMultiplier,210,20,entryPanel,(HMENU)(IDC_TEXT_EVNAME+i),GetModuleHandle(NULL),NULL);
         if (!TxtActualName[i])
         {
             int result=GetLastError();
@@ -1349,7 +1349,7 @@ int startProcess()
         swprintf(extractInfo.C4PPath,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
+            strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
             CreateDirectoryA(buffer,NULL);
         }
         buffer[0]='\0';
@@ -1386,7 +1386,7 @@ int startProcess()
         swprintf(extractInfo.C4MPath,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
+            strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
             CreateDirectoryA(buffer,NULL);
 
         }
