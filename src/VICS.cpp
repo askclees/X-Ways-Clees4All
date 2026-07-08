@@ -385,7 +385,7 @@ static void cjsonAddFiletime(cJSON* obj, const char* key, FILETIME ft, int tz)
     }
     else
     {
-        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%07dZ",
+        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03dZ",
                  st.wYear, st.wMonth, st.wDay,
                  st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
     }
