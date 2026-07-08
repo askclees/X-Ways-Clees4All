@@ -165,7 +165,10 @@ int identifyReportTables()
         LONG flags = 0;
         wchar_t* tblName = (wchar_t*)XWF_GetReportTableInfo(NULL, i, &flags);
         if (flags & 0x02){
-            int result = addReportTableEntry(tblName, i,true);
+            if (tblName != NULL)
+            {
+                int result = addReportTableEntry(tblName, i,true);
+            }
         }
         else{
             if (tblName != NULL)
