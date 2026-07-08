@@ -306,6 +306,7 @@ int getTypeStatus()
             break;
         }
     }
+    delete[] arrItems;
     return retVal;
 }
 
@@ -337,6 +338,7 @@ int getFileTypeStatus()
             break;
         }
     }
+    delete[] arrItems;
     return retVal;
 }
 
