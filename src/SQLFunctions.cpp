@@ -472,27 +472,36 @@ void setParentSelected(sqlite3* sqlDB, DWORD parentID)
  */
 int insertEvObjRecord(sqlite3* sqlDB, EvidenceProps &record)
 {
-    wchar_t* sqlQuery;
-    sqlQuery = new wchar_t[1024];
-    sqlQuery[0] = '\0';
-    swprintf(sqlQuery,L"INSERT INTO EvidenceObjects VALUES (%lu, \'%ls\', \'%ls\', %lu, %i, %i)",record.ID, record.Name, record.SourceID,record.parentID, record.fileID, record.selected);
+    const wchar_t* sqlQuery = L"INSERT INTO EvidenceObjects VALUES (?, ?, ?, ?, ?, ?)";
     sqlite3_stmt *statement;
-    int rc = sqlite3_prepare16_v2(sqlDB , sqlQuery,(wcslen(sqlQuery)+1)*sizeof(wchar_t),&statement, NULL);
+    int rc = sqlite3_prepare16_v2(sqlDB , sqlQuery,-1,&statement, NULL);
     if (rc != SQLITE_OK)
     {
         //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
+        XWF_OutputMessage(L"Error preparing statement to insert evidence object record",0);
+        return -1;
+    }
+    rc = sqlite3_bind_int(statement,1,record.ID);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,2,record.Name,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,3,record.SourceID,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,4,record.parentID);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,5,record.fileID);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,6,record.selected);
+    if (rc != SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error binding evidence object record values",0);
+        sqlite3_finalize(statement);
         return -1;
     }
     rc = sqlite3_step(statement);
     if (rc != SQLITE_DONE)
     {
         //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
+        XWF_OutputMessage(L"Error inserting evidence object record",0);
+        sqlite3_finalize(statement);
         return -2;
     }
     sqlite3_finalize(statement);
-    delete[] sqlQuery;
     return 0;
 }
 
@@ -703,15 +712,16 @@ ObjectNames* retrieveEvidenceNames(sqlite3* sqlDB,int *retCounter)
 int updateEvidenceNames(sqlite3* sqlDB,ObjectNames* listEvObj, int noObjs)
 {
     if (extractInfo.debugSet){debugWriteDetails("Start of updateEvidenceNames Function");}
+    const wchar_t* sqlQuery = L"UPDATE EvidenceObjects SET sourceID = ? WHERE ID = ?;";
     //update sourceID in database where it doesn't match original
     for (int i = 0;i<noObjs;i++)
     {
         if (wcscmp(listEvObj[i].actualName,listEvObj[i].prefName)!=0)
         {
-            char sqlQuery[2048];
             sqlite3_stmt *statement;
-            sprintf(sqlQuery,"Update EvidenceObjects SET sourceID = \'%ls\' where ID = %lu ;",listEvObj[i].prefName,listEvObj[i].objectID);
-            int rc = sqlite3_prepare_v2(sqlDB,sqlQuery,strlen(sqlQuery)+1,&statement,NULL);
+            int rc = sqlite3_prepare16_v2(sqlDB,sqlQuery,-1,&statement,NULL);
+            if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,1,listEvObj[i].prefName,-1,SQLITE_STATIC);
+            if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,2,listEvObj[i].objectID);
             if (rc == SQLITE_OK)
             {
                 rc = sqlite3_step(statement);
@@ -719,7 +729,7 @@ int updateEvidenceNames(sqlite3* sqlDB,ObjectNames* listEvObj, int noObjs)
                 {
                     //problem
                     wchar_t errMsg[2048];
-                    swprintf(errMsg,L"Error updating source ID for: %lu . SQL Query: %s",listEvObj[i].objectID, sqlQuery);
+                    swprintf(errMsg,L"Error updating source ID for: %lu",listEvObj[i].objectID);
                     XWF_OutputMessage(errMsg, 0);
                 }
             }
@@ -1965,52 +1975,45 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
  */
 int insertMediaFileRecord(sqlite3* vicsDB, VICSMediaFile &record, int picture)
 {
-    wchar_t* sqlQuery;
-    wchar_t tableName[20] = {0};
-    INT64 sizeofData = getMediaFileRecordSize(record);
-    sqlQuery = new wchar_t[sizeofData + 512];
-    sqlQuery[0] = '\0';
-    if (picture == 1)
-    {
-        wcscpy(tableName, L"VICSPicsRecords\0");
-    }
-    else
-    {
-        wcscpy(tableName,L"VICSMoviesRecords\0");
-    }
-    swprintf(sqlQuery,L"INSERT INTO %ls VALUES (\'%ls\', ?, ?,%llu, %llu, %llu, %i, \'%ls\', %llu, %i",tableName,record.MD5, Filetime2INT64(record.created),
-             Filetime2INT64(record.written), Filetime2INT64(record.accessed), record.unallocated, record.sourceID, record.physicalLocation, record.deleted);
-    if (record.parentMD5[0] != '\0') { swprintf(sqlQuery+wcslen(sqlQuery),L", %ls", record.parentMD5); } else { wcscat(sqlQuery,L",\'\'"); }
-    if (record.parentName != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", %ls", record.parentName); } else { wcscat(sqlQuery,L",\'\'"); }
-    if (record.parentFilePath != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", %ls", record.parentFilePath); } else { wcscat(sqlQuery,L",\'\'"); }
-    //1.50 added itemID
-    swprintf(sqlQuery+wcslen(sqlQuery),L", %llu, %lu",record.parentPhysLoc, record.XWFitemID);
-    wcscat(sqlQuery,L");");
+    const wchar_t* tableName = (picture == 1) ? L"VICSPicsRecords" : L"VICSMoviesRecords";
+    wchar_t sqlQuery[160];
+    swprintf(sqlQuery,160,L"INSERT INTO %ls VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",tableName);
     sqlite3_stmt *statement;
-    int rc = sqlite3_prepare16_v2(vicsDB , sqlQuery,(wcslen(sqlQuery)+1)*sizeof(wchar_t) ,&statement, NULL);
+    int rc = sqlite3_prepare16_v2(vicsDB , sqlQuery,-1,&statement, NULL);
     if (rc != SQLITE_OK)
     {
         //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
+        XWF_OutputMessage(L"Error preparing statement to insert media file record",0);
         return -1;
     }
-    rc = sqlite3_bind_text16(statement,1,record.fileName,(wcslen(record.fileName)+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,1,record.MD5,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,2,record.fileName,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,3,record.filePath,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,4,Filetime2INT64(record.created));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,5,Filetime2INT64(record.written));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,6,Filetime2INT64(record.accessed));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,7,record.unallocated);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,8,record.sourceID,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,9,record.physicalLocation);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,10,record.deleted);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,11,record.parentMD5,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,12,record.parentName != NULL ? record.parentName : L"",-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,13,record.parentFilePath != NULL ? record.parentFilePath : L"",-1,SQLITE_STATIC);
+    //1.50 added itemID
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,14,record.parentPhysLoc);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,15,record.XWFitemID);
     if (rc != SQLITE_OK)
     {
-        XWF_OutputMessage(L"Error Binding file name",0);
+        XWF_OutputMessage(L"Error binding media file record values",0);
+        sqlite3_finalize(statement);
         return -3;
-    }
-    rc = sqlite3_bind_text16(statement,2,record.filePath ,(wcslen(record.filePath)+1)*sizeof(wchar_t),SQLITE_STATIC);
-    if (rc != SQLITE_OK)
-    {
-        XWF_OutputMessage(L"Error Binding file path",0);
-        return -4;
     }
     rc = sqlite3_step(statement);
     if (rc != SQLITE_DONE)
     {
         //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
+        XWF_OutputMessage(L"Error inserting media file record",0);
+        sqlite3_finalize(statement);
         return -2;
     }
     sqlite3_finalize(statement);
@@ -2031,44 +2034,47 @@ int insertMediaFileRecord(sqlite3* vicsDB, VICSMediaFile &record, int picture)
  */
 int insertMediaRecord(sqlite3* vicsDB, VICSMedia &record, int picture)
 {
-    wchar_t* sqlQuery;
-    wchar_t tableName[20] = {0};
-    INT64 sizeofData = getMediaRecordSize(record);
-    sqlQuery = new wchar_t[sizeofData + 512];
-    sqlQuery[0] = '\0';
-    if (picture == 1)
-    {
-        wcscpy(tableName, L"VICSPics");
-    }
-    else
-    {
-        wcscpy(tableName,L"VICSMovies");
-    }
-    swprintf(sqlQuery,L"INSERT INTO %ls VALUES (%llu, %i, \'%ls\', \'%ls\', %i, %i, %i",tableName,record.MediaID, record.Category, record.SHA1, record.MD5, record.VictimID, record.OffenderID, record.IsDistributed);
-    if (record.Comments != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", \'%ls\'", record.Comments); } else { wcscat(sqlQuery+wcslen(sqlQuery),L",\'\'"); }
-    if (record.Tags != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", \'%ls\'", record.Tags); } else { wcscat(sqlQuery+wcslen(sqlQuery),L",\'\'"); }
-    if (record.Series != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", \'%ls\'", record.Series); } else { wcscat(sqlQuery+wcslen(sqlQuery),L",\'\'"); }
-    swprintf(sqlQuery+wcslen(sqlQuery),L", %llu",record.MediaSize);
-    if (record.RelativeFilePath != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", \'%ls\'", record.RelativeFilePath); } else { wcscat(sqlQuery+wcslen(sqlQuery),L",\'\'"); }
-    swprintf(sqlQuery+wcslen(sqlQuery),L", %llu , %i",Filetime2INT64(record.DateUpdated), record.timeZone);
-    if (record.PrecatSource != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", \'%ls\'", record.PrecatSource); } else { wcscat(sqlQuery+wcslen(sqlQuery),L",\'\'"); }
-    swprintf(sqlQuery+wcslen(sqlQuery),L", %i",record.IsSuspected);
-    if (record.MimeType != NULL) { swprintf(sqlQuery+wcslen(sqlQuery),L", \'%ls\'", record.MimeType); } else { wcscat(sqlQuery+wcslen(sqlQuery),L",\'\'"); }
-    if (record.PhotoDNA[0] != L'\0') { swprintf(sqlQuery+wcslen(sqlQuery),L", \'%ls\'", record.PhotoDNA); } else { wcscat(sqlQuery+wcslen(sqlQuery),L",\'\'"); }
-    wcscat(sqlQuery, L");");
+    const wchar_t* tableName = (picture == 1) ? L"VICSPics" : L"VICSMovies";
+    wchar_t sqlQuery[160];
+    swprintf(sqlQuery,160,L"INSERT INTO %ls VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",tableName);
     sqlite3_stmt *statement;
-    int rc = sqlite3_prepare16_v2(vicsDB , sqlQuery,(wcslen(sqlQuery)+1)*sizeof(wchar_t),&statement, NULL);
+    int rc = sqlite3_prepare16_v2(vicsDB , sqlQuery,-1,&statement, NULL);
     if (rc != SQLITE_OK)
     {
         //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
+        XWF_OutputMessage(L"Error preparing statement to insert media record",0);
         return -1;
+    }
+    rc = sqlite3_bind_int64(statement,1,record.MediaID);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,2,record.Category);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,3,record.SHA1,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,4,record.MD5,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,5,record.VictimID);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,6,record.OffenderID);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,7,record.IsDistributed);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,8,record.Comments != NULL ? record.Comments : L"",-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,9,record.Tags != NULL ? record.Tags : L"",-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,10,record.Series != NULL ? record.Series : L"",-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,11,record.MediaSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,12,record.RelativeFilePath != NULL ? record.RelativeFilePath : L"",-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,13,Filetime2INT64(record.DateUpdated));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,14,record.timeZone);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,15,record.PrecatSource != NULL ? record.PrecatSource : L"",-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,16,record.IsSuspected);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,17,record.MimeType != NULL ? record.MimeType : L"",-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,18,record.PhotoDNA,-1,SQLITE_STATIC);
+    if (rc != SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error binding media record values",0);
+        sqlite3_finalize(statement);
+        return -3;
     }
     rc = sqlite3_step(statement);
     if (rc != SQLITE_DONE)
     {
         //do error stuff here
-        XWF_OutputMessage(sqlQuery,0);
+        XWF_OutputMessage(L"Error inserting media record",0);
+        sqlite3_finalize(statement);
         return -2;
     }
     sqlite3_finalize(statement);
@@ -2164,8 +2170,9 @@ int getRowCount(sqlite3* database, char* tablename, wchar_t* hashValue)
     char sqlQuery[256]={0};
     int retVal = 0;
     sqlite3_stmt* statement;
-    snprintf(sqlQuery,256, "Select count(*) from %s where MD5Hash = \'%ls\';",tablename,hashValue);
-    int rc = sqlite3_prepare_v2(database,sqlQuery,strlen(sqlQuery)+1,&statement,NULL);
+    snprintf(sqlQuery,256, "Select count(*) from %s where MD5Hash = ?;",tablename);
+    int rc = sqlite3_prepare_v2(database,sqlQuery,-1,&statement,NULL);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,1,hashValue,-1,SQLITE_STATIC);
     if (rc == SQLITE_OK)
     {
         rc = sqlite3_step(statement);
@@ -2181,6 +2188,7 @@ int getRowCount(sqlite3* database, char* tablename, wchar_t* hashValue)
     }
     else
     {
+        sqlite3_finalize(statement);
         return -2;
     }
     sqlite3_finalize(statement);
@@ -2257,8 +2265,9 @@ int returnMediaFileRecords(sqlite3* database, sqlite3_stmt** statement, int pict
     {
         return -1;
     }
-    snprintf(sqlQuery,256, "Select * from %s where MD5Hash = \'%ls\';",tablename,hashValue);
-    int rc = sqlite3_prepare_v2(database,sqlQuery,(strlen(sqlQuery)+1)*sizeof(wchar_t),statement,NULL);
+    snprintf(sqlQuery,256, "Select * from %s where MD5Hash = ?;",tablename);
+    int rc = sqlite3_prepare_v2(database,sqlQuery,-1,statement,NULL);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(*statement,1,hashValue,-1,SQLITE_STATIC);
     if (rc == SQLITE_OK)
     {
         rc = sqlite3_step(*statement);
@@ -2362,8 +2371,9 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
         //no records, no further requirement
         return 0;
     }
-    snprintf(sqlQuery,256, "Select * from MediaMetadata where MD5hash = \'%ls\';",hashValue);
+    snprintf(sqlQuery,256, "Select * from MediaMetadata where MD5hash = ?;");
     int rc = sqlite3_prepare_v2(database,sqlQuery,-1,statement,NULL);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(*statement,1,hashValue,-1,SQLITE_STATIC);
     if (rc == SQLITE_OK)
     {
         rc = sqlite3_step(*statement);
