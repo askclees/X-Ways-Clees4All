@@ -671,6 +671,14 @@ ObjectNames* retrieveEvidenceNames(sqlite3* sqlDB,int *retCounter)
     sqlite3_stmt *statement;
     //get count of objects in table
     rc = sqlite3_exec(sqlDB,"Select count(*) from EvidenceObjects where parentID = 0  and selected = 1 ;",countCallback, &noObjs, &zErrMsg);
+    if (rc != SQLITE_OK)
+    {
+        wchar_t* message = new wchar_t[strlen(zErrMsg)+1];
+        swprintf(message,L"%s\0",zErrMsg);
+        XWF_OutputMessage(message,0);
+        delete[] message;
+    }
+    sqlite3_free(zErrMsg);
     //create array of objects
     ObjectNames* retArray = new ObjectNames[noObjs];
     char sqlQuery[1024]={0};
@@ -2353,6 +2361,9 @@ int returnMediaRecords(sqlite3* database, sqlite3_stmt** statement, int picture)
             return 0;
         }
         else{
+            //SQL Error - prepare succeeded but step failed; release the statement
+            sqlite3_finalize(*statement);
+            *statement = NULL;
             return -2;
         }
     }
