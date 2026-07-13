@@ -17,5 +17,7 @@ INT64 Filetime2INT64(FILETIME &inFT);
 wchar_t* extendBuffer(wchar_t* currBuffer, INT64 currSize, INT64 newSize);
 /** @brief Returns the size in bytes of the file at the given path, or -1 on error. */
 INT64 getFileSize(const char* filePath);
+/** @brief Returns the filename of the supported Griffeye CLI executable found in @p folder, or NULL if none is present (or @p folder is empty). */
+const char* findGriffeyeExe(const wchar_t* folder);
 
 #endif // UTILITY_H_INCLUDED
