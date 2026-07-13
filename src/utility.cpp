@@ -1,5 +1,7 @@
 
 #include <windows.h>
+#include <cstdio>
+#include <cstring>
 
 /** @brief Number of nanoseconds in a second. */
 #define Nano2Seconds 10000000LL
@@ -133,4 +135,25 @@ INT64 getFileSize(const char* filePath)
     size.HighPart = fad.nFileSizeHigh;
     size.LowPart = fad.nFileSizeLow;
     return size.QuadPart;
+}
+
+/**
+ * @brief Detects which supported Griffeye CLI executable is present in a folder.
+ *
+ * @param folder Wide string path to the Griffeye installation directory; may be empty.
+ * @return       Filename of the found executable, or NULL if @p folder is empty or
+ *               neither supported executable is present.
+ */
+const char* findGriffeyeExe(const wchar_t* folder)
+{
+    if (folder == NULL || folder[0] == L'\0') return NULL;
+    char narrowFolder[MAX_PATH];
+    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
+    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
+    char check[MAX_PATH];
+    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
+    if (FILE* f = fopen(check, "r")) { fclose(f); return "analyze-cli.exe"; }
+    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
+    if (FILE* f = fopen(check, "r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
+    return NULL;
 }

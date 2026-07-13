@@ -1507,25 +1507,6 @@ int updateRecords(int picture, long nItemID, hashValueStruct currHash)
 }
 
 /**
- * @brief Detects which Griffeye CLI executable is present in the configured Griffeye folder.
- *
- * @param folder Wide string path to the Griffeye installation directory.
- * @return Filename of the found executable, or NULL if neither is present.
- */
-static const char* detectGriffeyeExe(const wchar_t* folder)
-{
-    char narrowFolder[MAX_PATH];
-    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
-    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
-    char check[MAX_PATH];
-    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return "analyze-cli.exe"; }
-    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
-    return NULL;
-}
-
-/**
  * @brief Launches the Griffeye CLI to import VICS results into a new or existing case.
  *
  * @return 0 on success, 1 if the Griffeye executable was not found or CreateProcess failed.
@@ -1535,7 +1516,7 @@ static const char* detectGriffeyeExe(const wchar_t* folder)
 int createGriffeyeCase()
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"createGriffeyeCase Start");}
-    const char* griffeyeExe = detectGriffeyeExe(extractOpt.GriffeyePath);
+    const char* griffeyeExe = findGriffeyeExe(extractOpt.GriffeyePath);
     if (griffeyeExe == NULL)
     {
         XWF_OutputMessage(L"Griffeye CLI executable not found, cannot create case",0);

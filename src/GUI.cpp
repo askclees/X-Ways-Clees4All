@@ -700,22 +700,6 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hwnd,uMsg,wParam, lParam);
 }
 
-/** @brief Checks whether a supported Griffeye CLI executable exists at the configured path. */
-static bool griffeyeExeAvailable()
-{
-    const wchar_t* folder = extractOpt.GriffeyePath;
-    if (folder[0] == L'\0') return false;
-    char narrowFolder[MAX_PATH];
-    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
-    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
-    char check[MAX_PATH];
-    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
-    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
-    return false;
-}
-
 /**
  * @brief Populates all dialog controls to reflect a previously saved ExtractionDetails record.
  * @param record Extraction settings to apply to the UI.
@@ -731,7 +715,7 @@ void setExtractionOptions(ExtractionDetails record)
     if (record.checkParent){SendMessageA(parentChkBox,BM_SETCHECK,BST_CHECKED,0);}
     else {SendMessageA(parentChkBox,BM_SETCHECK,BST_UNCHECKED,0);}
     {
-        bool exeFound = griffeyeExeAvailable();
+        bool exeFound = (findGriffeyeExe(extractOpt.GriffeyePath) != NULL);
         EnableWindow(griffChkBox, exeFound ? TRUE : FALSE);
         bool griffOn = record.createGriffeye && exeFound;
         SendMessageA(griffChkBox, BM_SETCHECK, griffOn ? BST_CHECKED : BST_UNCHECKED, 0);
