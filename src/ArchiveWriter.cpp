@@ -378,18 +378,24 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
             readSize = fileSize - currOffset;
         }
         DWORD read = XWF_Read(hItem,currOffset,buffer,readSize);
-        if (read > 0)
+        if (read != readSize)
         {
-            la_ssize_t written = archive_write_data(outa,buffer,read);
-            if (written < 0 || (DWORD)written != read)
-            {
-                XWF_Close(hItem);
-                delete[] buffer;
-                closeZipArchiveEntry(&outa, entry);
-                LeaveCriticalSection(&archiveLock);
-                delete[] filePath;
-                return ERROR_WRITE;
-            }
+            XWF_Close(hItem);
+            delete[] buffer;
+            closeZipArchiveEntry(&outa, entry);
+            LeaveCriticalSection(&archiveLock);
+            delete[] filePath;
+            return ERROR_WRITE;
+        }
+        la_ssize_t written = archive_write_data(outa,buffer,read);
+        if (written < 0 || (DWORD)written != read)
+        {
+            XWF_Close(hItem);
+            delete[] buffer;
+            closeZipArchiveEntry(&outa, entry);
+            LeaveCriticalSection(&archiveLock);
+            delete[] filePath;
+            return ERROR_WRITE;
         }
         currOffset += readSize;
     }
