@@ -1233,9 +1233,19 @@ bool isThumbnailObject(LONG nItemID)
         return false;
     }
     LONG parentID = XWF_GetItemParent(nItemID);
+    if (parentID == -1)
+    {
+        if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return False (no parent)");}
+        return false;
+    }
     DWORD buffLen = 1024 | 0x40000000;
-    wchar_t buffer[1024];
+    wchar_t buffer[1024] = {0};
     LONG itemStatus = XWF_GetItemType(parentID,buffer,buffLen);
+    if (itemStatus == -1)
+    {
+        outputErrorMessage(L"XWF_GetItemType failed in isThumbnailObject for itemID: ", nItemID);
+        return false;
+    }
     if (wcscmp(buffer, L"Pictures")!=0){return false;}
     if (itemStatus == 3 || itemStatus == 5 || itemStatus == 6 ){
         if (extractInfo.exceptMismatch){
