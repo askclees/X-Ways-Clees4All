@@ -2353,6 +2353,9 @@ int returnMediaRecords(sqlite3* database, sqlite3_stmt** statement, int picture)
             return 0;
         }
         else{
+            //SQL Error - prepare succeeded but step failed; release the statement
+            sqlite3_finalize(*statement);
+            *statement = NULL;
             return -2;
         }
     }
