@@ -1508,11 +1508,15 @@ ExtractOptions extractOldSchemaOptions(sqlite3* db, bool* error)
             retOpt.overwriteFiles = TRUE;
         }
         wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,2);
-        wcsncpy(retOpt.errorReportPath, temp, 2047);
-        retOpt.errorReportPath[2047] = L'\0';
+        if (temp != NULL) {
+            wcsncpy(retOpt.errorReportPath, temp, 2047);
+            retOpt.errorReportPath[2047] = L'\0';
+        }
         wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,4);
-        wcsncpy(retOpt.GriffeyePath, temp2, 2047);
-        retOpt.GriffeyePath[2047] = L'\0';
+        if (temp2 != NULL) {
+            wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+            retOpt.GriffeyePath[2047] = L'\0';
+        }
     }
     sqlite3_finalize(statement);
     return retOpt;
@@ -1559,11 +1563,15 @@ ExtractOptions extractV1SchemaOptions(sqlite3* db, bool* error)
             retOpt.overwriteFiles = TRUE;
         }
         wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,4);
-        wcsncpy(retOpt.errorReportPath, temp, 2047);
-        retOpt.errorReportPath[2047] = L'\0';
+        if (temp != NULL) {
+            wcsncpy(retOpt.errorReportPath, temp, 2047);
+            retOpt.errorReportPath[2047] = L'\0';
+        }
         wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,6);
-        wcsncpy(retOpt.GriffeyePath, temp2, 2047);
-        retOpt.GriffeyePath[2047] = L'\0';
+        if (temp2 != NULL) {
+            wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+            retOpt.GriffeyePath[2047] = L'\0';
+        }
     }
     sqlite3_finalize(statement);
     return retOpt;
@@ -1609,11 +1617,15 @@ ExtractOptions extractV2SchemaOptions(sqlite3* db, bool* error)
             retOpt.overwriteFiles = TRUE;
         }
         wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,4);
-        wcsncpy(retOpt.errorReportPath, temp, 2047);
-        retOpt.errorReportPath[2047] = L'\0';
+        if (temp != NULL) {
+            wcsncpy(retOpt.errorReportPath, temp, 2047);
+            retOpt.errorReportPath[2047] = L'\0';
+        }
         wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,6);
-        wcsncpy(retOpt.GriffeyePath, temp2, 2047);
-        retOpt.GriffeyePath[2047] = L'\0';
+        if (temp2 != NULL) {
+            wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+            retOpt.GriffeyePath[2047] = L'\0';
+        }
         retOpt.TypeStatusFlags = sqlite3_column_int(statement,7);
         retOpt.FileTypeFlag = sqlite3_column_int(statement,8);
     }
