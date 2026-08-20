@@ -2238,6 +2238,12 @@ void getItemFileName(long nItemID, VICSMediaFile* record)
     }
     catch (...)
     {
+        xName = NULL;
+    }
+    //XWF_GetItemName returns NULL on failure rather than throwing, so the catch above alone
+    //doesn't cover it - both failure modes fall back to the same empty-name handling here
+    if (xName == NULL)
+    {
         XWF_OutputMessage(L"Error retrieving item name. Item will have --noName--",0);
         xName = new wchar_t[8];
         xName[0] = L'\0';
