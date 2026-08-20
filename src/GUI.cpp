@@ -279,6 +279,11 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         MessageBox(NULL,"You have to select at least one output type!!","Error!! ",MB_ICONERROR);
                         break;
                     }
+                    if (extractInfo.C4ALLExport && extractInfo.noNames > MAX_OUTPUT_FILES)
+                    {
+                        MessageBox(NULL,"C4All XML output cannot be used with more than 64 evidence objects in the case. Deselect C4All XML output, or use Project VICS JSON output instead.","Error!! ",MB_ICONERROR);
+                        break;
+                    }
                     if (extractInfo.debugSet) {XWF_OutputMessage(L"CleesForAll Debug Msg: PreStartProcess",0); }
                     int error = startProcess();
                     if (extractInfo.debugSet) {XWF_OutputMessage(L"CleesForAll Debug Msg: PostStartProcess",0); }

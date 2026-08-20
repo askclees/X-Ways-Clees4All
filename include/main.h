@@ -94,6 +94,9 @@ struct EvidenceObjects{
 };
 
 
+/** @brief Maximum number of evidence objects that can have C4P/C4M XML output files (see ExtractionDetails::outputFiles). */
+#define MAX_OUTPUT_FILES 64
+
 /**
  * @brief Contains details of XML output files associated with an evidence object.
  */
@@ -138,8 +141,8 @@ struct ExtractionDetails{
     BOOL extractPictures;
     /** @brief Flag to extract videos. */
     BOOL extractVideos;
-    /** @brief Array of per-evidence-object output file details (up to 32 objects). */
-    outputDetails outputFiles[32];
+    /** @brief Array of per-evidence-object output file details (up to MAX_OUTPUT_FILES objects). */
+    outputDetails outputFiles[MAX_OUTPUT_FILES];
     /** @brief Number of active entries in outputFiles. */
     int outputFileCounter;
     /** @brief Array of evidence object name mappings. */
