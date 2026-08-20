@@ -414,7 +414,13 @@ BOOL checkParentSelected(sqlite3* sqlDB, DWORD parentID)
     rc = sqlite3_prepare_v2(sqlDB,sqlQuery,strlen(sqlQuery)+1,&statement,NULL);
     if (rc == SQLITE_OK)
     {
-        sqlite3_step(statement);
+        rc = sqlite3_step(statement);
+        if (rc != SQLITE_ROW)
+        {
+            //no such parentID, or an error - either way, not selected
+            sqlite3_finalize(statement);
+            return false;
+        }
         int result = sqlite3_column_int(statement,0);
         sqlite3_finalize(statement);
         if (result == 0)
@@ -851,7 +857,7 @@ int updateFileNumber(sqlite3* sqlDB,DWORD objID,int fileNo)
 int getFileNumber(sqlite3* sqlDB,DWORD objID)
 {
     int rc = 0;
-    int result = 0;
+    int result = -1; //default to the documented error value; overwritten on a successful row read below
     sqlite3_stmt *statement;
     char sqlQuery[1024]={0};
     //get all items which are selected and are not root objects
