@@ -611,8 +611,12 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
         wcsncpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2), 40);
         recMedia.SHA1[40] = L'\0';
     }
-    wcsncpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3), 32);
-    recMedia.MD5[32] = L'\0';
+    CheckSize = sqlite3_column_bytes16(statement,3);
+    if (CheckSize == 0) { recMedia.MD5[0] = L'\0'; }
+    else {
+            wcsncpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3), 32);
+            recMedia.MD5[32] = L'\0';
+        }
     recMedia.VictimID = sqlite3_column_int(statement,4);
     recMedia.OffenderID = sqlite3_column_int(statement,5);
     recMedia.IsDistributed = sqlite3_column_int(statement,6);
@@ -636,8 +640,11 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
         }
     recMedia.MediaSize = sqlite3_column_int64(statement,10);
     CheckSize = sqlite3_column_bytes16(statement,11);
-    recMedia.RelativeFilePath =  new wchar_t[CheckSize + 1];
-    wcscpy(recMedia.RelativeFilePath,(wchar_t*)sqlite3_column_text16(statement,11));
+    if (CheckSize == 0) { recMedia.RelativeFilePath = NULL; }
+    else {
+            recMedia.RelativeFilePath =  new wchar_t[CheckSize + 2];
+            wcscpy(recMedia.RelativeFilePath,(wchar_t*)sqlite3_column_text16(statement,11));
+        }
     INT64 timeTmp = sqlite3_column_int64(statement,12);
     FILETIME tmpFileTime;
     memcpy(&tmpFileTime,&timeTmp,sizeof(tmpFileTime));
@@ -674,16 +681,26 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
  */
 void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement)
 {
-    wcsncpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
-    recMediaFile.MD5[32] = L'\0';
+    int CheckSize = sqlite3_column_bytes16(statement,0);
+    if (CheckSize == 0) { recMediaFile.MD5[0] = L'\0'; }
+    else {
+            wcsncpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+            recMediaFile.MD5[32] = L'\0';
+        }
     //Filename
-    int CheckSize = sqlite3_column_bytes16(statement,1);
-    recMediaFile.fileName =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.fileName, (wchar_t*)sqlite3_column_text16(statement,1));
+    CheckSize = sqlite3_column_bytes16(statement,1);
+    if (CheckSize == 0) { recMediaFile.fileName = NULL; }
+    else {
+            recMediaFile.fileName =  new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.fileName, (wchar_t*)sqlite3_column_text16(statement,1));
+        }
     //file path
     CheckSize = sqlite3_column_bytes16(statement,2);
-    recMediaFile.filePath =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.filePath, (wchar_t*)sqlite3_column_text16(statement,2));
+    if (CheckSize == 0) { recMediaFile.filePath = NULL; }
+    else {
+            recMediaFile.filePath =  new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.filePath, (wchar_t*)sqlite3_column_text16(statement,2));
+        }
     //Created
     INT64 timeTmp = sqlite3_column_int64(statement,3);
     FILETIME tmpFileTime;
@@ -750,14 +767,24 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
  */
 void extractVICSMediaMetadataSQL(VICSMediaMetadata* record,sqlite3_stmt* statement)
 {
-    wcsncpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
-    record->MD5[32] = L'\0';
-    int CheckSize = sqlite3_column_bytes16(statement,1);
-    record->PropertyName =  new wchar_t[CheckSize + 2];
-    wcscpy(record->PropertyName, (wchar_t*)sqlite3_column_text16(statement,1));
+    int CheckSize = sqlite3_column_bytes16(statement,0);
+    if (CheckSize == 0) { record->MD5[0] = L'\0'; }
+    else {
+            wcsncpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+            record->MD5[32] = L'\0';
+        }
+    CheckSize = sqlite3_column_bytes16(statement,1);
+    if (CheckSize == 0) { record->PropertyName = NULL; }
+    else {
+            record->PropertyName =  new wchar_t[CheckSize + 2];
+            wcscpy(record->PropertyName, (wchar_t*)sqlite3_column_text16(statement,1));
+        }
     CheckSize = sqlite3_column_bytes16(statement,2);
-    record->PropertyValue =  new wchar_t[CheckSize + 2];
-    wcscpy(record->PropertyValue, (wchar_t*)sqlite3_column_text16(statement,2));
+    if (CheckSize == 0) { record->PropertyValue = NULL; }
+    else {
+            record->PropertyValue =  new wchar_t[CheckSize + 2];
+            wcscpy(record->PropertyValue, (wchar_t*)sqlite3_column_text16(statement,2));
+        }
 }
 
 /**
