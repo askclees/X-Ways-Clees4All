@@ -675,7 +675,7 @@ int drawFourthLine(HWND hwnd)
     ReportOutput = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE,LeftHandStartX+170, FourthLineY ,MainWindowWidth - 230,20,hwnd,(HMENU)IDC_TEXT_REPORTOUTPUT,GetModuleHandle(NULL),NULL);
     if (!ReportOutput) {outputControlOutputError("ReportOutput");}
 
-    char tempPath[MAX_PATH];
+    char tempPath[2048];
     snprintf(tempPath, sizeof(tempPath), "%ls",extractOpt.errorReportPath);
     SetWindowText(ReportOutput,tempPath);
     cmdReportOutput = CreateWindowEx(0,"BUTTON","...",WS_CHILD|WS_VISIBLE,MainWindowWidth - 50,FourthLineY,20,20,hwnd,(HMENU)IDC_BTN_REPORTOUTPUT,GetModuleHandle(NULL),0);
