@@ -108,11 +108,11 @@ struct VICSMediaFile
     /** @brief Full file path as it appeared on the evidence. */
     wchar_t* filePath=NULL;
     /** @brief File creation timestamp. */
-    FILETIME created;
+    FILETIME created={0,0};
     /** @brief File last-written timestamp. */
-    FILETIME written;
+    FILETIME written={0,0};
     /** @brief File last-accessed timestamp. */
-    FILETIME accessed;
+    FILETIME accessed={0,0};
     /** @brief True if the file was recovered from unallocated space. */
     BOOL unallocated;
     /** @brief Source ID of the evidence object containing this file. */
