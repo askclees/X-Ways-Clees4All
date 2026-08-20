@@ -706,18 +706,19 @@ int getCaseOptions()
     {
         if (extractInfo.noNames > MAX_OUTPUT_FILES)
         {
-            //the GUI path already blocks this before Start is pressed (see IDC_BTN_OK in GUI.cpp);
-            //this covers the command-line (xtparam:) path, which skips that dialog entirely
-            XWF_OutputMessage(L"C4All XML output cannot be used with more than 64 evidence objects in the case; skipping C4All XML output",0);
+            //the GUI path already blocks this before Start is pressed (see IDC_BTN_OK in GUI.cpp), so
+            //extractInfo.processStart never gets set there. This covers the command-line (xtparam:) path,
+            //which skips that dialog and sets processStart unconditionally in getCommandLineOptions() -
+            //aborting here (propagated up through firstRunSetup/XT_Prepare) is the only way left to stop
+            //before any item is processed with a NULL currPicFile/currVidFile.
+            XWF_OutputMessage(L"C4All XML output cannot be used with more than 64 evidence objects in the case; aborting",0);
+            return -1;
         }
-        else
+        int check = createC4POutput();
+        if (check !=0)
         {
-            int check = createC4POutput();
-            if (check !=0)
-            {
-                //error creating files
-                return -1;
-            }
+            //error creating files
+            return -1;
         }
     }
     if (extractInfo.VICSCompressed)
