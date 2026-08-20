@@ -1,10 +1,6 @@
 #ifndef OPTIONS_H_INCLUDED
 #define OPTIONS_H_INCLUDED
 
-
-
-#endif // OPTIONS_H_INCLUDED
-
 /** @brief Creates and displays the extraction options GUI window. */
 extern int createOptionsWindow();
 /** @brief Loads options from the options database, creating it with defaults if it does not exist. */
@@ -20,3 +16,5 @@ int loadLastExtractionSettings(ExtractionDetails* record);
 
 /** @brief Releases GDI resources allocated during options GUI creation. Call when the X-Tension is unloaded. */
 void cleanupOptions();
+
+#endif // OPTIONS_H_INCLUDED
