@@ -1199,7 +1199,7 @@ bool validType(LONG nItemID, int* picture)
         if (typeValid == TYPE_OTHER)    {return 0;}
         else{
         //some kind of error
-            if (typeValid == ERROR_GETITEMTYPE){
+            if (typeValid == ERROR_GETITEMTYPE || typeValid == ERROR_GETITEMTYPEDESC){
                 //add file to report table for easier finding
                 errorRaised(nItemID,REPORT_ERROR_TYPE);
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"validType - End return false");}
