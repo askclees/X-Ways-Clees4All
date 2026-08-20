@@ -750,7 +750,8 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
  */
 void extractVICSMediaMetadataSQL(VICSMediaMetadata* record,sqlite3_stmt* statement)
 {
-    wcscpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0));
+    wcsncpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+    record->MD5[32] = L'\0';
     int CheckSize = sqlite3_column_bytes16(statement,1);
     record->PropertyName =  new wchar_t[CheckSize + 2];
     wcscpy(record->PropertyName, (wchar_t*)sqlite3_column_text16(statement,1));
