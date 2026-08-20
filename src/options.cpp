@@ -185,7 +185,17 @@ INT64 getSizeInBytes(HWND hwnCmbo, HWND hwndTxt)
             multiplier = 1;
         break;
     }
-    return (strtoll(numVal,NULL,10)*multiplier);
+    INT64 numericValue = strtoll(numVal,NULL,10);
+    //clamp rather than let the multiplication silently overflow/underflow (UB for a signed type)
+    if (numericValue > LLONG_MAX / multiplier)
+    {
+        numericValue = LLONG_MAX / multiplier;
+    }
+    else if (numericValue < LLONG_MIN / multiplier)
+    {
+        numericValue = LLONG_MIN / multiplier;
+    }
+    return (numericValue*multiplier);
 
 }
 
