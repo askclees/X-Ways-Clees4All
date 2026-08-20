@@ -1993,9 +1993,9 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     sqlite3_bind_int64(statement,8,record->physicalLocation);
     if (record->deleted) { sqlite3_bind_int(statement,9,1);} else {sqlite3_bind_int(statement,9,0);}
     //bind parent attributes
-    if (record->parentMD5[0] != '\0') { sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC); } else { sqlite3_bind_text16(statement,10,"",-1,SQLITE_TRANSIENT); }
-    if (record->parentName != NULL) { sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,11,"",-1,SQLITE_TRANSIENT); }
-    if (record->parentFilePath != NULL) { sqlite3_bind_text16(statement,12,record->parentFilePath,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,12,"",-1,SQLITE_TRANSIENT); }
+    if (record->parentMD5[0] != '\0') { sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC); } else { sqlite3_bind_text16(statement,10,L"",-1,SQLITE_TRANSIENT); }
+    if (record->parentName != NULL) { sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,11,L"",-1,SQLITE_TRANSIENT); }
+    if (record->parentFilePath != NULL) { sqlite3_bind_text16(statement,12,record->parentFilePath,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,12,L"",-1,SQLITE_TRANSIENT); }
     sqlite3_bind_int64(statement,13,record->parentPhysLoc);
     sqlite3_bind_int(statement,14,record->XWFitemID);
     //bind parameters
