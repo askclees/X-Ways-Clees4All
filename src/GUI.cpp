@@ -1268,6 +1268,10 @@ int startProcess()
     char buffer[1024];
     if(extractInfo.createGriffeye)
     {
+        //free any allocations left over from a previous, failed attempt to start processing
+        if (extractInfo.GriffeyeCaseLocation != NULL) { delete[] extractInfo.GriffeyeCaseLocation; extractInfo.GriffeyeCaseLocation = NULL; }
+        if (extractInfo.GriffeyeSettingsName != NULL) { delete[] extractInfo.GriffeyeSettingsName; extractInfo.GriffeyeSettingsName = NULL; }
+        if (extractInfo.GriffeyeCaseName != NULL) { delete[] extractInfo.GriffeyeCaseName; extractInfo.GriffeyeCaseName = NULL; }
         int length = GetWindowTextLength(GriffeyeCase);
         if (length == 0)
         {
