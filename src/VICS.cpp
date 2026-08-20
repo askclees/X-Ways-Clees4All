@@ -43,29 +43,49 @@ FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
 	//1.51 fixed so case number also translates wide characters
     if (vCaseData.CaseNumber != nullptr) {
         char* caseNumStr = convertWideToChar(vCaseData.CaseNumber);
-        fprintf(newFile,"\"CaseNumber\":\"%s\",\r\n\t",caseNumStr);
+        char* caseNumEsc = jsonEscapeString(caseNumStr);
+        fprintf(newFile,"\"CaseNumber\":\"%s\",\r\n\t",caseNumEsc);
+        delete[] caseNumEsc;
         delete[] caseNumStr;
     }
-	if (vCaseData.ContactPhone != nullptr) {fprintf(newFile,"\"ContactPhone\":\"%ls\",\r\n\t",vCaseData.ContactPhone);}
+	if (vCaseData.ContactPhone != nullptr) {
+        char* phoneStr = convertWideToChar(vCaseData.ContactPhone);
+        char* phoneEsc = jsonEscapeString(phoneStr);
+        fprintf(newFile,"\"ContactPhone\":\"%s\",\r\n\t",phoneEsc);
+        delete[] phoneEsc;
+        delete[] phoneStr;
+    }
 	//1.41 - convert details to UTF8
 	if (vCaseData.ContactEmail != nullptr) {
         char* emailStr = convertWideToChar(vCaseData.ContactEmail);
-        fprintf(newFile,"\"ContactEmail\":\"%s\",\r\n\t",emailStr);
+        char* emailEsc = jsonEscapeString(emailStr);
+        fprintf(newFile,"\"ContactEmail\":\"%s\",\r\n\t",emailEsc);
+        delete[] emailEsc;
         delete[] emailStr;
     }
 	if (vCaseData.ContactTitle != nullptr) {
         char* titleStr = convertWideToChar(vCaseData.ContactTitle);
-        fprintf(newFile,"\"ContactTitle\":\"%s\",\r\n\t",titleStr);
+        char* titleEsc = jsonEscapeString(titleStr);
+        fprintf(newFile,"\"ContactTitle\":\"%s\",\r\n\t",titleEsc);
+        delete[] titleEsc;
         delete[] titleStr;
     }
 	if (vCaseData.ContactOrg != nullptr) {
         char* contactStr = convertWideToChar(vCaseData.ContactOrg);
-        fprintf(newFile,"\"ContactOrganization\":\"%s\",\r\n\t",contactStr);
+        char* contactEsc = jsonEscapeString(contactStr);
+        fprintf(newFile,"\"ContactOrganization\":\"%s\",\r\n\t",contactEsc);
+        delete[] contactEsc;
         delete[] contactStr;
     }
     //1.41 changed to use data from struct
 	fprintf(newFile,"\"SourceApplicationName\":\"Clees4All\",\r\n\t");
-	fprintf(newFile,"\"SourceApplicationVersion\":\"%ls\",\r\n\t",progVersion);
+    {
+        char* versionStr = convertWideToChar(progVersion);
+        char* versionEsc = jsonEscapeString(versionStr);
+        fprintf(newFile,"\"SourceApplicationVersion\":\"%s\",\r\n\t",versionEsc);
+        delete[] versionEsc;
+        delete[] versionStr;
+    }
 	fprintf(newFile,"\"Media\":[");
 	fflush(newFile);
 	return newFile;
@@ -369,17 +389,32 @@ static void cjsonAddWide(cJSON* obj, const char* key, const wchar_t* wstr)
 }
 
 /* Add a FILETIME as an ISO 8601 string to a cJSON object.
-   tz is a signed hours offset applied to the DateUpdated field (MediaRecord only).
+   ft is a UTC timestamp. tz is a signed hours offset applied to the DateUpdated
+   field (MediaRecord only); when non-zero, ft is shifted by tz hours so the
+   printed wall-clock time is the local time at that offset, and the string is
+   suffixed with the offset instead of "Z" (a timestamp cannot be both).
    Skips invalid timestamps. */
 static void cjsonAddFiletime(cJSON* obj, const char* key, FILETIME ft, int tz)
 {
     if (!validFiletime(ft)) return;
+
+    if (tz != 0)
+    {
+        ULARGE_INTEGER uli;
+        uli.LowPart  = ft.dwLowDateTime;
+        uli.HighPart = ft.dwHighDateTime;
+        uli.QuadPart += (INT64)tz * 3600LL * 10000000LL; // hours -> 100ns intervals
+        ft.dwLowDateTime  = uli.LowPart;
+        ft.dwHighDateTime = uli.HighPart;
+    }
+
     SYSTEMTIME st;
     if (!FileTimeToSystemTime(&ft, &st)) return;
+
     char buf[64];
     if (tz != 0)
     {
-        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03d%+03d:00Z",
+        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03d%+03d:00",
                  st.wYear, st.wMonth, st.wDay,
                  st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, tz);
     }
@@ -401,7 +436,7 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
 
     cJSON* obj = cJSON_CreateObject();
 
-    char md5[33];
+    char md5[33] = {0};
     wcstombs(md5, f->MD5, sizeof(md5));
     md5[32] = '\0';
     cJSON_AddStringToObject(obj, "MD5", md5);
@@ -412,12 +447,12 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
     cjsonAddFiletime(obj, "Written",  f->written,  0);
     cjsonAddFiletime(obj, "Accessed", f->accessed, 0);
 
-    if (f->unallocated) cJSON_AddStringToObject(obj, "Unallocated", "true");
-    if (f->deleted)     cJSON_AddStringToObject(obj, "Deleted",     "true");
+    if (f->unallocated) cJSON_AddTrueToObject(obj, "Unallocated");
+    if (f->deleted)     cJSON_AddTrueToObject(obj, "Deleted");
 
     if (f->parentMD5[0] != L'\0')
     {
-        char pmd5[33];
+        char pmd5[33] = {0};
         wcstombs(pmd5, f->parentMD5, sizeof(pmd5));
         pmd5[32] = '\0';
         cJSON_AddStringToObject(obj, "ParentMD5", pmd5);
@@ -448,22 +483,22 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     if (m.Category != 0)
         cJSON_AddNumberToObject(obj, "Category", m.Category);
 
-    char md5[33];
+    char md5[33] = {0};
     wcstombs(md5, m.MD5, sizeof(md5));
     md5[32] = '\0';
     cJSON_AddStringToObject(obj, "MD5", md5);
 
     if (m.SHA1[0] != L'\0')
     {
-        char sha1[41];
+        char sha1[41] = {0};
         wcstombs(sha1, m.SHA1, sizeof(sha1));
         sha1[40] = '\0';
         cJSON_AddStringToObject(obj, "SHA1", sha1);
     }
 
-    if (m.VictimID)     cJSON_AddStringToObject(obj, "VictimIdentified",   "true");
-    if (m.OffenderID)   cJSON_AddStringToObject(obj, "OffenderIdentified",  "true");
-    if (m.IsDistributed)cJSON_AddStringToObject(obj, "IsDistributed",       "true");
+    if (m.VictimID)     cJSON_AddTrueToObject(obj, "VictimIdentified");
+    if (m.OffenderID)   cJSON_AddTrueToObject(obj, "OffenderIdentified");
+    if (m.IsDistributed)cJSON_AddTrueToObject(obj, "IsDistributed");
 
     cjsonAddWide(obj, "Comments", m.Comments);
     cjsonAddWide(obj, "Series",   m.Series);
@@ -478,17 +513,17 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
 
     if (m.IsPreCat)
     {
-        cJSON_AddStringToObject(obj, "IsPrecategorized", "true");
+        cJSON_AddTrueToObject(obj, "IsPrecategorized");
         cjsonAddWide(obj, "PrecategorizationSource", m.PrecatSource);
     }
     if (m.IsSuspected)
-        cJSON_AddStringToObject(obj, "IsSuspected", "true");
+        cJSON_AddTrueToObject(obj, "IsSuspected");
 
     cjsonAddWide(obj, "MimeType", m.MimeType);
 
     if (m.PhotoDNA[0] != L'\0')
     {
-        char photodna[256];
+        char photodna[256] = {0};
         wcstombs(photodna, m.PhotoDNA, sizeof(photodna));
         photodna[255] = '\0';
         cJSON_AddStringToObject(obj, "PhotoDNA", photodna);

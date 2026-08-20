@@ -11,6 +11,8 @@ BOOL ifFileExistsW(const wchar_t* path);
 BOOL dirExistsW(LPCWSTR szPath);
 /** @brief Converts a wide string to a newly allocated UTF-8 char buffer; caller must delete[]. */
 char* convertWideToChar(const wchar_t* wString);
+/** @brief Escapes a UTF-8 string for embedding in a JSON string literal; returns a newly allocated buffer the caller must delete[]. */
+char* jsonEscapeString(const char* input);
 /** @brief Converts a FILETIME to an INT64 (100-nanosecond intervals since 1601-01-01). */
 INT64 Filetime2INT64(FILETIME &inFT);
 /** @brief Reallocates a wide-character buffer to a larger size, copying existing content. */
