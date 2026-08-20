@@ -1019,19 +1019,30 @@ int createOptionsExtractionTable(sqlite3* sqlDB)
  * @brief Inserts or replaces the current schema version record in the SchemaVersion table.
  *
  * @param sqlDB Handle to the options SQLite database.
- * @return 0 on success, -2 if the insert fails.
+ * @return 0 on success, -2 if clearing or inserting the schema version record fails.
  *
  * @see createOptionsSchemaTable
  * @see updateOptionsSchema
  */
 int insertOptionsSchemaRecord(sqlite3* sqlDB)
 {
-    char* errMsg;
+    char* errMsg = NULL;
     char sqlQuery[2048];
     int rc = sqlite3_exec(sqlDB,"DELETE FROM SchemaVersion", NULL, NULL, &errMsg);
+    if (rc != SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error clearing SchemaVersion table",0);
+        if (errMsg != NULL) { sqlite3_free(errMsg); errMsg = NULL; }
+        return -2;
+    }
     sprintf(sqlQuery,"INSERT INTO SchemaVersion VALUES (%i)",optionsSchemaVersion);
     rc = sqlite3_exec(sqlDB,sqlQuery, NULL, NULL, &errMsg);
-    if (rc!=SQLITE_OK) {return -2;}
+    if (rc!=SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error inserting SchemaVersion record",0);
+        if (errMsg != NULL) { sqlite3_free(errMsg); errMsg = NULL; }
+        return -2;
+    }
     return 0;
 }
 
