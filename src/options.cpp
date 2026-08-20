@@ -243,6 +243,7 @@ int getTypeStatus()
 {
     int retVal =0;
     int noItems = SendMessage(lstFileStatus, LB_GETSELCOUNT, 0, 0);
+    if (noItems == LB_ERR) { return retVal; }
     int* arrItems = new int[noItems];
     SendMessage(lstFileStatus,LB_GETSELITEMS,noItems,(LPARAM)arrItems);
     for (int i=0;i<noItems;i++)
@@ -284,6 +285,7 @@ int getFileTypeStatus()
 {
     int retVal =0;
     int noItems = SendMessage(lstFileFormat, LB_GETSELCOUNT, 0, 0);
+    if (noItems == LB_ERR) { return retVal; }
     int* arrItems = new int[noItems];
     SendMessage(lstFileFormat,LB_GETSELITEMS,noItems,(LPARAM)arrItems);
     for (int i=0;i<noItems;i++)
