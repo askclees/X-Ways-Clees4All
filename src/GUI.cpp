@@ -1325,7 +1325,11 @@ int startProcess()
                 }
                 else if (res == IDYES)
                 {
-                    CreateDirectoryA(buffer,NULL);
+                    if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+                    {
+                        MessageBox(NULL,"Unable to create picture output directory","Error!! ",MB_ICONERROR);
+                        return 1;
+                    }
                 }
             }
             else
@@ -1344,7 +1348,11 @@ int startProcess()
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
-            CreateDirectoryA(buffer,NULL);
+            if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                MessageBox(NULL,"Unable to create picture output Files directory","Error!! ",MB_ICONERROR);
+                return 1;
+            }
         }
         buffer[0]='\0';
     }
@@ -1362,7 +1370,11 @@ int startProcess()
                 }
                 else if (res == IDYES)
                 {
-                    CreateDirectoryA(buffer,NULL);
+                    if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+                    {
+                        MessageBox(NULL,"Unable to create video output directory","Error!! ",MB_ICONERROR);
+                        return 1;
+                    }
                 }
             }
             else
@@ -1381,7 +1393,11 @@ int startProcess()
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
-            CreateDirectoryA(buffer,NULL);
+            if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                MessageBox(NULL,"Unable to create video output Files directory","Error!! ",MB_ICONERROR);
+                return 1;
+            }
 
         }
         buffer[0]='\0';
