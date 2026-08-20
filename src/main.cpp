@@ -1116,7 +1116,7 @@ int checkItemType(LONG nItemID, int* picture)
             if (retVal == -1){
                     return ERROR_GETITEMTYPEDESC;
             }
-            if (wcsncmp(descr,L"Macromedia Flash",16)!=0)
+            if (wcsncmp(descr,L"Macromedia Flash",16)!=0 || !extractInfo.extractVideos)
             {
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
                 return TYPE_OTHER;
