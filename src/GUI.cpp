@@ -932,7 +932,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     {
         XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving case name",0);
     }
-    sprintf(caseName,"%ls",caseNameW);
+    snprintf(caseName,128,"%ls",caseNameW);
     GriffeyeCase = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",caseName,WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_GROUP,lblVidStartX + 160,start,150,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYECASE,GetModuleHandle(NULL),NULL);
     if (!GriffeyeCase)
     {
@@ -990,7 +990,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     {
         XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving investigator name",0);
     }
-    sprintf(Name,"%ls",NameW);
+    snprintf(Name,128,"%ls",NameW);
     GriffeyeInvName = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",Name,WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+50,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYEINVNAME,GetModuleHandle(NULL),NULL);
     if (!GriffeyeInvName)
     {
@@ -1157,9 +1157,10 @@ void createControls(HWND hwnd)
     for (int i=0; i< extractInfo.noNames;i++)
     {
         char* txtEvCurr;
-        txtEvCurr = new char[wcslen(extractInfo.nameList[i].actualName)+2];
+        size_t txtEvCurrSize = wcslen(extractInfo.nameList[i].actualName)+2;
+        txtEvCurr = new char[txtEvCurrSize];
         txtEvCurr[0] = '\0';
-        sprintf(txtEvCurr,"%ls",extractInfo.nameList[i].actualName);
+        snprintf(txtEvCurr,txtEvCurrSize,"%ls",extractInfo.nameList[i].actualName);
         lblActual[i] = CreateWindowEx(0,"Static","Evidence Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX - 10,i*boxMultiplier,140,30,entryPanel,0,GetModuleHandle(NULL),0);
         if (!lblActual[i])
         {

@@ -1939,7 +1939,7 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         if (checkVal == 0)
         {
             unsigned char* tBuffer = new unsigned char[145];
-            sprintf((char*)tBuffer,"%ls",tempBuffer);
+            snprintf((char*)tBuffer,145,"%ls",tempBuffer);
             char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
             if (result != NULL)
             {
