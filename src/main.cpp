@@ -1635,9 +1635,11 @@ int caseCleanup()
         debugWriteDetails(dbPathMsg);
         loadOrSaveDb(vicsDB, sqlOutputPath, 1);
     }
+    //vicsDB is opened unconditionally in setupVics, so it must be closed unconditionally here too -
+    //not just when VICS export is selected
+    sqlite3_close(vicsDB);
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
-        sqlite3_close(vicsDB);
         if (vicPicFile)   { fclose(vicPicFile);   vicPicFile   = NULL; }
         if (vicMovieFile) { fclose(vicMovieFile);  vicMovieFile = NULL; }
         if (extractInfo.VICSCompressed)
