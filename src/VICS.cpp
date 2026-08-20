@@ -412,8 +412,8 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
     cjsonAddFiletime(obj, "Written",  f->written,  0);
     cjsonAddFiletime(obj, "Accessed", f->accessed, 0);
 
-    if (f->unallocated) cJSON_AddStringToObject(obj, "Unallocated", "true");
-    if (f->deleted)     cJSON_AddStringToObject(obj, "Deleted",     "true");
+    if (f->unallocated) cJSON_AddTrueToObject(obj, "Unallocated");
+    if (f->deleted)     cJSON_AddTrueToObject(obj, "Deleted");
 
     if (f->parentMD5[0] != L'\0')
     {
@@ -461,9 +461,9 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
         cJSON_AddStringToObject(obj, "SHA1", sha1);
     }
 
-    if (m.VictimID)     cJSON_AddStringToObject(obj, "VictimIdentified",   "true");
-    if (m.OffenderID)   cJSON_AddStringToObject(obj, "OffenderIdentified",  "true");
-    if (m.IsDistributed)cJSON_AddStringToObject(obj, "IsDistributed",       "true");
+    if (m.VictimID)     cJSON_AddTrueToObject(obj, "VictimIdentified");
+    if (m.OffenderID)   cJSON_AddTrueToObject(obj, "OffenderIdentified");
+    if (m.IsDistributed)cJSON_AddTrueToObject(obj, "IsDistributed");
 
     cjsonAddWide(obj, "Comments", m.Comments);
     cjsonAddWide(obj, "Series",   m.Series);
@@ -478,11 +478,11 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
 
     if (m.IsPreCat)
     {
-        cJSON_AddStringToObject(obj, "IsPrecategorized", "true");
+        cJSON_AddTrueToObject(obj, "IsPrecategorized");
         cjsonAddWide(obj, "PrecategorizationSource", m.PrecatSource);
     }
     if (m.IsSuspected)
-        cJSON_AddStringToObject(obj, "IsSuspected", "true");
+        cJSON_AddTrueToObject(obj, "IsSuspected");
 
     cjsonAddWide(obj, "MimeType", m.MimeType);
 
