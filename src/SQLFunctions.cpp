@@ -1855,13 +1855,14 @@ void outputErrorStats(sqlite3* sqlDB,WORD versionNo)
         if (rc != SQLITE_OK)
         {
             XWF_OutputMessage(L"Error preparing query for error table",0);
-            return;
+            continue;
         }
         rc = sqlite3_step(statement);
         if (rc != SQLITE_ROW)
         {
             XWF_OutputMessage(L"Error executing query for error table",0);
-            return;
+            sqlite3_finalize(statement);
+            continue;
         }
         int noErrors = sqlite3_column_int(statement,0);
         wchar_t tempMessage[512]={0};
