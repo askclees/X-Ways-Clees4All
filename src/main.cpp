@@ -1524,7 +1524,9 @@ int createGriffeyeCase()
     }
     char cmdOutput[8192];
     char tempString[1024];
-    snprintf(cmdOutput,sizeof(cmdOutput),"\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
+    size_t pathLen = wcslen(extractOpt.GriffeyePath);
+    bool pathHasSlash = (pathLen > 0 && extractOpt.GriffeyePath[pathLen-1] == L'\\');
+    snprintf(cmdOutput,sizeof(cmdOutput),pathHasSlash ? "\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"" : "\"%ls\\%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
     int sourceNo = 1;
 
     wchar_t path[32768] ={0};
