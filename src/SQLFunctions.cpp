@@ -2388,7 +2388,7 @@ int returnMediaRecords(sqlite3* database, sqlite3_stmt** statement, int picture)
         return -1;
     }
     snprintf(sqlQuery,256, "Select * from %s;",tablename);
-    int rc = sqlite3_prepare_v2(database,sqlQuery,(strlen(sqlQuery)+1)*sizeof(wchar_t),statement,NULL);
+    int rc = sqlite3_prepare_v2(database,sqlQuery,strlen(sqlQuery)+1,statement,NULL);
     if (rc == SQLITE_OK)
     {
         rc = sqlite3_step(*statement);
