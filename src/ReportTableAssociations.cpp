@@ -105,8 +105,10 @@ ReportTableList stringToEntryList(wchar_t* buffer, int bufferLen)
 {
     ReportTableList retVal;
     int length = wcsnlen(buffer,bufferLen);
+    //if buffer isn't null-terminated within bufferLen, don't read the (possibly out-of-bounds) byte past it
+    int loopEnd = (length < bufferLen) ? length + 1 : bufferLen;
     int start = 0;
-    for (int i=0;i<length+1 && retVal.numEntries<128;i++)
+    for (int i=0;i<loopEnd && retVal.numEntries<128;i++)
     {
         if (buffer[i]==L',' || buffer[i]==L'\0' )
         {
