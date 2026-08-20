@@ -725,7 +725,15 @@ int getCaseOptions()
     {
         setArchivePath(extractInfo.C4PPath, SET_PIC_PATH);
         setArchivePath(extractInfo.C4MPath, SET_VID_PATH);
-        setupZipArchives();
+        int archiveCheck = setupZipArchives();
+        if (archiveCheck != SUCCESS)
+        {
+            //ArchPic/ArchVid can end up NULL if only one of the two archives failed to open
+            //(e.g. one output path is unwritable); later archive writes would otherwise
+            //dereference that NULL pointer, so abort here instead
+            XWF_OutputMessage(L"Error setting up compressed archive output",0);
+            return -1;
+        }
     }
     if (extractInfo.debugSet){debugWriteDetails("End of GetCaseOptions function");}
     return 0;
