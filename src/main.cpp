@@ -2412,6 +2412,7 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
             initializeMediaFileRecord(recUpdate);
             int rc = extractMediaFileRecordDetails(nItemID,hashVals.MD5,picture,&recUpdate);
             updateMediaFileRecord(vicsDB,&recUpdate,picture,hashVals.MD5, duplicateItemID);
+            deallocateMediaFileRecord(recUpdate);
         }
         else
         {
