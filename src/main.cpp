@@ -1665,8 +1665,14 @@ int caseCleanup()
     cleanupArchivePaths();
     extractInfo.noNames = 0;
     freeVicsCaseData();
-    delete [] extractInfo.C4PPath;
-    delete [] extractInfo.C4MPath;
+    if (extractInfo.C4PPath != NULL) {
+        delete[] extractInfo.C4PPath;
+        extractInfo.C4PPath = NULL;
+    }
+    if (extractInfo.C4MPath != NULL) {
+        delete[] extractInfo.C4MPath;
+        extractInfo.C4MPath = NULL;
+    }
     //clean up Griffeye case variables
     if (extractInfo.GriffeyeCaseLocation != NULL) {
         delete[] extractInfo.GriffeyeCaseLocation;
