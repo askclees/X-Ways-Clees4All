@@ -2819,7 +2819,9 @@ int writeRecords(sqlite3* database,FILE* vicFile, int picture)
     //get number of records returned
     int noRecords = returnMediaRecords(vicsDB,&statement,picture);
     if (noRecords < 0){
-        //error
+        //error - returnMediaRecords already finalizes/nulls statement on its own error paths where
+        //it was actually allocated, so nothing to do with it here; but the VICS file is still open
+        closeVICSFile(vicFile);
         return -1;
     }
     else if (noRecords == 0)
