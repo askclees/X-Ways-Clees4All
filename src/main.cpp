@@ -1619,8 +1619,13 @@ int caseCleanup()
             closeXML(extractInfo.outputFiles[i].vidOutput);
 
         }
-        firstTime = 0;
     }
+    //must run regardless of whether C4All XML output was used (outputFileCounter stays 0
+    //when C4ALLExport is off, e.g. compressVICS-only mode) - otherwise XT_Prepare's
+    //"if (firstTime == 0)" check skips firstRunSetup (and therefore setupVics/getCaseOptions)
+    //entirely on the next case processed in the same X-Ways session, reusing the just-closed
+    //vicsDB handle and stale case configuration
+    firstTime = 0;
     if (picResults) { fclose(picResults); picResults = NULL; }
     if (vidResults) { fclose(vidResults); vidResults = NULL; }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
