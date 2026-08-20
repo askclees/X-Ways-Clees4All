@@ -101,42 +101,6 @@ void createOptions(char path[]);
 
 
 /**
- * @brief Returns true if the file at the given path can be opened for reading.
- *
- * @param filename Null-terminated path to the file.
- * @return true if the file exists and is accessible, false otherwise.
- */
-bool fileExists(const char* filename)
-{
-    if (FILE* file = fopen(filename,"r"))
-    {
-        fclose(file);
-        return true;
-    }
-    return false;
-}
-
-/**
- * @brief Returns the Griffeye CLI executable name found in the given folder.
- *
- * Checks for analyze-cli.exe then magnet-griffeye-cli.exe. The returned pointer
- * is a string literal and must not be freed by the caller.
- *
- * @param folder Null-terminated path to the Griffeye installation directory.
- * @return Executable filename string literal, or NULL if neither is found.
- */
-static const char* findGriffeyeExe(const char* folder)
-{
-    char check[MAX_PATH];
-    bool hasSlash = (folder[strlen(folder)-1] == '\\');
-    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", folder);
-    if (fileExists(check)) return "analyze-cli.exe";
-    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", folder);
-    if (fileExists(check)) return "magnet-griffeye-cli.exe";
-    return NULL;
-}
-
-/**
  * @brief Creates and runs the options window so that defaults can be changed.
  *
  * @return 0 always.
@@ -243,9 +207,9 @@ bool detailsValid()
         return false;
     }
     //check valid griffeye location (optional — skip if empty)
-    char griffeyeTemp[MAX_PATH];
-    GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
-    if (strlen(griffeyeTemp) > 0)
+    wchar_t griffeyeTemp[MAX_PATH];
+    GetWindowTextW(GriffeyeLocation,griffeyeTemp,MAX_PATH);
+    if (wcslen(griffeyeTemp) > 0)
     {
         if (findGriffeyeExe(griffeyeTemp) == NULL)
         {

@@ -190,6 +190,7 @@ const char* findGriffeyeExe(const wchar_t* folder)
     if (folder == NULL || folder[0] == L'\0') return NULL;
     char narrowFolder[MAX_PATH];
     snprintf(narrowFolder, MAX_PATH, "%ls", folder);
+    if (narrowFolder[0] == '\0') return NULL;
     bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
     char check[MAX_PATH];
     snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
