@@ -444,7 +444,7 @@ int createC4POutput()
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput == NULL)
             {
                 wchar_t errorMessage[2048];
-                swprintf(errorMessage,L"Unable to open file for picture output. Filepath : %s",filepath);
+                swprintf(errorMessage,2048,L"Unable to open file for picture output. Filepath : %s",filepath);
                 XWF_OutputMessage(errorMessage,0);
                 if (extractInfo.debugSet){debugWriteDetails("createC4POutput Function End - Return -1");}
                 return -1;
@@ -460,7 +460,7 @@ int createC4POutput()
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput == NULL)
             {
                 wchar_t errorMessage[2048];
-                swprintf(errorMessage,L"Unable to open file for movie output. Filepath : %s",filepath);
+                swprintf(errorMessage,2048,L"Unable to open file for movie output. Filepath : %s",filepath);
                 XWF_OutputMessage(errorMessage,0);
                 if (extractInfo.debugSet){debugWriteDetails("createC4POutput Function End - Return -1");}
                 return -1;
