@@ -331,12 +331,12 @@ void freeVicsCaseData()
 /**
  * @brief Returns the total character count of all variable-length wide string fields in a VICSMediaFile record.
  *
- * Used by insertMediaFileRecord to determine the required SQL query buffer size.
+ * Currently unused: insertMediaFileRecord now builds its query with bound parameters
+ * (a small fixed-size buffer for the query text only), so it no longer needs to size a
+ * buffer from record content length. Left over from before that refactor.
  *
  * @param record Reference to the VICSMediaFile struct to measure.
  * @return Total character count of all non-null wchar_t* fields.
- *
- * @see insertMediaFileRecord
  */
 INT64 getMediaFileRecordSize(VICSMediaFile &record)
 {
@@ -352,12 +352,12 @@ INT64 getMediaFileRecordSize(VICSMediaFile &record)
 /**
  * @brief Returns the total character count of all variable-length wide string fields in a VICSMedia record.
  *
- * Used by insertMediaRecord to determine the required SQL query buffer size.
+ * Currently unused: insertMediaRecord now builds its query with bound parameters
+ * (a small fixed-size buffer for the query text only), so it no longer needs to size a
+ * buffer from record content length. Left over from before that refactor.
  *
  * @param record Reference to the VICSMedia struct to measure.
  * @return Total character count of all non-null wchar_t* fields.
- *
- * @see insertMediaRecord
  */
 INT64 getMediaRecordSize(VICSMedia &record)
 {
