@@ -1594,7 +1594,11 @@ int createGriffeyeCase()
         snprintf(tempString,sizeof(tempString)," --import-settings-file %ls", extractInfo.GriffeyeSettingsName);
         strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
-    XWF_OutputMessage((wchar_t*)cmdOutput,4);
+    //cmdOutput must stay narrow (CreateProcess below is the ANSI variant) - convert to wide
+    //for logging rather than reinterpret-casting the narrow bytes as UTF-16
+    wchar_t cmdOutputW[8192];
+    swprintf(cmdOutputW,8192,L"%s",cmdOutput);
+    XWF_OutputMessage(cmdOutputW,4);
     PROCESS_INFORMATION ProcessInfo;
     STARTUPINFO StartupInfo;
     ZeroMemory(&StartupInfo, sizeof(StartupInfo));
