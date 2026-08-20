@@ -677,6 +677,10 @@ ObjectNames* retrieveEvidenceNames(sqlite3* sqlDB,int *retCounter)
     int noObjs=0;
     int rc = 0;
     sqlite3_stmt *statement;
+    //default to empty; only overwritten with the real count on the success path below,
+    //so a stale caller-side value can't survive a failure here and outlive this (possibly
+    //smaller or empty) array
+    *retCounter = 0;
     //get count of objects in table
     rc = sqlite3_exec(sqlDB,"Select count(*) from EvidenceObjects where parentID = 0  and selected = 1 ;",countCallback, &noObjs, &zErrMsg);
     if (rc != SQLITE_OK)
