@@ -271,8 +271,9 @@ struct archive* selectArchiveObject(bool picFile)
  * @param filename   Path for the file within the archive.
  * @param picFile    True if the file is a picture.
  * @return           SUCCESS on success, ERROR_OPEN if the file size could not
- *                   be determined or the file could not be opened, or
- *                   ERROR_WRITE if the archive entry header could not be written.
+ *                   be determined or the file could not be opened, ERROR_WRITE
+ *                   if the archive entry header could not be written, or
+ *                   ERROR_READ if reading the source file fails partway through.
  *
  * @see getFileSize, createZipArchiveEntry
  */
@@ -305,6 +306,13 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
             delete[] buffer;
             return ERROR_WRITE;
         }
+    }
+    if (ferror(inputFile))
+    {
+        fclose(inputFile);
+        closeZipArchiveEntry(&outa, entry);
+        delete[] buffer;
+        return ERROR_READ;
     }
     fclose(inputFile);
     closeZipArchiveEntry(&outa, entry);

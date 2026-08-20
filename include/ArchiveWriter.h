@@ -23,6 +23,9 @@
 /** @brief Returned when archive_write_free fails during close. */
 #define ERROR_CLOSE         6
 
+/** @brief Returned when reading the source file fails partway through (as opposed to a clean EOF). */
+#define ERROR_READ           7
+
 /** @brief Flag passed to setArchivePath to set the picture archive path. */
 #define SET_PIC_PATH    1
 /** @brief Flag passed to setArchivePath to set the video archive path. */
