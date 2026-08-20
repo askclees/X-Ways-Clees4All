@@ -342,9 +342,9 @@ void BTN_OK_CLICK(HWND hwnd)
     //so a path that passed validation isn't silently truncated here before being saved
     char tempPath[1024], griffeyeTemp[MAX_PATH];
     GetWindowText(ReportOutput,tempPath,1024);
-    swprintf((wchar_t*)opt.errorReportPath,L"%s",tempPath);
+    swprintf(opt.errorReportPath,2048,L"%s",tempPath);
     GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
-    swprintf((wchar_t*)opt.GriffeyePath,L"%s",griffeyeTemp);
+    swprintf(opt.GriffeyePath,2048,L"%s",griffeyeTemp);
     int owrite = SendMessage(lstOverwrite,CB_GETCURSEL, 0, 0);
     if (owrite == 0){
         opt.overwriteFiles = FALSE;

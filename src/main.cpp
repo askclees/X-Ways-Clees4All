@@ -812,7 +812,7 @@ int getCommandLineOptions()
     }
     for (int i = 0;i<extractInfo.noNames;i++)
     {
-        swprintf(extractInfo.nameList[i].prefName,L"%ls",extractInfo.nameList[i].actualName);
+        swprintf(extractInfo.nameList[i].prefName,1024,L"%ls",extractInfo.nameList[i].actualName);
         XWF_OutputMessage(extractInfo.nameList[i].prefName,0);
     }
     HRESULT error = CoCreateGuid(&vCaseData.caseGuid);
@@ -1938,7 +1938,7 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
             char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
             if (result != NULL)
             {
-                swprintf(PDNABuffer,L"%s",result);
+                swprintf(PDNABuffer,256,L"%s",result);
                 delete[] result;
             }
             delete[] tBuffer;
@@ -2037,7 +2037,7 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
     char relativeBuffer[128]={0};
     int retVal = generateRelativeFilePath(&relativeBuffer[0],128,currentRecord.MD5,false);
     //merge paths
-    swprintf(currentRecord.RelativeFilePath,L"%s\\%ls",relativeBuffer,currentRecord.MD5);
+    swprintf(currentRecord.RelativeFilePath,128,L"%s\\%ls",relativeBuffer,currentRecord.MD5);
     INT64 sizeResult = XWF_GetItemSize(nItemID);
     if (sizeResult < 0)
     {

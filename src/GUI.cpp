@@ -1287,16 +1287,16 @@ int startProcess()
             return 1;
         }
         extractInfo.GriffeyeCaseLocation = new wchar_t[length + 40];
-        swprintf(extractInfo.GriffeyeCaseLocation,L"%s",buffer);
+        swprintf(extractInfo.GriffeyeCaseLocation,length + 40,L"%s",buffer);
         buffer[0]='\0';
         length = GetWindowTextLength(GriffeyeSettings);
         GetWindowText(GriffeyeSettings,buffer,1024);
         if (length != 0){
             wchar_t pathBuffer[2048];
-            swprintf(pathBuffer,L"%ls%s",GriffeyeConfigPath,buffer);
+            swprintf(pathBuffer,2048,L"%ls%s",GriffeyeConfigPath,buffer);
             if (ifFileExistsW(pathBuffer)){
                 extractInfo.GriffeyeSettingsName = new wchar_t[length + 10];
-                swprintf(extractInfo.GriffeyeSettingsName,L"%s",buffer);
+                swprintf(extractInfo.GriffeyeSettingsName,length + 10,L"%s",buffer);
                 buffer[0]='\0';
             }
             else{
@@ -1308,7 +1308,7 @@ int startProcess()
         length = GetWindowTextLength(GriffeyeCase);
         GetWindowText(GriffeyeCase,buffer,1024);
         extractInfo.GriffeyeCaseName = new wchar_t[length + 10];
-        swprintf(extractInfo.GriffeyeCaseName,L"%s",buffer);
+        swprintf(extractInfo.GriffeyeCaseName,length + 10,L"%s",buffer);
         buffer[0]='\0';
     }
     if (extractInfo.extractPictures)
@@ -1340,7 +1340,7 @@ int startProcess()
             buffer[pathLen] = '\\';
             buffer[pathLen+1] = '\0';
         }
-        swprintf(extractInfo.C4PPath,L"%s",buffer);
+        swprintf(extractInfo.C4PPath,1024,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
@@ -1377,7 +1377,7 @@ int startProcess()
             buffer[pathLen] = '\\';
             buffer[pathLen+1] = '\0';
         }
-        swprintf(extractInfo.C4MPath,L"%s",buffer);
+        swprintf(extractInfo.C4MPath,1024,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
@@ -1390,7 +1390,7 @@ int startProcess()
     for (int i = 0;i<extractInfo.noNames;i++)
     {
         GetWindowText(TxtNewName[i],buffer,1024);
-        swprintf(extractInfo.nameList[i].prefName,L"%s",buffer);
+        swprintf(extractInfo.nameList[i].prefName,1024,L"%s",buffer);
         buffer[0]='\0';
     }
     HRESULT error = CoCreateGuid(&vCaseData.caseGuid);

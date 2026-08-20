@@ -61,7 +61,7 @@ int setArchivePath(wchar_t* path, int flags)
     wchar_t* tempStr;
     int pathLen = wcslen(path) + 64;
     tempStr = new wchar_t[pathLen];
-    swprintf(tempStr,L"%lsJSON export.zip",path);
+    swprintf(tempStr,pathLen,L"%lsJSON export.zip",path);
     if (flags & SET_PIC_PATH)
     {
         archivePic = convertWideToChar(tempStr);
