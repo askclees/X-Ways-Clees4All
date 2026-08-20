@@ -314,6 +314,10 @@ int setupVics(sqlite3** sqlDB)
  *
  * Records are inserted via insertEvObjRecord.
  *
+ * Note: record.Name and record.SourceID are heap-allocated here and passed to
+ * insertEvObjRecord, which binds them with SQLITE_STATIC without taking ownership;
+ * neither is freed after the call, so both leak once per evidence object.
+ *
  * @param sqlDB Handle to the in-memory SQLite database.
  * @param evObj Handle to the evidence object whose properties are to be recorded.
  *
@@ -463,13 +467,17 @@ void setParentSelected(sqlite3* sqlDB, DWORD parentID)
 /**
  * @brief Inserts a SQLite record for an evidence object.
  *
- * Note: a possible memory leak may occur if an error is encountered.
+ * The prepared statement is finalized on every return path, including bind and
+ * step failures, so no leak occurs within this function itself. record.Name and
+ * record.SourceID are bound with SQLITE_STATIC (the caller retains ownership);
+ * see createSQLNameList for the actual lifetime of those buffers.
  *
  * @param sqlDB  Handle to the in-memory SQLite database.
  * @param record Reference to an EvidenceProps struct containing the data to insert.
- * @return 0 on success, -1 if the query could not be prepared, -2 if the query could not be executed.
+ * @return 0 on success, -1 if the query could not be prepared or bound, -2 if the query could not be executed.
  *
  * @see checkParentObjectsSelected
+ * @see createSQLNameList
  */
 int insertEvObjRecord(sqlite3* sqlDB, EvidenceProps &record)
 {
