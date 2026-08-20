@@ -1476,7 +1476,7 @@ int getGriffeyeDetails()
                 {
                     //line 1 - inv title
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1486,7 +1486,7 @@ int getGriffeyeDetails()
                 {
                     //line 2 - contact email
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1496,7 +1496,7 @@ int getGriffeyeDetails()
                 {
                     //line 3 - phone number
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1506,7 +1506,7 @@ int getGriffeyeDetails()
                 {
                     //line 2 - organisation
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
