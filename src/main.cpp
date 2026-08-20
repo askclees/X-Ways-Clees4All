@@ -704,11 +704,20 @@ int getCaseOptions()
     //create C4P/M output files if applicable
     if (extractInfo.C4ALLExport)
     {
-        int check = createC4POutput();
-        if (check !=0)
+        if (extractInfo.noNames > MAX_OUTPUT_FILES)
         {
-            //error creating files
-            return -1;
+            //the GUI path already blocks this before Start is pressed (see IDC_BTN_OK in GUI.cpp);
+            //this covers the command-line (xtparam:) path, which skips that dialog entirely
+            XWF_OutputMessage(L"C4All XML output cannot be used with more than 64 evidence objects in the case; skipping C4All XML output",0);
+        }
+        else
+        {
+            int check = createC4POutput();
+            if (check !=0)
+            {
+                //error creating files
+                return -1;
+            }
         }
     }
     if (extractInfo.VICSCompressed)
