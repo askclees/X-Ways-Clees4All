@@ -679,12 +679,20 @@ int getCaseOptions()
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4PPath);
-            CreateDirectory(buffer,NULL);
+            if (!CreateDirectory(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                XWF_OutputMessage(L"Unable to create picture output Files directory",0);
+                return -1;
+            }
         }
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4MPath);
-            CreateDirectory(buffer,NULL);
+            if (!CreateDirectory(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                XWF_OutputMessage(L"Unable to create video output Files directory",0);
+                return -1;
+            }
         }
     }
     //update database with new names
