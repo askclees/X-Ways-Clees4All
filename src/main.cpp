@@ -745,6 +745,8 @@ int getCommandLineOptions()
     if (argv == NULL)
     {
         XWF_OutputMessage(L"CommandLineToArgvW Failed\n",0);
+        if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions End - CommandLineToArgvW Failed");}
+        return 0;
     }
     if (numArgv == 1)
     {
