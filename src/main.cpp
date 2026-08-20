@@ -1705,10 +1705,11 @@ int caseCleanup()
         delete[] extractInfo.nameList;
         extractInfo.nameList = NULL;
     }
-    if (extractInfo.VICSCompressed)
-    {
-        closeZipArchives();
-    }
+    //always called (not just when VICSCompressed was set this run) - closeZipArchive nulls each
+    //pointer after freeing, so this is safe even when nothing was actually opened, and it's the
+    //only thing that prevents a stale archive pointer from a run that DID use VICSCompressed
+    //from surviving into a later run in the same X-Ways session that doesn't
+    closeZipArchives();
     cleanupArchivePaths();
     extractInfo.noNames = 0;
     freeVicsCaseData();

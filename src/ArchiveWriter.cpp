@@ -207,9 +207,14 @@ int closeZipArchiveEntry(struct archive** archFile, struct archive_entry* entry)
  */
 int closeZipArchive(struct archive** archFile)
 {
-    if (archive_write_free(*archFile)!=ARCHIVE_OK)
-        return ERROR_CLOSE;
-    return SUCCESS;
+    //archive_write_free releases all resources regardless of its return code, so the pointer
+    //must always be nulled here - otherwise a stale pointer from this run can be mistaken for
+    //a live archive by setupZipArchives()/selectArchiveObject() on a later run in the same
+    //X-Ways session (e.g. switching between a combined and a separate picture/video output
+    //config leaves whichever archive pointer the new config doesn't use dangling)
+    int result = (archive_write_free(*archFile)!=ARCHIVE_OK) ? ERROR_CLOSE : SUCCESS;
+    *archFile = NULL;
+    return result;
 }
 
 /**
