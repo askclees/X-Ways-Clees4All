@@ -2254,7 +2254,7 @@ int extractMediaFileRecordDetails(LONG nItemID,wchar_t MD5Hash[33], int picture,
     //add source
     record->sourceID = new wchar_t[128];
     record->sourceID[0] = L'\0';
-    swprintf(record->sourceID,L"%ls",currSrcID);
+    swprintf(record->sourceID,128,L"%ls",currSrcID);
     record->XWFitemID = nItemID;
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"extractMediaFileRecordDetails End");}
     return 0;
