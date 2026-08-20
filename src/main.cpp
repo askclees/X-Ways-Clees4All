@@ -634,6 +634,18 @@ int getCaseOptions()
 {
     if (extractInfo.debugSet){debugWriteDetails("Start of getCaseOptions Function");}
     vicPicCounter = 0;
+    vicMovieCounter = 0;
+    //C4PPath/C4MPath are freed and NULLed by caseCleanup() at the end of every run, but only
+    //ever allocated once, in XT_Init, for the very first run - free-if-non-null then reallocate
+    //fresh here (safe on both the first run, where XT_Init already allocated it, and any later
+    //run in the same X-Ways session, where it's NULL) so processing never writes through a
+    //dangling/NULL pointer
+    if (extractInfo.C4PPath != NULL) { delete[] extractInfo.C4PPath; }
+    extractInfo.C4PPath = new wchar_t[1024];
+    extractInfo.C4PPath[0] = L'\0';
+    if (extractInfo.C4MPath != NULL) { delete[] extractInfo.C4MPath; }
+    extractInfo.C4MPath = new wchar_t[1024];
+    extractInfo.C4MPath[0] = L'\0';
     extractInfo.extractPictures= TRUE;
     extractInfo.extractVideos= TRUE;
     //before we create window, get evidence object list
