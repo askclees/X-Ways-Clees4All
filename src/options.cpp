@@ -366,7 +366,7 @@ void BTN_OK_CLICK(HWND hwnd)
  */
 void BTN_GRIFFEYE_CLICK()
 {
-    TCHAR path[2048];
+    TCHAR path[2048]={0};
     BROWSEINFO folderDialog = {0};
     folderDialog.lpszTitle = ("Select Griffeye Folder");
     folderDialog.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
@@ -374,8 +374,10 @@ void BTN_GRIFFEYE_CLICK()
     LPITEMIDLIST pidl = SHBrowseForFolder(&folderDialog);
     if (pidl != 0)
     {
-        SHGetPathFromIDList(pidl,path);
-        SetWindowText(GriffeyeLocation,path);
+        if (SHGetPathFromIDList(pidl,path))
+        {
+            SetWindowText(GriffeyeLocation,path);
+        }
         CoTaskMemFree(pidl);
     }
 }
@@ -385,7 +387,7 @@ void BTN_GRIFFEYE_CLICK()
  */
 void BTN_REPORTOUTPUT_CLICK()
 {
-    TCHAR path[2048];
+    TCHAR path[2048]={0};
     BROWSEINFO folderDialog = {0};
     folderDialog.lpszTitle = ("Select Report Output Folder");
     folderDialog.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
@@ -393,8 +395,10 @@ void BTN_REPORTOUTPUT_CLICK()
     LPITEMIDLIST pidl = SHBrowseForFolder(&folderDialog);
     if (pidl != 0)
     {
-        SHGetPathFromIDList(pidl,path);
-        SetWindowText(ReportOutput,path);
+        if (SHGetPathFromIDList(pidl,path))
+        {
+            SetWindowText(ReportOutput,path);
+        }
         CoTaskMemFree(pidl);
     }
 }
