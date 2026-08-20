@@ -606,8 +606,10 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
 {
     recMedia.MediaID = sqlite3_column_int64(statement,0);
     recMedia.Category = sqlite3_column_int(statement,1);
+    //a valid SHA1 is exactly 40 hex characters (80 bytes as UTF-16); reject anything else
+    //rather than silently truncating a corrupted value
     int CheckSize = sqlite3_column_bytes16(statement,2);
-    if (CheckSize < 10)
+    if (CheckSize != 80)
     {
         recMedia.SHA1[0] = L'\0';
     }
