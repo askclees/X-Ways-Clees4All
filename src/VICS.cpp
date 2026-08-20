@@ -107,6 +107,7 @@ int closeVICSFile(FILE* vFile)
 	int check = fprintf(vFile,"\t]\r\n\t}]\r\n\t}");
 	if (check<0)
 	{
+		fclose(vFile);
 		return 2;
 	}
 	return fclose(vFile);
