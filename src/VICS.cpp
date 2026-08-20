@@ -258,25 +258,22 @@ void initializeSegmentRecord(VICSSegment& record)
 void deallocateVICSRecord(VICSRecord record)
 {
     deallocateMediaRecord(record.vMedia);
-    if (record.noMediaFiles !=0)
+    //vMediaFiles/vMediaMetaData are allocated unconditionally (even as new T[0]) by the caller,
+    //so they must always be deleted here too - delete[] on a valid pointer is always safe/required,
+    //whether or not the count is 0
+    for (int i=0;i<record.noMediaFiles;i++)
     {
-        for (int i=0;i<record.noMediaFiles;i++)
-        {
-            deallocateMediaFileRecord(record.vMediaFiles[i]);
-        }
-        delete[] record.vMediaFiles;
-        record.noMediaFiles= 0;
+        deallocateMediaFileRecord(record.vMediaFiles[i]);
     }
+    delete[] record.vMediaFiles;
+    record.noMediaFiles= 0;
     //1.41 add cleaning of media metadata records
-    if (record.noMediaMetadata !=0)
+    for (int i=0;i<record.noMediaMetadata;i++)
     {
-        for (int i=0;i<record.noMediaMetadata;i++)
-        {
-            deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
-        }
-        delete[] record.vMediaMetaData;
-        record.noMediaMetadata= 0;
+        deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
     }
+    delete[] record.vMediaMetaData;
+    record.noMediaMetadata= 0;
 }
 
 /**

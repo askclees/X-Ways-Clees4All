@@ -1974,50 +1974,38 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
     }
     //bind record variables
     rc = sqlite3_bind_text16(statement,1,record->fileName,wcslen(record->fileName)*sizeof(wchar_t),SQLITE_STATIC);
-    if (rc != SQLITE_OK){
-        XWF_OutputMessage(L"Error Binding file name",0);
-        sqlite3_finalize(statement);
-        delete[] sqlQuery;
-        return -3;
-    }
-    rc = sqlite3_bind_text16(statement,2,record->filePath,wcslen(record->filePath)*sizeof(wchar_t),SQLITE_STATIC);
-    if (rc != SQLITE_OK){
-        XWF_OutputMessage(L"Error Binding file name",0);
-        sqlite3_finalize(statement);
-        delete[] sqlQuery;
-        return -3;
-    }
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,2,record->filePath,wcslen(record->filePath)*sizeof(wchar_t),SQLITE_STATIC);
     //bind filetimes
     ULARGE_INTEGER timestamp;
     timestamp.HighPart = record->created.dwHighDateTime;
     timestamp.LowPart = record->created.dwLowDateTime;
-    sqlite3_bind_int64(statement,3,timestamp.QuadPart);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,3,timestamp.QuadPart);
     timestamp.HighPart = record->written.dwHighDateTime;
     timestamp.LowPart = record->written.dwLowDateTime;
-    sqlite3_bind_int64(statement,4,timestamp.QuadPart);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,4,timestamp.QuadPart);
     timestamp.HighPart = record->accessed.dwHighDateTime;
     timestamp.LowPart = record->accessed.dwLowDateTime;
-    sqlite3_bind_int64(statement,5,timestamp.QuadPart);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,5,timestamp.QuadPart);
     //bind other attributes
-    if (record->unallocated) { sqlite3_bind_int(statement,6,1);} else {sqlite3_bind_int(statement,6,0);}
-    rc = sqlite3_bind_text16(statement,7,record->sourceID,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,6,record->unallocated ? 1 : 0);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,7,record->sourceID,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,8,record->physicalLocation);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,9,record->deleted ? 1 : 0);
+    //bind parent attributes
+    if (rc == SQLITE_OK) rc = (record->parentMD5[0] != '\0') ? sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC) : sqlite3_bind_text16(statement,10,L"",-1,SQLITE_TRANSIENT);
+    if (rc == SQLITE_OK) rc = (record->parentName != NULL) ? sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC) : sqlite3_bind_text16(statement,11,L"",-1,SQLITE_TRANSIENT);
+    if (rc == SQLITE_OK) rc = (record->parentFilePath != NULL) ? sqlite3_bind_text16(statement,12,record->parentFilePath,-1,SQLITE_STATIC) : sqlite3_bind_text16(statement,12,L"",-1,SQLITE_TRANSIENT);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,13,record->parentPhysLoc);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,14,record->XWFitemID);
+    //bind parameters
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,15,MD5,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,16,dupItemID);
     if (rc != SQLITE_OK){
-        XWF_OutputMessage(L"Error Binding Source ID",0);
+        XWF_OutputMessage(L"Error binding media file update values",0);
         sqlite3_finalize(statement);
         delete[] sqlQuery;
         return -3;
     }
-    sqlite3_bind_int64(statement,8,record->physicalLocation);
-    if (record->deleted) { sqlite3_bind_int(statement,9,1);} else {sqlite3_bind_int(statement,9,0);}
-    //bind parent attributes
-    if (record->parentMD5[0] != '\0') { sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC); } else { sqlite3_bind_text16(statement,10,L"",-1,SQLITE_TRANSIENT); }
-    if (record->parentName != NULL) { sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,11,L"",-1,SQLITE_TRANSIENT); }
-    if (record->parentFilePath != NULL) { sqlite3_bind_text16(statement,12,record->parentFilePath,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,12,L"",-1,SQLITE_TRANSIENT); }
-    sqlite3_bind_int64(statement,13,record->parentPhysLoc);
-    sqlite3_bind_int(statement,14,record->XWFitemID);
-    //bind parameters
-    rc = sqlite3_bind_text16(statement,15,MD5,-1,SQLITE_STATIC);
-    rc = sqlite3_bind_int(statement,16,dupItemID);
     //step statement
     rc = sqlite3_step(statement);
     if (rc != SQLITE_DONE)

@@ -67,7 +67,8 @@ struct VICSMedia
     wchar_t* RelativeFilePath;
     /** @brief Date the media record was last updated. */
     FILETIME DateUpdated;
-    /** @brief Timezone offset in hours (not in the VICS standard; currently unused). */
+    /** @brief Timezone offset in hours (not in the VICS standard); applied to DateUpdated in the JSON export,
+     *  but nothing in the codebase currently sets this to a value other than its 0 default. */
     int timeZone;
     /** @brief True if the media has been pre-categorised. */
     BOOL IsPreCat;
