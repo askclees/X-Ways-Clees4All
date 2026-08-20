@@ -2501,7 +2501,7 @@ int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
     //get filename/path
     picFile.fullPath = getFullPath(currSrcID,nItemID,false);
     removeInvalidChars(picFile.fullPath);
-    picFile.fullPath = replaceInvalidXMLChars(picFile.fullPath);
+    //fullPath is written into a CDATA section in writeXML, which needs no entity escaping
     //get physical location and offset
     INT64 ds;
     XWF_GetItemOfs(nItemID,(INT64*)&ds,(INT64*)&picFile.physicalSector);
