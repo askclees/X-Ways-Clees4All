@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <set>
 #include <string>
+#include <utility>
 
 //project includes
 #include "ArchiveWriter.h"
@@ -31,8 +32,10 @@ struct archive* ArchVid=nullptr;
 /** @brief libarchive write object used when picture and video paths are the same. */
 struct archive* ArchAll=nullptr;
 
-/** @brief Set of MD5 hash strings for files already written to the archive, used for deduplication. */
-std::set<std::string> hashList;
+/** @brief Set of (destination archive, MD5 hash) pairs for files already written, used for deduplication.
+ *  Keyed per destination archive object so a hash written to one archive (e.g. ArchVid) doesn't
+ *  suppress writing it to a different, separate archive (e.g. ArchPic). */
+std::set<std::pair<struct archive*, std::string>> hashList;
 
 /** @brief Critical section preventing simultaneous writes to a zip archive. */
 CRITICAL_SECTION archiveLock;
@@ -331,10 +334,12 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
 {
     EnterCriticalSection(&archiveLock);
     char* filePath = generateCompressedPath(fileName);
+    struct archive *outa = selectArchiveObject(picFile);
     bool fileFound = false;
     std::wstring wFileName(fileName);
     std::string hashValue(wFileName.begin(), wFileName.end());
-    fileFound = hashList.count(hashValue);
+    auto hashKey = std::make_pair(outa, hashValue);
+    fileFound = hashList.count(hashKey);
 
     if (fileFound)
     {
@@ -353,7 +358,6 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
         delete[] filePath;
         return 1;
     }
-    struct archive *outa = selectArchiveObject(picFile);
     struct archive_entry *entry;
     if (createZipArchiveEntry(&outa,&entry,filePath,fileSize) != SUCCESS)
     {
@@ -403,7 +407,7 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
     XWF_Close(hItem);
     delete[] buffer;
     closeZipArchiveEntry(&outa, entry);
-    hashList.insert(hashValue);
+    hashList.insert(hashKey);
     //end of function, unlock file
     LeaveCriticalSection(&archiveLock);
     delete[] filePath;
