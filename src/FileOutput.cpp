@@ -82,10 +82,12 @@ static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool pi
         pos = snprintf(buffer, maxSize, "%ls\\", extractInfo.C4MPath);
     }
     if (pos < 0) pos = 0;
+    else if (pos > maxSize) pos = maxSize;
     //generate subfolder to split out number of files.
     generateRelativeFilePath(tempBuffer, 128, fileName, false);
     int written = snprintf(buffer + pos, maxSize - pos, "%s", tempBuffer);
     if (written > 0) pos += written;
+    if (pos > maxSize) pos = maxSize;
     //lock folder critical section to stop folder being created twice.
     EnterCriticalSection(&lockFolder);
     if (!ifFileExists(buffer))
