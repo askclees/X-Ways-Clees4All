@@ -191,8 +191,8 @@ static int writeOutputFileSmall(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG 
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of writeOutputFileSmall Function Output");}
     BYTE* buffer = new BYTE[fileSize+1];
     DWORD read = XWF_Read(hItem,0,buffer,fileSize);
-    //sometime file is 1 byte different, account for this.
-    if (read==0 || read < fileSize-1)
+    //sometime file is 1 byte different, account for this. A 0-byte file legitimately reads 0 bytes.
+    if (fileSize != 0 && (read==0 || read < fileSize-1))
     {
         XWF_Close(hItem);
         delete[] buffer;
