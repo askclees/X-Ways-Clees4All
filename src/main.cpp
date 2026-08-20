@@ -2837,18 +2837,29 @@ int writeRecords(sqlite3* database,FILE* vicFile, int picture)
         closeVICSFile(vicFile);
         return 0;
     }
+    bool wroteAnyRecord = false;
     for (int i=0;i<noRecords;i++)
     {
         VICSRecord currentRecord;
         extractVICSMediaSQL(currentRecord.vMedia,statement);
         int result = extractIntoVicsRecord(vicsDB,&currentRecord,(wchar_t*)&currentRecord.vMedia.MD5,picture);
         if (result == 0){
-            //success now write record
-            writeMediaRecord(vicFile, &currentRecord);
-        }
-        if (i != noRecords -1){
-            //not last record, add seperator
-            fprintf(vicFile,",\r\t\t");
+            //separator goes before each successful record (except the first), not after every
+            //iteration by index - a record can be skipped below (or extractIntoVicsRecord can
+            //fail above) without there being anything on either side of an index-based comma
+            if (wroteAnyRecord)
+            {
+                fprintf(vicFile,",\r\t\t");
+            }
+            int writeResult = writeMediaRecord(vicFile, &currentRecord);
+            if (writeResult == 0)
+            {
+                wroteAnyRecord = true;
+            }
+            else
+            {
+                XWF_OutputMessage(L"Error writing VICS media record; record skipped",0);
+            }
         }
         //update screen every 100 records
         if (i % 100==0) {XWF_ShouldStop();}
