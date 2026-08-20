@@ -376,6 +376,7 @@ void BTN_GRIFFEYE_CLICK()
     {
         SHGetPathFromIDList(pidl,path);
         SetWindowText(GriffeyeLocation,path);
+        CoTaskMemFree(pidl);
     }
 }
 
@@ -394,6 +395,7 @@ void BTN_REPORTOUTPUT_CLICK()
     {
         SHGetPathFromIDList(pidl,path);
         SetWindowText(ReportOutput,path);
+        CoTaskMemFree(pidl);
     }
 }
 
