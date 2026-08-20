@@ -1473,12 +1473,12 @@ ExtractOptions extractOldSchemaOptions(sqlite3* db, bool* error)
         else{
             retOpt.overwriteFiles = TRUE;
         }
-        int bytes = sqlite3_column_bytes(statement,2);
-        char* temp = (char*)sqlite3_column_text(statement,2);
-        swprintf(retOpt.errorReportPath, L"%s",temp);
-        bytes = sqlite3_column_bytes(statement,4);
-        char* temp2 = (char*)sqlite3_column_text(statement,4);
-        swprintf(retOpt.GriffeyePath, L"%s",temp2);
+        wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,2);
+        wcsncpy(retOpt.errorReportPath, temp, 2047);
+        retOpt.errorReportPath[2047] = L'\0';
+        wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,4);
+        wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+        retOpt.GriffeyePath[2047] = L'\0';
     }
     sqlite3_finalize(statement);
     return retOpt;
@@ -1524,12 +1524,12 @@ ExtractOptions extractV1SchemaOptions(sqlite3* db, bool* error)
         else{
             retOpt.overwriteFiles = TRUE;
         }
-        int bytes = sqlite3_column_bytes(statement,4);
-        char* temp = (char*)sqlite3_column_text(statement,4);
-        swprintf(retOpt.errorReportPath, L"%s",temp);
-        bytes = sqlite3_column_bytes(statement,6);
-        char* temp2 = (char*)sqlite3_column_text(statement,6);
-        swprintf(retOpt.GriffeyePath, L"%s",temp2);
+        wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,4);
+        wcsncpy(retOpt.errorReportPath, temp, 2047);
+        retOpt.errorReportPath[2047] = L'\0';
+        wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,6);
+        wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+        retOpt.GriffeyePath[2047] = L'\0';
     }
     sqlite3_finalize(statement);
     return retOpt;
@@ -1574,12 +1574,12 @@ ExtractOptions extractV2SchemaOptions(sqlite3* db, bool* error)
         else{
             retOpt.overwriteFiles = TRUE;
         }
-        int bytes = sqlite3_column_bytes(statement,4);
-        char* temp = (char*)sqlite3_column_text(statement,4);
-        swprintf(retOpt.errorReportPath, L"%s",temp);
-        bytes = sqlite3_column_bytes(statement,6);
-        char* temp2 = (char*)sqlite3_column_text(statement,6);
-        swprintf(retOpt.GriffeyePath, L"%s",temp2);
+        wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,4);
+        wcsncpy(retOpt.errorReportPath, temp, 2047);
+        retOpt.errorReportPath[2047] = L'\0';
+        wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,6);
+        wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+        retOpt.GriffeyePath[2047] = L'\0';
         retOpt.TypeStatusFlags = sqlite3_column_int(statement,7);
         retOpt.FileTypeFlag = sqlite3_column_int(statement,8);
     }
