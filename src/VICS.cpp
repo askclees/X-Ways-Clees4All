@@ -436,7 +436,7 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
 
     cJSON* obj = cJSON_CreateObject();
 
-    char md5[33];
+    char md5[33] = {0};
     wcstombs(md5, f->MD5, sizeof(md5));
     md5[32] = '\0';
     cJSON_AddStringToObject(obj, "MD5", md5);
@@ -452,7 +452,7 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
 
     if (f->parentMD5[0] != L'\0')
     {
-        char pmd5[33];
+        char pmd5[33] = {0};
         wcstombs(pmd5, f->parentMD5, sizeof(pmd5));
         pmd5[32] = '\0';
         cJSON_AddStringToObject(obj, "ParentMD5", pmd5);
@@ -483,14 +483,14 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     if (m.Category != 0)
         cJSON_AddNumberToObject(obj, "Category", m.Category);
 
-    char md5[33];
+    char md5[33] = {0};
     wcstombs(md5, m.MD5, sizeof(md5));
     md5[32] = '\0';
     cJSON_AddStringToObject(obj, "MD5", md5);
 
     if (m.SHA1[0] != L'\0')
     {
-        char sha1[41];
+        char sha1[41] = {0};
         wcstombs(sha1, m.SHA1, sizeof(sha1));
         sha1[40] = '\0';
         cJSON_AddStringToObject(obj, "SHA1", sha1);
@@ -523,7 +523,7 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
 
     if (m.PhotoDNA[0] != L'\0')
     {
-        char photodna[256];
+        char photodna[256] = {0};
         wcstombs(photodna, m.PhotoDNA, sizeof(photodna));
         photodna[255] = '\0';
         cJSON_AddStringToObject(obj, "PhotoDNA", photodna);
