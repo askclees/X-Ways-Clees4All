@@ -2337,10 +2337,13 @@ int returnMediaFileRecords(sqlite3* database, sqlite3_stmt** statement, int pict
         if (rc == SQLITE_ROW){
             return retVal;
         }
-        else if (rc == SQLITE_OK){
+        else if (rc == SQLITE_OK || rc == SQLITE_DONE){
             return 0;
         }
         else{
+            //SQL Error - prepare succeeded but step failed; release the statement
+            sqlite3_finalize(*statement);
+            *statement = NULL;
             return -2;
         }
     }
