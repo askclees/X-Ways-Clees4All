@@ -932,7 +932,7 @@ int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText)
         delete[] sqlQuery;
         return -1;
     }
-    rc = sqlite3_bind_text16(statement,1,xName,(nameLen+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,1,xName,nameLen*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
         XWF_OutputMessage(L"Error Binding file name",0);
@@ -941,7 +941,7 @@ int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText)
         delete[] sqlQuery;
         return -3;
     }
-    rc = sqlite3_bind_text16(statement,2,filePath,(pathLen+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,2,filePath,pathLen*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
         XWF_OutputMessage(L"Error Binding file path",0);
@@ -1938,14 +1938,14 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
         return -3;
     }
     //bind record variables
-    rc = sqlite3_bind_text16(statement,1,record->fileName,(wcslen(record->fileName)+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,1,record->fileName,wcslen(record->fileName)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
         sqlite3_finalize(statement);
         delete[] sqlQuery;
         return -3;
     }
-    rc = sqlite3_bind_text16(statement,2,record->filePath,(wcslen(record->filePath)+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,2,record->filePath,wcslen(record->filePath)*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK){
         XWF_OutputMessage(L"Error Binding file name",0);
         sqlite3_finalize(statement);
