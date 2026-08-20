@@ -2466,6 +2466,9 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
             return 0;
         }
         else{
+            //SQL Error - prepare succeeded but step failed; release the statement
+            sqlite3_finalize(*statement);
+            *statement = NULL;
             return -2;
         }
     }
