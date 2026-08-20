@@ -114,7 +114,11 @@ int closeVICSFile(FILE* vFile)
 }
 
 /**
- * @brief Initialises all fields of a VICSMedia record to their zero/null defaults.
+ * @brief Initialises most fields of a VICSMedia record to their zero/null defaults.
+ *
+ * Does not touch PhotoDNA - it already has its own in-class default initializer
+ * ({0}), so every caller here passes a freshly-constructed VICSMedia where it's
+ * already empty.
  *
  * @param record Reference to the VICSMedia struct to initialise.
  */
