@@ -312,11 +312,9 @@ int setupVics(sqlite3** sqlDB)
 /**
  * @brief Creates an SQLite record for each evidence object in the case.
  *
- * Records are inserted via insertEvObjRecord.
- *
- * Note: record.Name and record.SourceID are heap-allocated here and passed to
- * insertEvObjRecord, which binds them with SQLITE_STATIC without taking ownership;
- * neither is freed after the call, so both leak once per evidence object.
+ * Records are inserted via insertEvObjRecord, which binds record.Name/record.SourceID
+ * with SQLITE_STATIC (no ownership transfer) and finalizes the statement before
+ * returning; both heap buffers are freed here afterward.
  *
  * @param sqlDB Handle to the in-memory SQLite database.
  * @param evObj Handle to the evidence object whose properties are to be recorded.
@@ -351,6 +349,8 @@ void createSQLNameList(sqlite3* sqlDB, HANDLE evObj)
         XWF_OutputMessage(L"Error adding evidence object to list",0);
     }
     delete[] buffer;
+    delete[] record.Name;
+    delete[] record.SourceID;
 }
 
 /**
