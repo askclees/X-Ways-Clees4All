@@ -1088,7 +1088,8 @@ int clearExtractionOptionsTable(sqlite3* db)
  *
  * @param sqlDB  Handle to the options SQLite database.
  * @param record ExtractOptions struct containing the values to store.
- * @return 0 on success, -1 if the statement could not be prepared, -2 if execution fails.
+ * @return 0 on success, -1 if the statement could not be prepared, -2 if execution fails,
+ *         -3 if a bind call fails.
  *
  * @see saveOptions
  * @see updateOptionsSchema
@@ -1103,20 +1104,26 @@ int insertOptionsExtraction(sqlite3* sqlDB, ExtractOptions record)
         XWF_OutputMessage(L"Error preparing ExtractionOptions Insert Record",0);
         return -1;
     }
-    rc =sqlite3_bind_int64(stmt, 1, record.minPictureSize);
-    rc =sqlite3_bind_int64(stmt, 2, record.maxPictureSize);
-    rc =sqlite3_bind_int64(stmt, 3, record.minMovieSize);
-    rc =sqlite3_bind_int64(stmt, 4, record.maxMovieSize);
-    rc =sqlite3_bind_text16(stmt, 5, record.errorReportPath,
+    rc = sqlite3_bind_int64(stmt, 1, record.minPictureSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(stmt, 2, record.maxPictureSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(stmt, 3, record.minMovieSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(stmt, 4, record.maxMovieSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(stmt, 5, record.errorReportPath,
                             wcslen(record.errorReportPath)*sizeof(wchar_t), SQLITE_STATIC);
     int overwrite = 0;
     if (record.overwriteFiles) {overwrite = 1;}
-    rc =sqlite3_bind_int(stmt, 6, overwrite);
-    rc =sqlite3_bind_text16(stmt, 7, record.GriffeyePath,
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 6, overwrite);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(stmt, 7, record.GriffeyePath,
                             wcslen(record.GriffeyePath)*sizeof(wchar_t), SQLITE_STATIC);
     //1.51 added new fields
-    rc =sqlite3_bind_int(stmt, 8, record.TypeStatusFlags);
-    rc =sqlite3_bind_int(stmt, 9, record.FileTypeFlag);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 8, record.TypeStatusFlags);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 9, record.FileTypeFlag);
+    if (rc != SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error binding ExtractionOptions Insert Record values",0);
+        sqlite3_finalize(stmt);
+        return -3;
+    }
     rc = sqlite3_step(stmt);
     if (rc!=SQLITE_DONE)
     {
@@ -1208,7 +1215,8 @@ int intToBool(int value)
  *
  * @param db     Handle to the options SQLite database.
  * @param record Pointer to an ExtractionDetails struct containing the settings to persist.
- * @return 0 on success, -1 if the statement could not be prepared.
+ * @return 0 on success, -1 if the statement could not be prepared, -2 if a bind call fails,
+ *         -3 if execution fails.
  *
  * @see readExtractionSettings
  * @see clearExtractionDetails
@@ -1219,41 +1227,44 @@ int insertExtractionDetails(sqlite3* db, ExtractionDetails *record)
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db,updateQuery,-1,&stmt,NULL);
     if (rc != SQLITE_OK) {
-        int extError = sqlite3_extended_errcode(db);
         wchar_t* errormsg = (wchar_t*) sqlite3_errmsg16(db);
         XWF_OutputMessage(errormsg,0);
         XWF_OutputMessage(L"Cannot clear previously used last settings from lastSettings Table",0);
         return -1;
     }
     //bind variables
-    // rc = sqlite3_bind_text16(statement,1,xName,(nameLen+1)*sizeof(wchar_t),SQLITE_STATIC);
     rc = sqlite3_bind_text16(stmt,1,record->C4PPath,-1,SQLITE_STATIC);
-    rc = sqlite3_bind_text16(stmt,2,record->C4MPath,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(stmt,2,record->C4MPath,-1,SQLITE_STATIC);
     //set extraction options
-    rc = sqlite3_bind_int(stmt,3,boolToInt(record->extractPictures));
-    if (rc != SQLITE_OK){
-            int extError = sqlite3_extended_errcode(db);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,3,boolToInt(record->extractPictures));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,4,boolToInt(record->extractVideos));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,5,boolToInt(record->checkParent));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,6,boolToInt(record->ignoreThumbs));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,7,boolToInt(record->exceptMismatch));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,8,boolToInt(record->exportReportTables));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,9,boolToInt(record->debugSet));
+    //griffeye option
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_GRIFFEYE,boolToInt(record->createGriffeye));
+    //output formats
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START,boolToInt(record->VICExport));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+1,boolToInt(record->C4ALLExport));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+2,boolToInt(record->VICSCompressed));
+    if (rc != SQLITE_OK)
+    {
         wchar_t* errormsg = (wchar_t*) sqlite3_errmsg16(db);
         XWF_OutputMessage(errormsg,0);
-        XWF_OutputMessage(L"Cannot clear previously used last settings from lastSettings Table",0);
+        XWF_OutputMessage(L"Error binding lastSettings Insert Record values",0);
+        sqlite3_finalize(stmt);
+        return -2;
     }
-    rc = sqlite3_bind_int(stmt,4,boolToInt(record->extractVideos));
-    rc = sqlite3_bind_int(stmt,5,boolToInt(record->checkParent));
-    rc = sqlite3_bind_int(stmt,6,boolToInt(record->ignoreThumbs));
-    rc = sqlite3_bind_int(stmt,7,boolToInt(record->exceptMismatch));
-    rc = sqlite3_bind_int(stmt,8,boolToInt(record->exportReportTables));
-    rc = sqlite3_bind_int(stmt,9,boolToInt(record->debugSet));
-    //griffeye option
-    rc = sqlite3_bind_int(stmt,OPTION_GRIFFEYE,boolToInt(record->createGriffeye));
-    //output formats
-    rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START,boolToInt(record->VICExport));
-    rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+1,boolToInt(record->C4ALLExport));
-    rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+2,boolToInt(record->VICSCompressed));
-
 
     rc = sqlite3_step(stmt);
     if (rc!= SQLITE_OK && rc != SQLITE_DONE){
-        //error
+        wchar_t* errormsg = (wchar_t*) sqlite3_errmsg16(db);
+        XWF_OutputMessage(errormsg,0);
+        XWF_OutputMessage(L"Error executing lastSettings Insert Record",0);
+        sqlite3_finalize(stmt);
+        return -3;
     }
     sqlite3_finalize(stmt);
     return 0;
