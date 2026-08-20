@@ -2591,7 +2591,7 @@ int getFileName(LPWSTR evObject,LONG nItemID, wchar_t* retValue,long bufferSize)
  * XML paths include the filename; VICS paths contain only the parent directory with
  * backslashes replaced by double-backslashes and pipe characters.
  *
- * @param evObject Evidence object wide string (used as path prefix).
+ * @param evObject Evidence object handle (unused, retained for API symmetry; passed through to getFileName).
  * @param nItemID  X-Ways item ID.
  * @param isVic    TRUE for VICS format, FALSE for XML format.
  * @return Newly allocated wide string containing the path (caller must delete[]).
