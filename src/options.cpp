@@ -328,8 +328,10 @@ void BTN_OK_CLICK(HWND hwnd)
     opt.minPictureSize = getSizeInBytes(drpMinPic,MinPicSize);
     opt.minMovieSize = getSizeInBytes(drpMinVid,MinVidSize);
 
-    char tempPath[MAX_PATH], griffeyeTemp[MAX_PATH];
-    GetWindowText(ReportOutput,tempPath,MAX_PATH);
+    //matches the 1024-byte buffer detailsValid() used to validate this same control,
+    //so a path that passed validation isn't silently truncated here before being saved
+    char tempPath[1024], griffeyeTemp[MAX_PATH];
+    GetWindowText(ReportOutput,tempPath,1024);
     swprintf((wchar_t*)opt.errorReportPath,L"%s",tempPath);
     GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
     swprintf((wchar_t*)opt.GriffeyePath,L"%s",griffeyeTemp);
