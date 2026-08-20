@@ -1911,12 +1911,18 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         //photoDNA Computed
         wchar_t tempBuffer[145]={0};
         int checkVal = getHashValue(nItemID,tempBuffer,144,hashTypePDNA,false);
-        unsigned char* tBuffer = new unsigned char[145];
-        sprintf((char*)tBuffer,"%ls",tempBuffer);
-        char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
-        swprintf(PDNABuffer,L"%s",result);
-        delete[] tBuffer;
-        delete[] result;
+        if (checkVal == 0)
+        {
+            unsigned char* tBuffer = new unsigned char[145];
+            sprintf((char*)tBuffer,"%ls",tempBuffer);
+            char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
+            if (result != NULL)
+            {
+                swprintf(PDNABuffer,L"%s",result);
+                delete[] result;
+            }
+            delete[] tBuffer;
+        }
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 0");}
     return 0;
