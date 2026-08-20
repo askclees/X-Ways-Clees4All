@@ -48,6 +48,13 @@ FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
         delete[] caseNumEsc;
         delete[] caseNumStr;
     }
+	if (vCaseData.ContactName != nullptr) {
+        char* nameStr = convertWideToChar(vCaseData.ContactName);
+        char* nameEsc = jsonEscapeString(nameStr);
+        fprintf(newFile,"\"ContactName\":\"%s\",\r\n\t",nameEsc);
+        delete[] nameEsc;
+        delete[] nameStr;
+    }
 	if (vCaseData.ContactPhone != nullptr) {
         char* phoneStr = convertWideToChar(vCaseData.ContactPhone);
         char* phoneEsc = jsonEscapeString(phoneStr);
