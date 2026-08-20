@@ -48,6 +48,7 @@
 #define IDC_CBO_MINVID              114
 #define IDC_LBX_TYPESTATUS          115
 #define IDC_LBX_FILEFORMAT          116
+#define IDC_TEXT_GRIFFEYELOCATION   117
 
 HWND optHwnd;
 HWND MaxPicSize, txtMaxPicSize, MaxVidSize, txtMaxVidSize, lstOverwrite, lstTxtOverwrite;
@@ -561,7 +562,7 @@ int drawFirstLine(HWND hwnd)
     txtMinPicSize = CreateWindowEx(0,"Static","Minimum Picture size to export:",WS_CHILD|WS_VISIBLE|SS_RIGHT,LeftHandStartX + ((MainWindowWidth-100)/2),FirstLineY,250,20,hwnd,0,GetModuleHandle(NULL),0);
     if (!txtMinPicSize) { outputControlOutputError("txtMinPicSize"); }
 
-    MinPicSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, FirstLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXPICSIZE,GetModuleHandle(NULL),NULL);
+    MinPicSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, FirstLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MINPICSIZE,GetModuleHandle(NULL),NULL);
     if (!MinPicSize) { outputControlOutputError("MinPicSize"); }
 
 
@@ -607,7 +608,7 @@ int drawSecondLine(HWND hwnd)
     txtMinVidSize = CreateWindowEx(0,"Static","Minimum Video size to export:",WS_CHILD|WS_VISIBLE|SS_RIGHT,LeftHandStartX + ((MainWindowWidth-100)/2),SecondLineY,250,20,hwnd,0,GetModuleHandle(NULL),0);
     if (!txtMinVidSize) { outputControlOutputError("txtMinVidSize"); }
 
-    MinVidSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, SecondLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXPICSIZE,GetModuleHandle(NULL),NULL);
+    MinVidSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, SecondLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MINVIDSIZE,GetModuleHandle(NULL),NULL);
     if (!MinVidSize) { outputControlOutputError("MinVidSize"); }
 
 
@@ -682,7 +683,7 @@ int drawFifthLine(HWND hwnd)
 
     char path[2048]={0};
     snprintf(path,sizeof(path),"%ls",extractOpt.GriffeyePath);
-    GriffeyeLocation = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",path,WS_CHILD|WS_VISIBLE,LeftHandStartX+170, FifthLineY ,MainWindowWidth - 230,20,hwnd,(HMENU)IDC_TEXT_REPORTOUTPUT,GetModuleHandle(NULL),NULL);
+    GriffeyeLocation = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",path,WS_CHILD|WS_VISIBLE,LeftHandStartX+170, FifthLineY ,MainWindowWidth - 230,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYELOCATION,GetModuleHandle(NULL),NULL);
     if (!GriffeyeLocation) {outputControlOutputError("GriffeyeLocation");}
 
     cmdGriffeyeLocation = CreateWindowEx(0,"BUTTON","...",WS_CHILD|WS_VISIBLE,MainWindowWidth - 50,FifthLineY,20,20,hwnd,(HMENU)IDC_BTN_GRIFFEYE,GetModuleHandle(NULL),0);
