@@ -389,17 +389,32 @@ static void cjsonAddWide(cJSON* obj, const char* key, const wchar_t* wstr)
 }
 
 /* Add a FILETIME as an ISO 8601 string to a cJSON object.
-   tz is a signed hours offset applied to the DateUpdated field (MediaRecord only).
+   ft is a UTC timestamp. tz is a signed hours offset applied to the DateUpdated
+   field (MediaRecord only); when non-zero, ft is shifted by tz hours so the
+   printed wall-clock time is the local time at that offset, and the string is
+   suffixed with the offset instead of "Z" (a timestamp cannot be both).
    Skips invalid timestamps. */
 static void cjsonAddFiletime(cJSON* obj, const char* key, FILETIME ft, int tz)
 {
     if (!validFiletime(ft)) return;
+
+    if (tz != 0)
+    {
+        ULARGE_INTEGER uli;
+        uli.LowPart  = ft.dwLowDateTime;
+        uli.HighPart = ft.dwHighDateTime;
+        uli.QuadPart += (INT64)tz * 3600LL * 10000000LL; // hours -> 100ns intervals
+        ft.dwLowDateTime  = uli.LowPart;
+        ft.dwHighDateTime = uli.HighPart;
+    }
+
     SYSTEMTIME st;
     if (!FileTimeToSystemTime(&ft, &st)) return;
+
     char buf[64];
     if (tz != 0)
     {
-        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03d%+03d:00Z",
+        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03d%+03d:00",
                  st.wYear, st.wMonth, st.wDay,
                  st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, tz);
     }
