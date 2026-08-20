@@ -52,6 +52,7 @@
 #define IDC_BTN_EMBCHK              123
 #define IDC_BTN_EMBMISCHK           124
 #define IDC_LBL_EXTRACTOPT          125
+#define IDC_TEXT_GRIFFEYESETTINGS   126
 
 #define IDC_TEXT_EVNAME         300
 #define IDC_ENTRY_PANEL         400
@@ -1070,7 +1071,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
         sprintf(message,"Static Text Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
     }
-    GriffeyeSettings = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+175,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYEINVORG,GetModuleHandle(NULL),NULL);
+    GriffeyeSettings = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+175,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYESETTINGS,GetModuleHandle(NULL),NULL);
     if (!GriffeyeSettings)
     {
         int result=GetLastError();
