@@ -43,29 +43,49 @@ FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
 	//1.51 fixed so case number also translates wide characters
     if (vCaseData.CaseNumber != nullptr) {
         char* caseNumStr = convertWideToChar(vCaseData.CaseNumber);
-        fprintf(newFile,"\"CaseNumber\":\"%s\",\r\n\t",caseNumStr);
+        char* caseNumEsc = jsonEscapeString(caseNumStr);
+        fprintf(newFile,"\"CaseNumber\":\"%s\",\r\n\t",caseNumEsc);
+        delete[] caseNumEsc;
         delete[] caseNumStr;
     }
-	if (vCaseData.ContactPhone != nullptr) {fprintf(newFile,"\"ContactPhone\":\"%ls\",\r\n\t",vCaseData.ContactPhone);}
+	if (vCaseData.ContactPhone != nullptr) {
+        char* phoneStr = convertWideToChar(vCaseData.ContactPhone);
+        char* phoneEsc = jsonEscapeString(phoneStr);
+        fprintf(newFile,"\"ContactPhone\":\"%s\",\r\n\t",phoneEsc);
+        delete[] phoneEsc;
+        delete[] phoneStr;
+    }
 	//1.41 - convert details to UTF8
 	if (vCaseData.ContactEmail != nullptr) {
         char* emailStr = convertWideToChar(vCaseData.ContactEmail);
-        fprintf(newFile,"\"ContactEmail\":\"%s\",\r\n\t",emailStr);
+        char* emailEsc = jsonEscapeString(emailStr);
+        fprintf(newFile,"\"ContactEmail\":\"%s\",\r\n\t",emailEsc);
+        delete[] emailEsc;
         delete[] emailStr;
     }
 	if (vCaseData.ContactTitle != nullptr) {
         char* titleStr = convertWideToChar(vCaseData.ContactTitle);
-        fprintf(newFile,"\"ContactTitle\":\"%s\",\r\n\t",titleStr);
+        char* titleEsc = jsonEscapeString(titleStr);
+        fprintf(newFile,"\"ContactTitle\":\"%s\",\r\n\t",titleEsc);
+        delete[] titleEsc;
         delete[] titleStr;
     }
 	if (vCaseData.ContactOrg != nullptr) {
         char* contactStr = convertWideToChar(vCaseData.ContactOrg);
-        fprintf(newFile,"\"ContactOrganization\":\"%s\",\r\n\t",contactStr);
+        char* contactEsc = jsonEscapeString(contactStr);
+        fprintf(newFile,"\"ContactOrganization\":\"%s\",\r\n\t",contactEsc);
+        delete[] contactEsc;
         delete[] contactStr;
     }
     //1.41 changed to use data from struct
 	fprintf(newFile,"\"SourceApplicationName\":\"Clees4All\",\r\n\t");
-	fprintf(newFile,"\"SourceApplicationVersion\":\"%ls\",\r\n\t",progVersion);
+    {
+        char* versionStr = convertWideToChar(progVersion);
+        char* versionEsc = jsonEscapeString(versionStr);
+        fprintf(newFile,"\"SourceApplicationVersion\":\"%s\",\r\n\t",versionEsc);
+        delete[] versionEsc;
+        delete[] versionStr;
+    }
 	fprintf(newFile,"\"Media\":[");
 	fflush(newFile);
 	return newFile;

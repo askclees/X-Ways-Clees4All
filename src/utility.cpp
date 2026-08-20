@@ -91,6 +91,47 @@ char* convertWideToChar(const wchar_t* wString)
 }
 
 /**
+ * @brief Escapes a UTF-8 string for embedding inside a JSON string literal.
+ *
+ * Escapes backslash, double-quote, and control characters per the JSON spec.
+ * Bytes >= 0x80 (UTF-8 continuation/lead bytes) are passed through unchanged.
+ *
+ * The returned buffer is allocated with new[] and must be freed by the caller
+ * using delete[].
+ *
+ * @param input Null-terminated UTF-8 string to escape.
+ * @return      Newly allocated null-terminated escaped string.
+ */
+char* jsonEscapeString(const char* input)
+{
+    size_t len = strlen(input);
+    char* out = new char[len * 6 + 1]; // worst case: every byte -> \u00XX
+    size_t o = 0;
+    for (size_t i = 0; i < len; ++i)
+    {
+        unsigned char c = (unsigned char)input[i];
+        switch (c)
+        {
+            case '\"': out[o++] = '\\'; out[o++] = '\"'; break;
+            case '\\': out[o++] = '\\'; out[o++] = '\\'; break;
+            case '\b': out[o++] = '\\'; out[o++] = 'b';  break;
+            case '\f': out[o++] = '\\'; out[o++] = 'f';  break;
+            case '\n': out[o++] = '\\'; out[o++] = 'n';  break;
+            case '\r': out[o++] = '\\'; out[o++] = 'r';  break;
+            case '\t': out[o++] = '\\'; out[o++] = 't';  break;
+            default:
+                if (c < 0x20)
+                    o += sprintf(out + o, "\\u%04x", c);
+                else
+                    out[o++] = (char)c;
+                break;
+        }
+    }
+    out[o] = '\0';
+    return out;
+}
+
+/**
  * @brief Converts a FILETIME structure to a 64-bit integer.
  *
  * @param inFT FILETIME structure to convert.
