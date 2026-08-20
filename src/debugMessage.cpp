@@ -255,7 +255,7 @@ int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message
 void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
 {
     wchar_t errorMessage[2048];
-    swprintf(errorMessage,2048,L"%ls %lu",errMsg, nItemID);
+    swprintf(errorMessage,2048,L"%ls %ld",errMsg, nItemID);
     EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage(errorMessage,0);
     LeaveCriticalSection(&dbgMessage);
