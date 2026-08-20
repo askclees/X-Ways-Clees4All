@@ -934,6 +934,11 @@ int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText)
 {
     //get file details
     LPWSTR xName = (LPWSTR)XWF_GetItemName(objID);
+    if (xName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", objID);
+        xName = L"*NoName*";
+    }
     int nameLen = wcslen(xName);
     wchar_t* filePath = getFullPath(srcText,objID,1);
     int pathLen = wcslen(filePath);
