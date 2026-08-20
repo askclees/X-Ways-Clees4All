@@ -157,6 +157,10 @@ int createZipArchiveEntry(struct archive** archFile, struct archive_entry** entr
 /**
  * @brief Closes all open zip archives.
  *
+ * Also clears the dedup hashList, since its keys are paired with the archive pointers
+ * being freed here - a stale entry could otherwise collide with an unrelated archive
+ * object a later run happens to allocate at the same address.
+ *
  * @return SUCCESS always.
  *
  * @see closeZipArchive
@@ -166,6 +170,7 @@ int closeZipArchives()
     closeZipArchive(&ArchPic);
     closeZipArchive(&ArchVid);
     closeZipArchive(&ArchAll);
+    hashList.clear();
     return SUCCESS;
 }
 
