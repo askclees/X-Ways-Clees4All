@@ -361,11 +361,21 @@ LONG DLL_EXPORT XT_Finalize(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void
 LONG DLL_EXPORT XT_Done(void* lpReserved)
 {
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function Start");}
-    //caseCleanup must run even if the user closed the options dialog without clicking Start
-    //(or firstRunSetup failed) - it's what resets firstTime and frees extractInfo.nameList, and
-    //is written defensively (NULL-checked) so it's safe to call on a run that never fully started
-    int retVal = caseCleanup();
-    errorReport();
+    //Gate on firstTime, not extractInfo.processStart: firstTime is set the instant firstRunSetup()
+    //(and therefore setupVics(), which opens vicsDB) actually runs, regardless of whether it
+    //succeeded or the user went on to click Start - so this correctly covers the "dialog closed
+    //without Start" case that processStart wrongly skipped (see prior fix), while still skipping
+    //cleanup when XT_Prepare was never called at all this session. That second case is common:
+    //X-Ways calls XT_Init immediately followed by XT_Done, with XT_Prepare never invoked, whenever
+    //it just loads/enumerates the X-Tension. extractInfo.VICExport defaults to TRUE from XT_Init,
+    //so calling caseCleanup() there reaches outputVICSFile()/writeRecords() against a vicsDB that
+    //setupVics() never opened - every SQLite call on it returns SQLITE_MISUSE (21) and
+    //writeRecords reports "Error writing Picture VICS data", on every single X-Tension load.
+    if (firstTime != 0)
+    {
+        caseCleanup();
+        errorReport();
+    }
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function End");}
     return 0;
 }
