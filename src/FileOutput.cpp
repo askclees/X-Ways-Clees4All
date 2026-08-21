@@ -1,7 +1,6 @@
 //standard libraries
 #include <windows.h>
 #include <cstdint>
-#include <mutex>
 #include <shlobj.h>
 
 //local functions
@@ -16,11 +15,16 @@
 /** @brief Maximum number of bytes read from an item in a single pass (4 MiB). */
 #define max_read 4194304LL
 
-/** @brief Mutex serialising file creation to prevent simultaneous writes of the same file. */
-std::mutex lockFile;
+/** @brief Critical section serialising file creation to prevent simultaneous writes of the same file. */
+CRITICAL_SECTION lockFile;
 
-/** @brief Mutex serialising directory creation to prevent duplicate mkdir calls. */
-std::mutex lockFolder;
+/** @brief Critical section serialising directory creation to prevent duplicate mkdir calls. */
+CRITICAL_SECTION lockFolder;
+
+/** @brief Initialises lockFile and lockFolder. Must be called before any output files are written. */
+void initFileOutputLocks()    { InitializeCriticalSection(&lockFile); InitializeCriticalSection(&lockFolder); }
+/** @brief Releases the resources held by lockFile and lockFolder. */
+void destroyFileOutputLocks() { DeleteCriticalSection(&lockFile);     DeleteCriticalSection(&lockFolder); }
 
 /**
  * @brief Generates a relative folder path from an MD5 hash filename.
@@ -78,12 +82,14 @@ static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool pi
         pos = snprintf(buffer, maxSize, "%ls\\", extractInfo.C4MPath);
     }
     if (pos < 0) pos = 0;
+    else if (pos > maxSize) pos = maxSize;
     //generate subfolder to split out number of files.
     generateRelativeFilePath(tempBuffer, 128, fileName, false);
     int written = snprintf(buffer + pos, maxSize - pos, "%s", tempBuffer);
     if (written > 0) pos += written;
-    //lock folder mutex to stop folder being created twice.
-    lockFolder.lock();
+    if (pos > maxSize) pos = maxSize;
+    //lock folder critical section to stop folder being created twice.
+    EnterCriticalSection(&lockFolder);
     if (!ifFileExists(buffer))
     {
         //create directory
@@ -93,7 +99,7 @@ static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool pi
             outputErrorMessage(L"Error creating directory, Error Code:",retVal);
         }
     }
-    lockFolder.unlock();
+    LeaveCriticalSection(&lockFolder);
     written = snprintf(buffer + pos, maxSize - pos, "\\%ls", fileName);
     return 0;
 }
@@ -187,8 +193,8 @@ static int writeOutputFileSmall(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG 
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of writeOutputFileSmall Function Output");}
     BYTE* buffer = new BYTE[fileSize+1];
     DWORD read = XWF_Read(hItem,0,buffer,fileSize);
-    //sometime file is 1 byte different, account for this.
-    if (read==0 || read < fileSize-1)
+    //sometime file is 1 byte different, account for this. A 0-byte file legitimately reads 0 bytes.
+    if (fileSize != 0 && (read==0 || read < fileSize-1))
     {
         XWF_Close(hItem);
         delete[] buffer;
@@ -290,7 +296,7 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
     char outputPath[2048];
     FILE* outputFile;
     generateFilePath(&outputPath[0],2048, fileName, picFile);
-    if (ifFileExists(outputPath))
+    if (!extractOpt.overwriteFiles && ifFileExists(outputPath))
     {
         //no need to re-write file
         //1.41 check filesize first
@@ -301,7 +307,7 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
             return SUCCESS;
         }
     }
-    lockFile.lock();
+    EnterCriticalSection(&lockFile);
     HANDLE hItem;
 
     hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
@@ -309,11 +315,11 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
     {
         errorRaised(nItemID,REPORT_FILEOPEN_ERROR);
         //clear file lock to prevent deadlock
-        lockFile.unlock();
+        LeaveCriticalSection(&lockFile);
         return ERROR_FILE_OPEN;
     }
     outputFile = fopen(outputPath,"wb");
-    lockFile.unlock();
+    LeaveCriticalSection(&lockFile);
     if (outputFile == NULL)
     {
         XWF_Close(hItem);
@@ -331,28 +337,25 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
     outputFile = NULL;
     if (retVal !=0 || closeValue !=0)
     {
-        if (retVal == FILE_ERROR_SIZE)
+        //retry with flush option
+        hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
+        if (hItem != 0)
         {
-            //retry with flush option
-            hItem = XWF_OpenItem(hdlCurrVol,nItemID,0);
-            if (hItem != 0)
+            outputFile = fopen(outputPath,"wb");
+            if (outputFile != NULL)
             {
-                outputFile = fopen(outputPath,"wb");
-                if (outputFile != NULL)
-                {
-                    if (fileSize <= max_read){
-                        retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
-                    }
-                    else {
-                        retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
-                    }
-                    fclose(outputFile);
-                    outputFile = NULL;
+                if (fileSize <= max_read){
+                    retVal = writeOutputFileSmall(outputFile,fileSize,hItem,nItemID);
                 }
-                else
-                {
-                    XWF_Close(hItem);
+                else {
+                    retVal = writeOutputFileLarge(outputFile,fileSize,hItem,nItemID,true);
                 }
+                fclose(outputFile);
+                outputFile = NULL;
+            }
+            else
+            {
+                XWF_Close(hItem);
             }
         }
         if (retVal !=0){

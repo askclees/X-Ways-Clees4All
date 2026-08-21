@@ -10,6 +10,12 @@ extern int _tc_pass, _tc_fail;
         else { _tc_fail++; printf("    FAIL line %d: %s\n", __LINE__, #expr); } \
     } while(0)
 
+#define CHECK_STR_EQ(str, expected) \
+    do { \
+        if ((str) && strcmp((str), (expected)) == 0) { _tc_pass++; } \
+        else { _tc_fail++; printf("    FAIL line %d: expected \"%s\", got \"%s\"\n", __LINE__, (expected), (str) ? (str) : "(null)"); } \
+    } while(0)
+
 #define CHECK_CONTAINS(str, needle) \
     do { \
         if ((str) && strstr((str), (needle))) { _tc_pass++; } \

@@ -24,4 +24,7 @@
 int writeOutputFile(LONG nItemID, bool picFile, wchar_t* fileName, INT64 fileSize, HANDLE hdlCurrVol);
 int generateRelativeFilePath(char* buffer, int sizeBuffer, wchar_t* fileName, bool escapedSlash = false);
 
+void initFileOutputLocks();
+void destroyFileOutputLocks();
+
 #endif // FILEOUTPUT_H_INCLUDED

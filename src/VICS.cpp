@@ -17,28 +17,19 @@ const DWORD minTime = 0x015fffff;
 
 
 
-/*  Section: VICS File Functions  */
-
-/*Function: openVICSFile
-    Function to create new file and write VICS case information to start of file.
-
-    Parameters are a valid file path for the file output and the program version
-
-    Output is not complete (valid) VICS JSON entry as it requires closing via <closeVICSFile>
-
-    Parameters:
-        char* filePath              - NULL terminated string containing filepath for file to be created
-        const wchar_t* progVersion  - Program version provided in Wide character text format
-
-    Returns:
-        FILE* of opened VICS file
-
-    See Also:
-        Related Functions   - <closeVICSFile>
-        Called by           - <setupVicsExport>
-
-*/
-
+/**
+ * @brief Creates a new VICS JSON output file and writes the case header information.
+ *
+ * The output is not a complete VICS JSON entry until closeVICSFile is called to write
+ * the closing brackets.
+ *
+ * @param filePath    NULL-terminated path for the file to be created.
+ * @param progVersion Wide string containing the program version to embed in the header.
+ * @return FILE pointer to the opened VICS file, or NULL on failure.
+ *
+ * @see closeVICSFile
+ * @see setupVicsExport
+ */
 FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
 {
 	FILE* newFile = fopen(filePath,"wb");
@@ -52,63 +43,93 @@ FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
 	//1.51 fixed so case number also translates wide characters
     if (vCaseData.CaseNumber != nullptr) {
         char* caseNumStr = convertWideToChar(vCaseData.CaseNumber);
-        fprintf(newFile,"\"CaseNumber\":\"%s\",\r\n\t",caseNumStr);
+        char* caseNumEsc = jsonEscapeString(caseNumStr);
+        fprintf(newFile,"\"CaseNumber\":\"%s\",\r\n\t",caseNumEsc);
+        delete[] caseNumEsc;
         delete[] caseNumStr;
     }
-	if (vCaseData.ContactPhone != nullptr) {fprintf(newFile,"\"ContactPhone\":\"%ls\",\r\n\t",vCaseData.ContactPhone);}
+	if (vCaseData.ContactName != nullptr) {
+        char* nameStr = convertWideToChar(vCaseData.ContactName);
+        char* nameEsc = jsonEscapeString(nameStr);
+        fprintf(newFile,"\"ContactName\":\"%s\",\r\n\t",nameEsc);
+        delete[] nameEsc;
+        delete[] nameStr;
+    }
+	if (vCaseData.ContactPhone != nullptr) {
+        char* phoneStr = convertWideToChar(vCaseData.ContactPhone);
+        char* phoneEsc = jsonEscapeString(phoneStr);
+        fprintf(newFile,"\"ContactPhone\":\"%s\",\r\n\t",phoneEsc);
+        delete[] phoneEsc;
+        delete[] phoneStr;
+    }
 	//1.41 - convert details to UTF8
 	if (vCaseData.ContactEmail != nullptr) {
         char* emailStr = convertWideToChar(vCaseData.ContactEmail);
-        fprintf(newFile,"\"ContactEmail\":\"%s\",\r\n\t",emailStr);
+        char* emailEsc = jsonEscapeString(emailStr);
+        fprintf(newFile,"\"ContactEmail\":\"%s\",\r\n\t",emailEsc);
+        delete[] emailEsc;
         delete[] emailStr;
     }
 	if (vCaseData.ContactTitle != nullptr) {
         char* titleStr = convertWideToChar(vCaseData.ContactTitle);
-        fprintf(newFile,"\"ContactTitle\":\"%s\",\r\n\t",titleStr);
+        char* titleEsc = jsonEscapeString(titleStr);
+        fprintf(newFile,"\"ContactTitle\":\"%s\",\r\n\t",titleEsc);
+        delete[] titleEsc;
         delete[] titleStr;
     }
 	if (vCaseData.ContactOrg != nullptr) {
         char* contactStr = convertWideToChar(vCaseData.ContactOrg);
-        fprintf(newFile,"\"ContactOrganization\":\"%s\",\r\n\t",contactStr);
+        char* contactEsc = jsonEscapeString(contactStr);
+        fprintf(newFile,"\"ContactOrganization\":\"%s\",\r\n\t",contactEsc);
+        delete[] contactEsc;
         delete[] contactStr;
     }
     //1.41 changed to use data from struct
 	fprintf(newFile,"\"SourceApplicationName\":\"Clees4All\",\r\n\t");
-	fprintf(newFile,"\"SourceApplicationVersion\":\"%ls\",\r\n\t",progVersion);
+    {
+        char* versionStr = convertWideToChar(progVersion);
+        char* versionEsc = jsonEscapeString(versionStr);
+        fprintf(newFile,"\"SourceApplicationVersion\":\"%s\",\r\n\t",versionEsc);
+        delete[] versionEsc;
+        delete[] versionStr;
+    }
 	fprintf(newFile,"\"Media\":[");
 	fflush(newFile);
 	return newFile;
 }
 
-/*Function: closeVICSFile
-    Writes data to VICS file that closes the entries and then closes the file.
-
-    Requires valid FILE* as parameter, should have been opened using openVICSFile
-
-    Parameters:
-        FILE* vFile -   Valid VICS output FILE
-
-    Returns:
-        Int result of fclose function on FILE parameter
-
-    See Also:
-        Related function    -   <openVICSFile>
-        Called by           -   <writeRecords>
-*/
-
+/**
+ * @brief Writes the closing JSON brackets to a VICS file and then closes it.
+ *
+ * @param vFile Valid FILE pointer previously opened by openVICSFile.
+ * @return 0 on success, 1 if vFile is NULL, 2 if writing the closing brackets fails,
+ *         or the result of fclose on error.
+ *
+ * @see openVICSFile
+ * @see writeRecords
+ */
 int closeVICSFile(FILE* vFile)
 {
 	if (vFile == NULL) { return 1;}
 	int check = fprintf(vFile,"\t]\r\n\t}]\r\n\t}");
 	if (check<0)
 	{
+		fclose(vFile);
 		return 2;
 	}
 	return fclose(vFile);
 }
 
-//initialisation records
-void InitializeMediaRecord(VICSMedia& record)
+/**
+ * @brief Initialises most fields of a VICSMedia record to their zero/null defaults.
+ *
+ * Does not touch PhotoDNA - it already has its own in-class default initializer
+ * ({0}), so every caller here passes a freshly-constructed VICSMedia where it's
+ * already empty.
+ *
+ * @param record Reference to the VICSMedia struct to initialise.
+ */
+void initializeMediaRecord(VICSMedia& record)
 {
     record.Category = 0;
     record.MediaID = 0;
@@ -135,14 +156,24 @@ void InitializeMediaRecord(VICSMedia& record)
     record.DateUpdated.dwLowDateTime = 0;
 }
 
-void InitializeAltHashRecord(VICSAltHash& record)
+/**
+ * @brief Initialises all fields of a VICSAltHash record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSAltHash struct to initialise.
+ */
+void initializeAltHashRecord(VICSAltHash& record)
 {
     record.hashName = NULL;
     record.hashValue = NULL;
     record.MD5[0] = L'\0';
 }
 
-void InitializeMediaFileRecord(VICSMediaFile& record)
+/**
+ * @brief Initialises all fields of a VICSMediaFile record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSMediaFile struct to initialise.
+ */
+void initializeMediaFileRecord(VICSMediaFile& record)
 {
     record.deleted = FALSE;
     record.unallocated = FALSE;
@@ -166,7 +197,14 @@ void InitializeMediaFileRecord(VICSMediaFile& record)
     record.physicalLocation = 0;
 }
 
-void InitializeVICSRecord(VICSRecord& record)
+/**
+ * @brief Initialises a VICSRecord and its embedded VICSMedia sub-record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSRecord struct to initialise.
+ *
+ * @see initializeMediaRecord
+ */
+void initializeVICSRecord(VICSRecord& record)
 {
     record.noMediaFiles = 0;
     record.noAltHash = 0;
@@ -174,23 +212,38 @@ void InitializeVICSRecord(VICSRecord& record)
     record.noSegments = 0;
     record.noRepository = 0;
 
-    InitializeMediaRecord(record.vMedia);
+    initializeMediaRecord(record.vMedia);
 }
 
-void InitializeRepositoryRecord(VICSRepository& record)
+/**
+ * @brief Initialises all fields of a VICSRepository record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSRepository struct to initialise.
+ */
+void initializeRepositoryRecord(VICSRepository& record)
 {
     record.repositoryName = NULL;
     record.MD5[0] = L'\0';
 }
 
-void InitializeExifRecord(VICSExif& record)
+/**
+ * @brief Initialises all fields of a VICSExif record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSExif struct to initialise.
+ */
+void initializeExifRecord(VICSExif& record)
 {
     record.propertyName = NULL;
     record.propertyValue = NULL;
     record.MD5 =  NULL;
 }
 
-void InitializeSegmentRecord(VICSSegment& record)
+/**
+ * @brief Initialises all fields of a VICSSegment record to their zero/null defaults.
+ *
+ * @param record Reference to the VICSSegment struct to initialise.
+ */
+void initializeSegmentRecord(VICSSegment& record)
 {
     record.Start = NULL;
     record.End = NULL;
@@ -200,30 +253,41 @@ void InitializeSegmentRecord(VICSSegment& record)
     record.category = 0;
 }
 
-/*Section: VICS Record Deallocation Functions*/
-
+/**
+ * @brief Frees all dynamically allocated memory within a VICSRecord, including its MediaFiles and MediaMetadata.
+ *
+ * @param record The VICSRecord to deallocate (passed by value; sub-records are freed in place).
+ *
+ * @see deallocateMediaRecord
+ * @see deallocateMediaFileRecord
+ * @see deallocateMediaMetadataRecord
+ */
 void deallocateVICSRecord(VICSRecord record)
 {
     deallocateMediaRecord(record.vMedia);
-    if (record.noMediaFiles !=0)
+    //vMediaFiles/vMediaMetaData are allocated unconditionally (even as new T[0]) by the caller,
+    //so they must always be deleted here too - delete[] on a valid pointer is always safe/required,
+    //whether or not the count is 0
+    for (int i=0;i<record.noMediaFiles;i++)
     {
-        for (int i=0;i<record.noMediaFiles;i++)
-        {
-            deallocateMediaFileRecord(record.vMediaFiles[i]);
-        }
-        record.noMediaFiles= 0;
+        deallocateMediaFileRecord(record.vMediaFiles[i]);
     }
+    delete[] record.vMediaFiles;
+    record.noMediaFiles= 0;
     //1.41 add cleaning of media metadata records
-    if (record.noMediaMetadata !=0)
+    for (int i=0;i<record.noMediaMetadata;i++)
     {
-        for (int i=0;i<record.noMediaMetadata;i++)
-        {
-            deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
-        }
-        record.noMediaFiles= 0;
+        deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
     }
+    delete[] record.vMediaMetaData;
+    record.noMediaMetadata= 0;
 }
 
+/**
+ * @brief Frees all dynamically allocated pointer fields within a VICSMedia record.
+ *
+ * @param record Reference to the VICSMedia struct whose fields are to be freed.
+ */
 void deallocateMediaRecord(VICSMedia &record)
 {
     if (record.Comments != NULL) {delete[] record.Comments;}
@@ -234,12 +298,22 @@ void deallocateMediaRecord(VICSMedia &record)
     if (record.Tags != NULL) {delete[] record.Tags;}
 }
 
+/**
+ * @brief Frees the PropertyName and PropertyValue fields within a VICSMediaMetadata record.
+ *
+ * @param record Reference to the VICSMediaMetadata struct whose fields are to be freed.
+ */
 void deallocateMediaMetadataRecord(VICSMediaMetadata &record)
 {
     if (record.PropertyName != NULL) {delete[] record.PropertyName;}
     if (record.PropertyValue != NULL) {delete[] record.PropertyValue;}
 }
 
+/**
+ * @brief Frees all dynamically allocated pointer fields within a VICSMediaFile record.
+ *
+ * @param record Reference to the VICSMediaFile struct whose fields are to be freed.
+ */
 void deallocateMediaFileRecord(VICSMediaFile &record)
 {
     if (record.fileName != NULL) {delete[] record.fileName;}
@@ -249,25 +323,29 @@ void deallocateMediaFileRecord(VICSMediaFile &record)
     if (record.sourceID != NULL) {delete[] record.sourceID;}
 }
 
+/**
+ * @brief Frees all dynamically allocated string fields in the global VICSCaseData struct.
+ */
 void freeVicsCaseData()
 {
-    if (vCaseData.CaseNumber != nullptr)    { delete[] vCaseData.CaseNumber; }
-    if (vCaseData.ContactEmail != nullptr)  { delete[] vCaseData.ContactEmail; }
-    if (vCaseData.ContactName != nullptr)   { delete[] vCaseData.ContactName; }
-    if (vCaseData.ContactOrg != nullptr)    { delete[] vCaseData.ContactOrg; }
-    if (vCaseData.ContactPhone != nullptr)  { delete[] vCaseData.ContactPhone; }
-    if (vCaseData.ContactTitle != nullptr)  { delete[] vCaseData.ContactTitle; }
+    if (vCaseData.CaseNumber != nullptr)    { delete[] vCaseData.CaseNumber;   vCaseData.CaseNumber = nullptr; }
+    if (vCaseData.ContactEmail != nullptr)  { delete[] vCaseData.ContactEmail; vCaseData.ContactEmail = nullptr; }
+    if (vCaseData.ContactName != nullptr)   { delete[] vCaseData.ContactName;  vCaseData.ContactName = nullptr; }
+    if (vCaseData.ContactOrg != nullptr)    { delete[] vCaseData.ContactOrg;   vCaseData.ContactOrg = nullptr; }
+    if (vCaseData.ContactPhone != nullptr)  { delete[] vCaseData.ContactPhone; vCaseData.ContactPhone = nullptr; }
+    if (vCaseData.ContactTitle != nullptr)  { delete[] vCaseData.ContactTitle; vCaseData.ContactTitle = nullptr; }
 }
 
-/*Section: VICS Record Size Functions*/
-
-/*Function: getMediaFileRecordSize
-    Returns the total character count of all variable-length wchar_t* fields in a VICSMediaFile record.
-    Used by insertMediaFileRecord to size the SQL query buffer.
-
-    See Also: <insertMediaFileRecord>
-*/
-
+/**
+ * @brief Returns the total character count of all variable-length wide string fields in a VICSMediaFile record.
+ *
+ * Currently unused: insertMediaFileRecord now builds its query with bound parameters
+ * (a small fixed-size buffer for the query text only), so it no longer needs to size a
+ * buffer from record content length. Left over from before that refactor.
+ *
+ * @param record Reference to the VICSMediaFile struct to measure.
+ * @return Total character count of all non-null wchar_t* fields.
+ */
 INT64 getMediaFileRecordSize(VICSMediaFile &record)
 {
     INT64 retSize=0;
@@ -279,13 +357,16 @@ INT64 getMediaFileRecordSize(VICSMediaFile &record)
     return retSize;
 }
 
-/*Function: getMediaRecordSize
-    Returns the total character count of all variable-length wchar_t* fields in a VICSMedia record.
-    Used by insertMediaRecord to size the SQL query buffer.
-
-    See Also: <insertMediaRecord>
-*/
-
+/**
+ * @brief Returns the total character count of all variable-length wide string fields in a VICSMedia record.
+ *
+ * Currently unused: insertMediaRecord now builds its query with bound parameters
+ * (a small fixed-size buffer for the query text only), so it no longer needs to size a
+ * buffer from record content length. Left over from before that refactor.
+ *
+ * @param record Reference to the VICSMedia struct to measure.
+ * @return Total character count of all non-null wchar_t* fields.
+ */
 INT64 getMediaRecordSize(VICSMedia &record)
 {
     INT64 retSize=0;
@@ -297,8 +378,6 @@ INT64 getMediaRecordSize(VICSMedia &record)
     if (record.MimeType!= NULL) {retSize = retSize + wcslen(record.MimeType);}
     return retSize;
 }
-
-/*Section: cJSON Helper Functions*/
 
 /* Add an INT64 field to a cJSON object as a JSON integer (no double conversion). */
 static void cjsonAddInt64(cJSON* obj, const char* key, INT64 value)
@@ -319,23 +398,38 @@ static void cjsonAddWide(cJSON* obj, const char* key, const wchar_t* wstr)
 }
 
 /* Add a FILETIME as an ISO 8601 string to a cJSON object.
-   tz is a signed hours offset applied to the DateUpdated field (MediaRecord only).
+   ft is a UTC timestamp. tz is a signed hours offset applied to the DateUpdated
+   field (MediaRecord only); when non-zero, ft is shifted by tz hours so the
+   printed wall-clock time is the local time at that offset, and the string is
+   suffixed with the offset instead of "Z" (a timestamp cannot be both).
    Skips invalid timestamps. */
 static void cjsonAddFiletime(cJSON* obj, const char* key, FILETIME ft, int tz)
 {
     if (!validFiletime(ft)) return;
+
+    if (tz != 0)
+    {
+        ULARGE_INTEGER uli;
+        uli.LowPart  = ft.dwLowDateTime;
+        uli.HighPart = ft.dwHighDateTime;
+        uli.QuadPart += (INT64)tz * 3600LL * 10000000LL; // hours -> 100ns intervals
+        ft.dwLowDateTime  = uli.LowPart;
+        ft.dwHighDateTime = uli.HighPart;
+    }
+
     SYSTEMTIME st;
     if (!FileTimeToSystemTime(&ft, &st)) return;
+
     char buf[64];
     if (tz != 0)
     {
-        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03d%+03d:00Z",
+        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03d%+03d:00",
                  st.wYear, st.wMonth, st.wDay,
                  st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, tz);
     }
     else
     {
-        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%07dZ",
+        snprintf(buf, sizeof(buf), "%d-%02d-%02dT%02d:%02d:%02d.%03dZ",
                  st.wYear, st.wMonth, st.wDay,
                  st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
     }
@@ -351,7 +445,7 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
 
     cJSON* obj = cJSON_CreateObject();
 
-    char md5[33];
+    char md5[33] = {0};
     wcstombs(md5, f->MD5, sizeof(md5));
     md5[32] = '\0';
     cJSON_AddStringToObject(obj, "MD5", md5);
@@ -362,12 +456,12 @@ static cJSON* buildMediaFileCJSON(VICSMediaFile* f)
     cjsonAddFiletime(obj, "Written",  f->written,  0);
     cjsonAddFiletime(obj, "Accessed", f->accessed, 0);
 
-    if (f->unallocated) cJSON_AddStringToObject(obj, "Unallocated", "true");
-    if (f->deleted)     cJSON_AddStringToObject(obj, "Deleted",     "true");
+    if (f->unallocated) cJSON_AddTrueToObject(obj, "Unallocated");
+    if (f->deleted)     cJSON_AddTrueToObject(obj, "Deleted");
 
     if (f->parentMD5[0] != L'\0')
     {
-        char pmd5[33];
+        char pmd5[33] = {0};
         wcstombs(pmd5, f->parentMD5, sizeof(pmd5));
         pmd5[32] = '\0';
         cJSON_AddStringToObject(obj, "ParentMD5", pmd5);
@@ -398,22 +492,22 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
     if (m.Category != 0)
         cJSON_AddNumberToObject(obj, "Category", m.Category);
 
-    char md5[33];
+    char md5[33] = {0};
     wcstombs(md5, m.MD5, sizeof(md5));
     md5[32] = '\0';
     cJSON_AddStringToObject(obj, "MD5", md5);
 
     if (m.SHA1[0] != L'\0')
     {
-        char sha1[41];
+        char sha1[41] = {0};
         wcstombs(sha1, m.SHA1, sizeof(sha1));
         sha1[40] = '\0';
         cJSON_AddStringToObject(obj, "SHA1", sha1);
     }
 
-    if (m.VictimID)     cJSON_AddStringToObject(obj, "VictimIdentified",   "true");
-    if (m.OffenderID)   cJSON_AddStringToObject(obj, "OffenderIdentified",  "true");
-    if (m.IsDistributed)cJSON_AddStringToObject(obj, "IsDistributed",       "true");
+    if (m.VictimID)     cJSON_AddTrueToObject(obj, "VictimIdentified");
+    if (m.OffenderID)   cJSON_AddTrueToObject(obj, "OffenderIdentified");
+    if (m.IsDistributed)cJSON_AddTrueToObject(obj, "IsDistributed");
 
     cjsonAddWide(obj, "Comments", m.Comments);
     cjsonAddWide(obj, "Series",   m.Series);
@@ -428,41 +522,37 @@ static cJSON* buildMediaCJSON(VICSMedia& m)
 
     if (m.IsPreCat)
     {
-        cJSON_AddStringToObject(obj, "IsPrecategorized", "true");
+        cJSON_AddTrueToObject(obj, "IsPrecategorized");
         cjsonAddWide(obj, "PrecategorizationSource", m.PrecatSource);
     }
     if (m.IsSuspected)
-        cJSON_AddStringToObject(obj, "IsSuspected", "true");
+        cJSON_AddTrueToObject(obj, "IsSuspected");
 
     cjsonAddWide(obj, "MimeType", m.MimeType);
 
     if (m.PhotoDNA[0] != L'\0')
     {
-        char photodna[256];
+        char photodna[256] = {0};
         wcstombs(photodna, m.PhotoDNA, sizeof(photodna));
+        photodna[255] = '\0';
         cJSON_AddStringToObject(obj, "PhotoDNA", photodna);
     }
 
     return obj;
 }
 
-/*Section: VICS Writing Functions*/
-
-/*Function: writeMediaRecord
-    Writes a single VICS Media record (with its MediaFiles array) to a FILE previously opened
-    with openVICSFile. Uses cJSON to build and serialise the record — all string escaping is
-    handled automatically.
-
-    Returns:
-         0  - success
-        -1  - NULL vicFile or record pointer, or mandatory MD5 absent
-        -2  - cJSON serialisation failure
-
-    See Also:
-        <openVICSFile>
-        <VICSRecord>
-*/
-
+/**
+ * @brief Writes a single VICS Media record (with its MediaFiles array) to an open VICS file.
+ *
+ * Uses cJSON to build and serialise the record; all string escaping is handled automatically.
+ *
+ * @param vicFile FILE pointer previously opened by openVICSFile.
+ * @param record  Pointer to the VICSRecord to write.
+ * @return 0 on success, -1 if vicFile or record is NULL or the mandatory MD5 field is absent,
+ *         -2 if cJSON serialisation fails.
+ *
+ * @see openVICSFile
+ */
 int writeMediaRecord(FILE* vicFile, VICSRecord* record)
 {
     if (vicFile == NULL || record == NULL) return -1;
@@ -482,6 +572,21 @@ int writeMediaRecord(FILE* vicFile, VICSRecord* record)
         cJSON_AddItemToObject(mediaObj, "MediaFiles", filesArray);
     }
 
+    if (record->noMediaMetadata > 0)
+    {
+        cJSON* metaArray = cJSON_CreateArray();
+        for (int i = 0; i < record->noMediaMetadata; i++)
+        {
+            VICSMediaMetadata* m = &record->vMediaMetaData[i];
+            if (m->PropertyName == NULL || m->PropertyValue == NULL) continue;
+            cJSON* metaObj = cJSON_CreateObject();
+            cjsonAddWide(metaObj, "PropertyName",  m->PropertyName);
+            cjsonAddWide(metaObj, "PropertyValue", m->PropertyValue);
+            cJSON_AddItemToArray(metaArray, metaObj);
+        }
+        cJSON_AddItemToObject(mediaObj, "MediaMetadata", metaArray);
+    }
+
     char* jsonStr = cJSON_Print(mediaObj);
     cJSON_Delete(mediaObj);
 
@@ -493,29 +598,36 @@ int writeMediaRecord(FILE* vicFile, VICSRecord* record)
     return 0;
 }
 
-/*Section: VICS SQL Extraction Functions*/
-
-/*Function: extractVICSMediaSQL
-    Functions takes a pointer a VICSMedia record and a sqlite3_stmt
-    Fills in the details from the SQL results into the VICSMedia record
-
-    See also: <VICSMedia>
-*/
-
+/**
+ * @brief Populates a VICSMedia record from the current row of an SQLite statement.
+ *
+ * @param recMedia  Reference to the VICSMedia struct to populate.
+ * @param statement Prepared and stepped SQLite statement positioned on a valid row.
+ *
+ * @see VICSMedia
+ */
 void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
 {
     recMedia.MediaID = sqlite3_column_int64(statement,0);
     recMedia.Category = sqlite3_column_int(statement,1);
+    //a valid SHA1 is exactly 40 hex characters (80 bytes as UTF-16); reject anything else
+    //rather than silently truncating a corrupted value
     int CheckSize = sqlite3_column_bytes16(statement,2);
-    if (CheckSize < 10)
+    if (CheckSize != 80)
     {
         recMedia.SHA1[0] = L'\0';
     }
     else
     {
-        wcscpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2));
+        wcsncpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2), 40);
+        recMedia.SHA1[40] = L'\0';
     }
-    wcscpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3));
+    CheckSize = sqlite3_column_bytes16(statement,3);
+    if (CheckSize == 0) { recMedia.MD5[0] = L'\0'; }
+    else {
+            wcsncpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3), 32);
+            recMedia.MD5[32] = L'\0';
+        }
     recMedia.VictimID = sqlite3_column_int(statement,4);
     recMedia.OffenderID = sqlite3_column_int(statement,5);
     recMedia.IsDistributed = sqlite3_column_int(statement,6);
@@ -539,18 +651,22 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
         }
     recMedia.MediaSize = sqlite3_column_int64(statement,10);
     CheckSize = sqlite3_column_bytes16(statement,11);
-    recMedia.RelativeFilePath =  new wchar_t[CheckSize + 1];
-    wcscpy(recMedia.RelativeFilePath,(wchar_t*)sqlite3_column_text16(statement,11));
+    if (CheckSize == 0) { recMedia.RelativeFilePath = NULL; }
+    else {
+            recMedia.RelativeFilePath =  new wchar_t[CheckSize + 2];
+            wcscpy(recMedia.RelativeFilePath,(wchar_t*)sqlite3_column_text16(statement,11));
+        }
     INT64 timeTmp = sqlite3_column_int64(statement,12);
     FILETIME tmpFileTime;
     memcpy(&tmpFileTime,&timeTmp,sizeof(tmpFileTime));
     recMedia.DateUpdated = tmpFileTime;
     recMedia.timeZone = sqlite3_column_int64(statement,13);
     CheckSize = sqlite3_column_bytes16(statement,14);
-    if (CheckSize == 0) { recMedia.PrecatSource = NULL; }
+    if (CheckSize == 0) { recMedia.PrecatSource = NULL; recMedia.IsPreCat = FALSE; }
     else {
             recMedia.PrecatSource = new wchar_t[CheckSize + 2];
             wcscpy(recMedia.PrecatSource, (wchar_t*)sqlite3_column_text16(statement,14));
+            recMedia.IsPreCat = TRUE;
         }
     recMedia.IsSuspected = sqlite3_column_int64(statement,15);
     CheckSize = sqlite3_column_bytes16(statement,16);
@@ -562,28 +678,41 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
     CheckSize = sqlite3_column_bytes16(statement,17);
     if (CheckSize == 0) { recMedia.PhotoDNA[0] = '\0'; }
         else {
-            wcscpy((wchar_t*)recMedia.PhotoDNA, (wchar_t*)sqlite3_column_text16(statement,17));
+            wcsncpy((wchar_t*)recMedia.PhotoDNA, (wchar_t*)sqlite3_column_text16(statement,17), 255);
+            recMedia.PhotoDNA[255] = L'\0';
         }
 }
 
-/*Function: extractVICSMediaFileSQL
-    Functions takes a pointer a VICSMediaFile record and a sqlite3_stmt
-    Fills in the details from the SQL results into the VICSMediaFile record
-
-    See also: <VICSMediaFile>
-*/
-
+/**
+ * @brief Populates a VICSMediaFile record from the current row of an SQLite statement.
+ *
+ * @param recMediaFile Reference to the VICSMediaFile struct to populate.
+ * @param statement    Prepared and stepped SQLite statement positioned on a valid row.
+ *
+ * @see VICSMediaFile
+ */
 void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement)
 {
-    wcscpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0));
+    int CheckSize = sqlite3_column_bytes16(statement,0);
+    if (CheckSize == 0) { recMediaFile.MD5[0] = L'\0'; }
+    else {
+            wcsncpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+            recMediaFile.MD5[32] = L'\0';
+        }
     //Filename
-    int CheckSize = sqlite3_column_bytes16(statement,1);
-    recMediaFile.fileName =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.fileName, (wchar_t*)sqlite3_column_text16(statement,1));
+    CheckSize = sqlite3_column_bytes16(statement,1);
+    if (CheckSize == 0) { recMediaFile.fileName = NULL; }
+    else {
+            recMediaFile.fileName =  new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.fileName, (wchar_t*)sqlite3_column_text16(statement,1));
+        }
     //file path
     CheckSize = sqlite3_column_bytes16(statement,2);
-    recMediaFile.filePath =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.filePath, (wchar_t*)sqlite3_column_text16(statement,2));
+    if (CheckSize == 0) { recMediaFile.filePath = NULL; }
+    else {
+            recMediaFile.filePath =  new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.filePath, (wchar_t*)sqlite3_column_text16(statement,2));
+        }
     //Created
     INT64 timeTmp = sqlite3_column_int64(statement,3);
     FILETIME tmpFileTime;
@@ -609,15 +738,19 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
     recMediaFile.unallocated = sqlite3_column_int(statement,6);
     //sourceID
     CheckSize = sqlite3_column_bytes16(statement,7);
-    recMediaFile.sourceID =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+    if (CheckSize == 0) { recMediaFile.sourceID = NULL; }
+    else {
+            recMediaFile.sourceID = new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.sourceID, (wchar_t*)sqlite3_column_text16(statement,7));
+        }
     recMediaFile.physicalLocation = sqlite3_column_int64(statement,8);
     recMediaFile.deleted = sqlite3_column_int(statement,9);
     //parentMD5
     CheckSize = sqlite3_column_bytes16(statement,10);
     if (CheckSize == 0) { recMediaFile.parentMD5[0] = L'\0'; }
     else {
-            wcscpy(recMediaFile.parentMD5, (wchar_t*)sqlite3_column_text16(statement,10));
+            wcsncpy(recMediaFile.parentMD5, (wchar_t*)sqlite3_column_text16(statement,10), 32);
+            recMediaFile.parentMD5[32] = L'\0';
         }
     //parentName
     CheckSize = sqlite3_column_bytes16(statement,11);
@@ -633,36 +766,48 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
             recMediaFile.parentFilePath = new wchar_t[CheckSize + 2];
             wcscpy(recMediaFile.parentFilePath, (wchar_t*)sqlite3_column_text16(statement,12));
         }
-    recMediaFile.parentPhysLoc = sqlite3_column_int(statement,13);
+    recMediaFile.parentPhysLoc = sqlite3_column_int64(statement,13);
 }
 
-/*Function: extractVICSMediaMetadataSQL
-    Functions takes a pointer a VICSMediaMetadata record and a sqlite3_stmt
-    Fills in the details from the SQL results into the VICSMediaMetadata record
-
-    See also: <VICSMediaMetadata>
-*/
-
+/**
+ * @brief Populates a VICSMediaMetadata record from the current row of an SQLite statement.
+ *
+ * @param record    Pointer to the VICSMediaMetadata struct to populate.
+ * @param statement Prepared and stepped SQLite statement positioned on a valid row.
+ *
+ * @see VICSMediaMetadata
+ */
 void extractVICSMediaMetadataSQL(VICSMediaMetadata* record,sqlite3_stmt* statement)
 {
-    wcscpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0));
-    int CheckSize = sqlite3_column_bytes16(statement,1);
-    record->PropertyName =  new wchar_t[CheckSize + 2];
-    wcscpy(record->PropertyName, (wchar_t*)sqlite3_column_text16(statement,1));
+    int CheckSize = sqlite3_column_bytes16(statement,0);
+    if (CheckSize == 0) { record->MD5[0] = L'\0'; }
+    else {
+            wcsncpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+            record->MD5[32] = L'\0';
+        }
+    CheckSize = sqlite3_column_bytes16(statement,1);
+    if (CheckSize == 0) { record->PropertyName = NULL; }
+    else {
+            record->PropertyName =  new wchar_t[CheckSize + 2];
+            wcscpy(record->PropertyName, (wchar_t*)sqlite3_column_text16(statement,1));
+        }
     CheckSize = sqlite3_column_bytes16(statement,2);
-    record->PropertyValue =  new wchar_t[CheckSize + 2];
-    wcscpy(record->PropertyValue, (wchar_t*)sqlite3_column_text16(statement,2));
+    if (CheckSize == 0) { record->PropertyValue = NULL; }
+    else {
+            record->PropertyValue =  new wchar_t[CheckSize + 2];
+            wcscpy(record->PropertyValue, (wchar_t*)sqlite3_column_text16(statement,2));
+        }
 }
 
-/*  Section: VICS Validation Functions  */
-
-/*Function: validFiletime
-    Validates a FILETIME: rejects zero, values below minTime, and timestamps more than
-    2 years in the future.  Added in 1.50.
-
-    Returns: true if valid, false otherwise
-*/
-
+/**
+ * @brief Validates a FILETIME value, rejecting zero, implausibly old, and future timestamps.
+ *
+ * Rejects timestamps that are zero, below the minTime constant, or more than two years
+ * in the future relative to the current system time.
+ *
+ * @param timestamp The FILETIME value to validate.
+ * @return true if the timestamp is valid, false otherwise.
+ */
 bool validFiletime(FILETIME timestamp)
 {
     if (timestamp.dwHighDateTime == 0 && timestamp.dwLowDateTime ==0)

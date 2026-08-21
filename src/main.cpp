@@ -6,12 +6,10 @@
 #include <ctime>
 #include <string>
 #include <windows.h>
-#include <mutex>
 #include <shlobj.h>
 #include <climits>
 #include <map>
 #include <excpt.h>
-#include <synchapi.h>
 
 //project headers
 #include "sqlite3.h"
@@ -55,7 +53,7 @@ wchar_t caseTitle[64];
 INT64 noErrorHash;
 int firstTime = 0,currentFileObject,itemCompleted=0, noNames=0;
 LONG lastItemID;
-std::mutex lockC4All, lockVics, updateLock, xwfOutputLock;
+CRITICAL_SECTION lockC4All, lockVics, updateLock, xwfOutputLock;
 //VICSRecord* VICSPics, *VICSMovie;
 
 HANDLE MainWnd, hdlCurrVol;
@@ -78,14 +76,14 @@ const wchar_t* INFO_DELETION[] =    {L"Existing",
 const int max_deletion = 5;
 
 //prototyping
-INT64 Filetime2Unix(INT64 fTime);
+INT64 filetime2Unix(INT64 fTime);
 wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVIC);
 int createC4POutput();
 void removeInvalidChars(wchar_t* strIn);
 
 int createC4AllRecord(LONG nItemID, int picture, wchar_t MD5Hash[33]);
-LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize);
-int UpdateRecords(int picture, long nItemID,hashValueStruct currHash);
+LONG mainItemProcess(LONG nItemID, int picture, INT64 fileSize);
+int updateRecords(int picture, long nItemID,hashValueStruct currHash);
 
 int createVICSRecord(LONG nItemID, int picture,hashValueStruct hashVals);
 
@@ -113,21 +111,45 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize);
 //int writeRecords(FILE* vicFile, int picture);
 int outputVICSFile();
 int writeRecords(sqlite3* database,FILE* vicFile, int picture);
-int writeMediaRecord(FILE* vicFile, VICSRecord &record);
 
 int DeviceTypeCol = -1;
 INT64 getPhysicalOffset(DWORD nItemID);
 INT64 getPhysicalOffset(DWORD nItemID, BOOL* unallocated, BOOL* deleted);
 
 /**
- * @brief DLL entry point — stores the DLL instance handle and module path.
+ * @brief DLL entry point.
+ *
+ * On DLL_PROCESS_ATTACH, stores the DLL instance handle and module path, and
+ * initialises all CRITICAL_SECTION locks used across the DLL. On
+ * DLL_PROCESS_DETACH, releases those same locks.
  *
  * @return TRUE always.
  */
 BOOL APIENTRY DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-	extractInfo.thisDLL = hInstDLL;
-	GetModuleFileNameW(hInstDLL, XT_PATH, MAX_PATH);
+    switch (fdwReason)
+    {
+    case DLL_PROCESS_ATTACH:
+        extractInfo.thisDLL = hInstDLL;
+        GetModuleFileNameW(hInstDLL, XT_PATH, MAX_PATH);
+        InitializeCriticalSection(&lockC4All);
+        InitializeCriticalSection(&lockVics);
+        InitializeCriticalSection(&updateLock);
+        InitializeCriticalSection(&xwfOutputLock);
+        initFileOutputLocks();
+        initArchiveLocks();
+        initDebugLocks();
+        break;
+    case DLL_PROCESS_DETACH:
+        DeleteCriticalSection(&lockC4All);
+        DeleteCriticalSection(&lockVics);
+        DeleteCriticalSection(&updateLock);
+        DeleteCriticalSection(&xwfOutputLock);
+        destroyFileOutputLocks();
+        destroyArchiveLocks();
+        destroyDebugLocks();
+        break;
+    }
     return TRUE;
 }
 
@@ -139,7 +161,7 @@ BOOL APIENTRY DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpvReserved)
  *
  * Checks the X-Ways version and decides if the DLL can be used. Also loads options from SQLite database.
  *
- * @return -1 to prevent use of DLL, 1 if X-Tension is thread-safe, 2 if not thread-safe.
+ * @return -1 to prevent use of DLL, 2 if X-Tension is not thread-safe (always returned on success).
  *
  * @see loadOrCreateOptions
  */
@@ -149,7 +171,7 @@ LONG DLL_EXPORT XT_Init(CallerInfo info, DWORD nFlags, HANDLE hMainWnd, void* lp
     //required if testing command line to set debugger
     //MessageBox(NULL,"Test","Test",MB_OK);
     XT_RetrieveFunctionPointers();
-    int retVal = SQLInit();
+    int retVal = sqlInit();
     if (retVal !=0){
         //error with SQL
         return -1;
@@ -228,7 +250,7 @@ LONG DLL_EXPORT XT_About(HANDLE hParentWnd, PVOID lpReserved)
  *
  * Displays the configuration window on first call, then prepares hash types and volume state.
  *
- * @return -4 if VICS setup fails, -3 if not run from RVS, 3 (XT_PREPARE_CALLPI | XT_PREPARE_CALLPILATE) on success.
+ * @return -4 if VICS setup fails, -3 if not run from RVS or MD5 hash type not configured or getCaseOptions fails, 3 (XT_PREPARE_CALLPI | XT_PREPARE_CALLPILATE) on success.
  *
  * @see determineHashTypes
  * @see getCaseOptions
@@ -274,12 +296,12 @@ LONG DLL_EXPORT XT_Prepare(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void*
 /**
  * @brief Main worker function called per item during RVS processing.
  *
- * Checks whether the item is an exportable media file and calls MainItemProcess if so.
+ * Checks whether the item is an exportable media file and calls mainItemProcess if so.
  *
  * @return 0 always.
  *
  * @see checkItemExport
- * @see MainItemProcess
+ * @see mainItemProcess
  */
 LONG DLL_EXPORT XT_ProcessItem(LONG nItemID, void* lpReserved)
 {
@@ -288,7 +310,7 @@ LONG DLL_EXPORT XT_ProcessItem(LONG nItemID, void* lpReserved)
     INT64 fileSize;
     if (checkItemExport(nItemID,&picture,&fileSize)){
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"XT_ProcessItem - Valid Item");}
-        return MainItemProcess(nItemID, picture, fileSize);
+        return mainItemProcess(nItemID, picture, fileSize);
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"XT_ProcessItem End");}
     return 0;
@@ -338,12 +360,10 @@ LONG DLL_EXPORT XT_Finalize(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void
 
 LONG DLL_EXPORT XT_Done(void* lpReserved)
 {
-    //check if process was exited
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function Start");}
-    if (extractInfo.processStart == FALSE)
-    {
-        return 0;
-    }
+    //caseCleanup must run even if the user closed the options dialog without clicking Start
+    //(or firstRunSetup failed) - it's what resets firstTime and frees extractInfo.nameList, and
+    //is written defensively (NULL-checked) so it's safe to call on a run that never fully started
     int retVal = caseCleanup();
     errorReport();
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function End");}
@@ -375,7 +395,11 @@ int firstRunSetup()
     int result = getCaseOptions();
     if (result !=0) { return -3;}
     INT64 strLen = XWF_GetCaseProp(NULL, 1, &caseTitle,64);
-    if (strLen > 64)
+    if (strLen < 0)
+    {
+        outputErrorMessage(L"XWF_GetCaseProp failed in firstRunSetup");
+    }
+    else if (strLen > 64)
     {
         XWF_OutputMessage(L"Case Title is bigger than 64 chars, truncated",0);
     }
@@ -413,12 +437,12 @@ int createC4POutput()
         }
         if (extractInfo.extractPictures)
         {
-            sprintf(filepath,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4P Index.xml",extractInfo.C4PPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput == NULL)
             {
                 wchar_t errorMessage[2048];
-                swprintf(errorMessage,L"Unable to open file for picture output. Filepath : %s",filepath);
+                swprintf(errorMessage,2048,L"Unable to open file for picture output. Filepath : %s",filepath);
                 XWF_OutputMessage(errorMessage,0);
                 if (extractInfo.debugSet){debugWriteDetails("createC4POutput Function End - Return -1");}
                 return -1;
@@ -429,12 +453,12 @@ int createC4POutput()
         }
         if (extractInfo.extractVideos)
         {
-            sprintf(filepath,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
+            snprintf(filepath,2048,"%ls%ls C4M Index.xml",extractInfo.C4MPath,buffer);
             extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput = createXML(filepath, progVersion);
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput == NULL)
             {
                 wchar_t errorMessage[2048];
-                swprintf(errorMessage,L"Unable to open file for movie output. Filepath : %s",filepath);
+                swprintf(errorMessage,2048,L"Unable to open file for movie output. Filepath : %s",filepath);
                 XWF_OutputMessage(errorMessage,0);
                 if (extractInfo.debugSet){debugWriteDetails("createC4POutput Function End - Return -1");}
                 return -1;
@@ -608,6 +632,18 @@ int getCaseOptions()
 {
     if (extractInfo.debugSet){debugWriteDetails("Start of getCaseOptions Function");}
     vicPicCounter = 0;
+    vicMovieCounter = 0;
+    //C4PPath/C4MPath are freed and NULLed by caseCleanup() at the end of every run, but only
+    //ever allocated once, in XT_Init, for the very first run - free-if-non-null then reallocate
+    //fresh here (safe on both the first run, where XT_Init already allocated it, and any later
+    //run in the same X-Ways session, where it's NULL) so processing never writes through a
+    //dangling/NULL pointer
+    if (extractInfo.C4PPath != NULL) { delete[] extractInfo.C4PPath; }
+    extractInfo.C4PPath = new wchar_t[1024];
+    extractInfo.C4PPath[0] = L'\0';
+    if (extractInfo.C4MPath != NULL) { delete[] extractInfo.C4MPath; }
+    extractInfo.C4MPath = new wchar_t[1024];
+    extractInfo.C4MPath[0] = L'\0';
     extractInfo.extractPictures= TRUE;
     extractInfo.extractVideos= TRUE;
     //before we create window, get evidence object list
@@ -653,12 +689,20 @@ int getCaseOptions()
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4PPath);
-            CreateDirectory(buffer,NULL);
+            if (!CreateDirectory(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                XWF_OutputMessage(L"Unable to create picture output Files directory",0);
+                return -1;
+            }
         }
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4MPath);
-            CreateDirectory(buffer,NULL);
+            if (!CreateDirectory(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                XWF_OutputMessage(L"Unable to create video output Files directory",0);
+                return -1;
+            }
         }
     }
     //update database with new names
@@ -678,6 +722,16 @@ int getCaseOptions()
     //create C4P/M output files if applicable
     if (extractInfo.C4ALLExport)
     {
+        if (extractInfo.noNames > MAX_OUTPUT_FILES)
+        {
+            //the GUI path already blocks this before Start is pressed (see IDC_BTN_OK in GUI.cpp), so
+            //extractInfo.processStart never gets set there. This covers the command-line (xtparam:) path,
+            //which skips that dialog and sets processStart unconditionally in getCommandLineOptions() -
+            //aborting here (propagated up through firstRunSetup/XT_Prepare) is the only way left to stop
+            //before any item is processed with a NULL currPicFile/currVidFile.
+            XWF_OutputMessage(L"C4All XML output cannot be used with more than 64 evidence objects in the case; aborting",0);
+            return -1;
+        }
         int check = createC4POutput();
         if (check !=0)
         {
@@ -689,7 +743,15 @@ int getCaseOptions()
     {
         setArchivePath(extractInfo.C4PPath, SET_PIC_PATH);
         setArchivePath(extractInfo.C4MPath, SET_VID_PATH);
-        setupZipArchives();
+        int archiveCheck = setupZipArchives();
+        if (archiveCheck != SUCCESS)
+        {
+            //ArchPic/ArchVid can end up NULL if only one of the two archives failed to open
+            //(e.g. one output path is unwritable); later archive writes would otherwise
+            //dereference that NULL pointer, so abort here instead
+            XWF_OutputMessage(L"Error setting up compressed archive output",0);
+            return -1;
+        }
     }
     if (extractInfo.debugSet){debugWriteDetails("End of GetCaseOptions function");}
     return 0;
@@ -707,18 +769,27 @@ int getCommandLineOptions()
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions Start");}
     int numArgv;
-    //get commandline options and change to lower case
-    LPWSTR cmdLine = GetCommandLineW();
-    int cmdLineLen = wcslen(cmdLine);
+    //get commandline options and change to lower case - GetCommandLineW() returns a pointer to
+    //the process's own command-line string (documented as such by Microsoft), not a caller-owned
+    //buffer, so it must be copied before being lowercased in place; mutating it directly would
+    //permanently corrupt it for any other in-process code (X-Ways itself, other X-Tensions) that
+    //calls GetCommandLineW() later in the session
+    LPWSTR origCmdLine = GetCommandLineW();
+    int cmdLineLen = wcslen(origCmdLine);
+    wchar_t* cmdLine = new wchar_t[cmdLineLen + 1];
+    wcscpy(cmdLine, origCmdLine);
     for (int j = 0;j<cmdLineLen;j++)
     {
         cmdLine[j]=towlower(cmdLine[j]);
     }
     //split options into delimited sets
     LPWSTR* argv = CommandLineToArgvW(cmdLine,&numArgv);
+    delete[] cmdLine;
     if (argv == NULL)
     {
         XWF_OutputMessage(L"CommandLineToArgvW Failed\n",0);
+        if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions End - CommandLineToArgvW Failed");}
+        return 0;
     }
     if (numArgv == 1)
     {
@@ -766,7 +837,7 @@ int getCommandLineOptions()
     }
     for (int i = 0;i<extractInfo.noNames;i++)
     {
-        swprintf(extractInfo.nameList[i].prefName,L"%ls",extractInfo.nameList[i].actualName);
+        swprintf(extractInfo.nameList[i].prefName,1024,L"%ls",extractInfo.nameList[i].actualName);
         XWF_OutputMessage(extractInfo.nameList[i].prefName,0);
     }
     HRESULT error = CoCreateGuid(&vCaseData.caseGuid);
@@ -774,6 +845,11 @@ int getCommandLineOptions()
     {
         vCaseData.CaseNumber = new wchar_t[128];
         INT64 result = XWF_GetCaseProp(NULL,1,vCaseData.CaseNumber,128);
+        if (result < 0)
+        {
+            outputErrorMessage(L"XWF_GetCaseProp failed in getCommandLineOptions");
+            vCaseData.CaseNumber[0] = L'\0';
+        }
     }
     extractInfo.processStart = TRUE;
     LocalFree(argv);
@@ -876,12 +952,19 @@ void addCaseDetail(wchar_t* strArg)
         extractInfo.VICExport = false;
         extractInfo.VICSCompressed = true;
     }
-    else if (wcsncmp(L"grfset",strArg,6)==0){
+    else if (wcsncmp(L"grfset:",strArg,7)==0){
         size_t valueLen = wcslen(strArg) - 7;
-        extractInfo.GriffeyeSettingsName = new wchar_t[valueLen + 1];
-        memcpy(extractInfo.GriffeyeSettingsName, strArg + 7, valueLen * sizeof(wchar_t));
-        extractInfo.GriffeyeSettingsName[valueLen] = L'\0';
-        XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
+        if (valueLen == 0)
+        {
+            XWF_OutputMessage(L"Error: grfset value empty",0);
+        }
+        else
+        {
+            extractInfo.GriffeyeSettingsName = new wchar_t[valueLen + 1];
+            memcpy(extractInfo.GriffeyeSettingsName, strArg + 7, valueLen * sizeof(wchar_t));
+            extractInfo.GriffeyeSettingsName[valueLen] = L'\0';
+            XWF_OutputMessage(extractInfo.GriffeyeSettingsName,0);
+        }
     }
     else if (wcsncmp(L"exthmbs",strArg,7)==0){
         extractInfo.ignoreThumbs = TRUE;
@@ -917,7 +1000,15 @@ int volumePrepare(HANDLE hEvidence)
     if (versionNo >= 2030){
         DeviceTypeCol = determineColumnNumber(L"Device type");
     }
-    XWF_OutputMessage((LPWSTR)XWF_GetEvObjProp(hEvidence,6,NULL),0);
+    LPWSTR evObjName = (LPWSTR)XWF_GetEvObjProp(hEvidence,6,NULL);
+    if (evObjName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetEvObjProp failed in volumePrepare");
+    }
+    else
+    {
+        XWF_OutputMessage(evObjName,0);
+    }
     //need to fill target value
     DWORD target = getRootObj(vicsDB,currEvidence);
 
@@ -1070,7 +1161,7 @@ int checkItemType(LONG nItemID, int* picture)
             if (retVal == -1){
                     return ERROR_GETITEMTYPEDESC;
             }
-            if (wcsncmp(descr,L"Macromedia Flash",16)!=0)
+            if (wcsncmp(descr,L"Macromedia Flash",16)!=0 || !extractInfo.extractVideos)
             {
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
                 return TYPE_OTHER;
@@ -1142,7 +1233,7 @@ bool validType(LONG nItemID, int* picture)
         if (typeValid == TYPE_OTHER)    {return 0;}
         else{
         //some kind of error
-            if (typeValid == ERROR_GETITEMTYPE){
+            if (typeValid == ERROR_GETITEMTYPE || typeValid == ERROR_GETITEMTYPEDESC){
                 //add file to report table for easier finding
                 errorRaised(nItemID,REPORT_ERROR_TYPE);
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"validType - End return false");}
@@ -1176,20 +1267,41 @@ bool validType(LONG nItemID, int* picture)
 bool isThumbnailObject(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - Start of Function");}
-    if (wcscmp(XWF_GetItemName(nItemID),L"Thumbnail.jpg")!=0){
+    const wchar_t* itemName = XWF_GetItemName(nItemID);
+    if (itemName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", nItemID);
+        return false;
+    }
+    if (wcscmp(itemName, L"Thumbnail.jpg") != 0){
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return False");}
         return false;
     }
     LONG parentID = XWF_GetItemParent(nItemID);
+    if (parentID == -1)
+    {
+        if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return False (no parent)");}
+        return false;
+    }
     DWORD buffLen = 1024 | 0x40000000;
-    wchar_t buffer[1024];
+    wchar_t buffer[1024] = {0};
     LONG itemStatus = XWF_GetItemType(parentID,buffer,buffLen);
+    if (itemStatus == -1)
+    {
+        outputErrorMessage(L"XWF_GetItemType failed in isThumbnailObject for itemID: ", nItemID);
+        return false;
+    }
     if (wcscmp(buffer, L"Pictures")!=0){return false;}
     if (itemStatus == 3 || itemStatus == 5 || itemStatus == 6 ){
         if (extractInfo.exceptMismatch){
             //need to add code to check for report table association here
             buffer[0] = L'\0';
-            DWORD numTables = XWF_GetReportTableAssocs(parentID,buffer,1024);
+            LONG numTables = XWF_GetReportTableAssocs(parentID,buffer,1024);
+            if (numTables < 0)
+            {
+                outputErrorMessage(L"XWF_GetReportTableAssocs failed in isThumbnailObject for itemID: ", nItemID);
+                return true;
+            }
             //return false if its contains mismatch table (i.e. include file), true if not (exclude)
             if (containsThumbnailMismatchTable(buffer,1024)){
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isThumbnailObject - End Return False");}
@@ -1261,30 +1373,30 @@ bool isSelectedFileTypeStatus(LONG nItemID)
 bool isSelectedFileFormatStatus(LONG nItemID)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isSelectedFileFormatStatus - Start of Function");}
-    LONG fileFormat = XWF_GetItemType(nItemID,NULL,0x80000000);
-    fileFormat = (fileFormat & 0xff00) >> 8;
-    if (fileFormat != -1){
-        int typeVal=0;
-        switch(fileFormat){
-        case 0:
-            typeVal = UNKNOWN;
-            break;
-        case 1:
-            typeVal = OK;
-            break;
-        case 2:
-            typeVal = IRREGULAR;
-            break;
-        case 3:
-            typeVal = CORRUPT;
-            break;
-        }
-        if (!(typeVal & extractOpt.FileTypeFlag)){
-            return false;
-        }
+    LONG rawFileFormat = XWF_GetItemType(nItemID,NULL,0x80000000);
+    if (rawFileFormat == -1)
+    {
+        outputErrorMessage(L"XWF_GetItemType returned error in isSelectedFileFormatStatus for itemID: ", nItemID);
+        return true;
     }
-    else{
-        debugWriteDetails(nItemID,L"Error determining File Format Status");
+    LONG fileFormat = (rawFileFormat & 0xff00) >> 8;
+    int typeVal=0;
+    switch(fileFormat){
+    case 0:
+        typeVal = UNKNOWN;
+        break;
+    case 1:
+        typeVal = OK;
+        break;
+    case 2:
+        typeVal = IRREGULAR;
+        break;
+    case 3:
+        typeVal = CORRUPT;
+        break;
+    }
+    if (!(typeVal & extractOpt.FileTypeFlag)){
+        return false;
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"isSelectedFileFormatStatus - End of Function");}
     return true;
@@ -1318,7 +1430,10 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
         }
     }
     *fileSize = XWF_GetItemSize(nItemID);
-    if (*fileSize == -1){
+    if (*fileSize < 0){
+        wchar_t errMsg[256];
+        swprintf(errMsg, 256, L"XWF_GetItemSize returned %lld in checkItemExport for itemID: %ld", *fileSize, nItemID);
+        outputErrorMessage(errMsg);
         errorRaised(nItemID,REPORT_UNKNOWN_FILESIZE);
         return false;
     }
@@ -1359,12 +1474,12 @@ bool checkItemExport(LONG nItemID, int* picture, INT64* fileSize)
  *
  * @see returnHashValue
  * @see writeOutputFile
- * @see UpdateRecords
+ * @see updateRecords
  */
 
-LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
+LONG mainItemProcess(LONG nItemID, int picture, INT64 fileSize)
 {
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"MainItemProcess Start");}
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"mainItemProcess Start");}
     hashValueStruct currHash;
     //start processing item
     int result = returnHashValue(nItemID,(wchar_t*)&currHash.MD5,(wchar_t*)&currHash.SHA1,(wchar_t*)&currHash.photoDNA);
@@ -1376,21 +1491,26 @@ LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
         }
         if (extractInfo.VICSCompressed)
         {//create compressed file here
+            int archiveResult;
             if (picture ==1){
-                writeArchiveFile(nItemID,true,currHash.MD5,fileSize, hdlCurrVol);
+                archiveResult = writeArchiveFile(nItemID,true,currHash.MD5,fileSize, hdlCurrVol);
             }
             else{
-                writeArchiveFile(nItemID,false,currHash.MD5,fileSize, hdlCurrVol);
+                archiveResult = writeArchiveFile(nItemID,false,currHash.MD5,fileSize, hdlCurrVol);
+            }
+            if (archiveResult == ERROR_WRITE)
+            {
+                errorRaised(nItemID,REPORT_FILESIZE_MISMATCH);
             }
         }
     }
     else{
-        if (extractInfo.debugSet){debugWriteDetails(nItemID, L"MainItemProcess End");}
+        if (extractInfo.debugSet){debugWriteDetails(nItemID, L"mainItemProcess End");}
         return 0;
     }
-    UpdateRecords(picture,nItemID, currHash);
+    updateRecords(picture,nItemID, currHash);
     //reset completed flag to 0
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"MainItemProcess End");}
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"mainItemProcess End");}
     return 0;
 }
 
@@ -1402,25 +1522,25 @@ LONG MainItemProcess(LONG nItemID, int picture, INT64 fileSize)
  * @param currHash  Hash values for the item.
  * @return 0 always.
  *
- * @see MainItemProcess
+ * @see mainItemProcess
  */
 
-int UpdateRecords(int picture, long nItemID, hashValueStruct currHash)
+int updateRecords(int picture, long nItemID, hashValueStruct currHash)
 {
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"UpdateRecords Start");}
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"updateRecords Start");}
     if (extractInfo.C4ALLExport)
     {
-        lockC4All.lock();
+        EnterCriticalSection(&lockC4All);
         createC4AllRecord(nItemID,picture,currHash.MD5);
-        lockC4All.unlock();
+        LeaveCriticalSection(&lockC4All);
     }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
-        lockVics.lock();
+        EnterCriticalSection(&lockVics);
         createVICSRecord(nItemID,picture,currHash);
-        lockVics.unlock();
+        LeaveCriticalSection(&lockVics);
     }
-    updateLock.lock();
+    EnterCriticalSection(&updateLock);
     if (picture == 1)
     {
         pictureCount++;
@@ -1431,28 +1551,9 @@ int UpdateRecords(int picture, long nItemID, hashValueStruct currHash)
         tmpVidCount++;
         movieCount++;
     }
-    updateLock.unlock();
-    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"UpdateRecords End");}
+    LeaveCriticalSection(&updateLock);
+    if (extractInfo.debugSet){debugWriteDetails(nItemID, L"updateRecords End");}
     return 0;
-}
-
-/**
- * @brief Detects which Griffeye CLI executable is present in the configured Griffeye folder.
- *
- * @param folder Wide string path to the Griffeye installation directory.
- * @return Filename of the found executable, or NULL if neither is present.
- */
-static const char* detectGriffeyeExe(const wchar_t* folder)
-{
-    char narrowFolder[MAX_PATH];
-    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
-    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
-    char check[MAX_PATH];
-    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return "analyze-cli.exe"; }
-    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
-    return NULL;
 }
 
 /**
@@ -1465,7 +1566,7 @@ static const char* detectGriffeyeExe(const wchar_t* folder)
 int createGriffeyeCase()
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"createGriffeyeCase Start");}
-    const char* griffeyeExe = detectGriffeyeExe(extractOpt.GriffeyePath);
+    const char* griffeyeExe = findGriffeyeExe(extractOpt.GriffeyePath);
     if (griffeyeExe == NULL)
     {
         XWF_OutputMessage(L"Griffeye CLI executable not found, cannot create case",0);
@@ -1473,35 +1574,41 @@ int createGriffeyeCase()
     }
     char cmdOutput[8192];
     char tempString[1024];
-    snprintf(cmdOutput,sizeof(cmdOutput),"\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
+    size_t pathLen = wcslen(extractOpt.GriffeyePath);
+    bool pathHasSlash = (pathLen > 0 && extractOpt.GriffeyePath[pathLen-1] == L'\\');
+    snprintf(cmdOutput,sizeof(cmdOutput),pathHasSlash ? "\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"" : "\"%ls\\%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
     int sourceNo = 1;
 
     wchar_t path[32768] ={0};
     swprintf(path,32768,L"%ls\\%ls\\%ls.ANCF",extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName,extractInfo.GriffeyeCaseName);
     if (ifFileExistsW((wchar_t*)&path))
     {
-        strncat(cmdOutput, " --add-source",8191);
+        strncat(cmdOutput, " --add-source",sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
 
     if (extractInfo.extractPictures)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Pictures_Results.json\" --source-type vics --include-vics-data all",sourceNo++,extractInfo.C4PPath);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     if (extractInfo.extractVideos)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --source-id source%d --source-path \"%lsVICS_Movies_Results.json\" --source-type vics --include-vics-data all", sourceNo++,extractInfo.C4MPath);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
     if (extractInfo.GriffeyeSettingsName != nullptr)
     {
         tempString[0] = '\0';
         snprintf(tempString,sizeof(tempString)," --import-settings-file %ls", extractInfo.GriffeyeSettingsName);
-        strncat(cmdOutput,tempString,8191);
+        strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
-    XWF_OutputMessage((wchar_t*)cmdOutput,4);
+    //cmdOutput must stay narrow (CreateProcess below is the ANSI variant) - convert to wide
+    //for logging rather than reinterpret-casting the narrow bytes as UTF-16
+    wchar_t cmdOutputW[8192];
+    swprintf(cmdOutputW,8192,L"%s",cmdOutput);
+    XWF_OutputMessage(cmdOutputW,4);
     PROCESS_INFORMATION ProcessInfo;
     STARTUPINFO StartupInfo;
     ZeroMemory(&StartupInfo, sizeof(StartupInfo));
@@ -1546,14 +1653,15 @@ int caseCleanup()
             closeXML(extractInfo.outputFiles[i].vidOutput);
 
         }
-        firstTime = 0;
     }
+    //must run regardless of whether C4All XML output was used (outputFileCounter stays 0
+    //when C4ALLExport is off, e.g. compressVICS-only mode) - otherwise XT_Prepare's
+    //"if (firstTime == 0)" check skips firstRunSetup (and therefore setupVics/getCaseOptions)
+    //entirely on the next case processed in the same X-Ways session, reusing the just-closed
+    //vicsDB handle and stale case configuration
+    firstTime = 0;
     if (picResults) { fclose(picResults); picResults = NULL; }
     if (vidResults) { fclose(vidResults); vidResults = NULL; }
-    if (extractInfo.debugSet)
-    {
-        endDebugLog();
-    }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
         outputVICSFile();
@@ -1561,20 +1669,25 @@ int caseCleanup()
     //used for debug
     if (extractInfo.debugSet)
     {
-        char sqlOutputPath[4096]= {0};
-        sprintf(sqlOutputPath,"%ls%ls",extractOpt.errorReportPath, caseTitle);
-        if (!DirExists(sqlOutputPath))
+        wchar_t wSqlOutputPath[4096] = {0};
+        swprintf(wSqlOutputPath, 4096, L"%ls%ls", extractOpt.errorReportPath, caseTitle);
+        if (!dirExistsW(wSqlOutputPath))
         {
-            CreateDirectory(sqlOutputPath,NULL);
+            CreateDirectoryW(wSqlOutputPath, NULL);
         }
-        //sprintf(sqlOutputPath,"%s\\errorOutput.sqlite",sqlOutputPath);
-        //this is not called?
-        strncat(sqlOutputPath,"\\errorOutput.sqlite",4095);
-        loadOrSaveDb(vicsDB,sqlOutputPath,1);
+        wcsncat(wSqlOutputPath, L"\\errorOutput.sqlite", 4095);
+        char sqlOutputPath[4096] = {0};
+        WideCharToMultiByte(CP_UTF8, 0, wSqlOutputPath, -1, sqlOutputPath, sizeof(sqlOutputPath), NULL, NULL);
+        char dbPathMsg[4096+32] = {0};
+        snprintf(dbPathMsg, sizeof(dbPathMsg), "Debug SQLite path: %s\r\n", sqlOutputPath);
+        debugWriteDetails(dbPathMsg);
+        loadOrSaveDb(vicsDB, sqlOutputPath, 1);
     }
+    //vicsDB is opened unconditionally in setupVics, so it must be closed unconditionally here too -
+    //not just when VICS export is selected
+    sqlite3_close(vicsDB);
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
-        sqlite3_close(vicsDB);
         if (vicPicFile)   { fclose(vicPicFile);   vicPicFile   = NULL; }
         if (vicMovieFile) { fclose(vicMovieFile);  vicMovieFile = NULL; }
         if (extractInfo.VICSCompressed)
@@ -1606,15 +1719,22 @@ int caseCleanup()
         delete[] extractInfo.nameList;
         extractInfo.nameList = NULL;
     }
-    if (extractInfo.VICSCompressed)
-    {
-        closeZipArchives();
-    }
+    //always called (not just when VICSCompressed was set this run) - closeZipArchive nulls each
+    //pointer after freeing, so this is safe even when nothing was actually opened, and it's the
+    //only thing that prevents a stale archive pointer from a run that DID use VICSCompressed
+    //from surviving into a later run in the same X-Ways session that doesn't
+    closeZipArchives();
     cleanupArchivePaths();
     extractInfo.noNames = 0;
     freeVicsCaseData();
-    delete [] extractInfo.C4PPath;
-    delete [] extractInfo.C4MPath;
+    if (extractInfo.C4PPath != NULL) {
+        delete[] extractInfo.C4PPath;
+        extractInfo.C4PPath = NULL;
+    }
+    if (extractInfo.C4MPath != NULL) {
+        delete[] extractInfo.C4MPath;
+        extractInfo.C4MPath = NULL;
+    }
     //clean up Griffeye case variables
     if (extractInfo.GriffeyeCaseLocation != NULL) {
         delete[] extractInfo.GriffeyeCaseLocation;
@@ -1631,7 +1751,12 @@ int caseCleanup()
     clearReportTableDetails();
     if (currSrcID != NULL) { delete[] currSrcID; currSrcID = NULL; }
     cleanupGUI();
-    if (extractInfo.debugSet){debugWriteDetails(0, L"caseCleanup End");}
+    cleanupOptions();
+    if (extractInfo.debugSet)
+    {
+        debugWriteDetails(0, L"caseCleanup End");
+        endDebugLog();
+    }
     return 0;
 }
 
@@ -1782,6 +1907,11 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
     INT64 flags;
     BOOL complete=FALSE;
     flags = XWF_GetItemInformation(nItemID,3,&complete);
+    if (!complete)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in returnHashValue for itemID: ", nItemID);
+        return 4;
+    }
     if (flags & 0x00040000)
     {
         //extract primary hash value
@@ -1789,9 +1919,9 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         if (retVal !=0)
         {
             outputErrorMessage(L"Unable to retrieve primary hash for itemID: ",nItemID);
-            xwfOutputLock.lock();
+            EnterCriticalSection(&xwfOutputLock);
             recordError(vicsDB,ERROR_NO_MD5_HASH, nItemID, currSrcID);
-            xwfOutputLock.unlock();
+            LeaveCriticalSection(&xwfOutputLock);
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 1");}
             return 1;
         }
@@ -1803,9 +1933,9 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         if (retVal !=0)
         {
             outputErrorMessage(L"Unable to retrieve secondary hash for itemID: ",nItemID);
-            xwfOutputLock.lock();
+            EnterCriticalSection(&xwfOutputLock);
             recordError(vicsDB,ERROR_NO_MD5_HASH, nItemID, currSrcID);
-            xwfOutputLock.unlock();
+            LeaveCriticalSection(&xwfOutputLock);
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 2");}
             return 2;
         }
@@ -1819,9 +1949,9 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
             //still failed
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"GetFileDetails - No hash computed for file");}
             errorRaised(nItemID,REPORT_NOHASH);
-            xwfOutputLock.lock();
+            EnterCriticalSection(&xwfOutputLock);
             recordError(vicsDB, ERROR_HASH_NOT_COMPUTED,nItemID,L"No hash computed for item");
-            xwfOutputLock.unlock();
+            LeaveCriticalSection(&xwfOutputLock);
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 3");}
             return 3;
         }
@@ -1832,17 +1962,27 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
     }
     //look at returning PhotoDNA hash here
     flags = XWF_GetItemInformation(nItemID,2,&complete);
-    if (flags & 0x80000000)
+    if (!complete)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in returnHashValue (PhotoDNA check) for itemID: ", nItemID);
+    }
+    else if (flags & 0x80000000)
     {
         //photoDNA Computed
         wchar_t tempBuffer[145]={0};
         int checkVal = getHashValue(nItemID,tempBuffer,144,hashTypePDNA,false);
-        unsigned char* tBuffer = new unsigned char[145];
-        sprintf((char*)tBuffer,"%ls",tempBuffer);
-        char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
-        swprintf(PDNABuffer,L"%s",result);
-        delete[] tBuffer;
-        delete[] result;
+        if (checkVal == 0)
+        {
+            unsigned char* tBuffer = new unsigned char[145];
+            snprintf((char*)tBuffer,145,"%ls",tempBuffer);
+            char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
+            if (result != NULL)
+            {
+                swprintf(PDNABuffer,256,L"%s",result);
+                delete[] result;
+            }
+            delete[] tBuffer;
+        }
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 0");}
     return 0;
@@ -1913,7 +2053,7 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaRecord Start");}
     VICSMedia currentRecord;
-    InitializeMediaRecord(currentRecord);
+    initializeMediaRecord(currentRecord);
     //set up VICSMedia record variables
     wcscpy(currentRecord.MD5,hashVals.MD5);
     if (SHA1Hash !=0)
@@ -1935,10 +2075,18 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
     currentRecord.RelativeFilePath = new wchar_t[128];
     //edit to include new folder path
     char relativeBuffer[128]={0};
-    int retVal = generateRelativeFilePath(&relativeBuffer[0],128,currentRecord.MD5,true);
+    int retVal = generateRelativeFilePath(&relativeBuffer[0],128,currentRecord.MD5,false);
     //merge paths
-    swprintf(currentRecord.RelativeFilePath,L"%s\\\\%ls",relativeBuffer,currentRecord.MD5);
-    currentRecord.MediaSize = XWF_GetItemSize(nItemID);
+    swprintf(currentRecord.RelativeFilePath,128,L"%s\\%ls",relativeBuffer,currentRecord.MD5);
+    INT64 sizeResult = XWF_GetItemSize(nItemID);
+    if (sizeResult < 0)
+    {
+        wchar_t errMsg[256];
+        swprintf(errMsg, 256, L"XWF_GetItemSize returned %lld in writeSQLMediaRecord for itemID: %ld", sizeResult, nItemID);
+        outputErrorMessage(errMsg);
+        sizeResult = 0;
+    }
+    currentRecord.MediaSize = sizeResult;
     insertMediaRecord(vicsDB,currentRecord, picture);
     deallocateMediaRecord(currentRecord);
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaRecord End");}
@@ -2059,6 +2207,11 @@ bool getDeletedStatus(long nItemID, BOOL* unallocated)
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getDeletedStatus Start");}
     BOOL boolCheck=0;
     INT64 delStatus = XWF_GetItemInformation(nItemID,4,&boolCheck);
+    if (!boolCheck)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in getDeletedStatus for itemID: ", nItemID);
+        return false;
+    }
     if (delStatus == 0)
     {
         if (extractInfo.debugSet){debugWriteDetails(nItemID, L"getDeletedStatus return false");}
@@ -2094,6 +2247,12 @@ void getItemFileName(long nItemID, VICSMediaFile* record)
         xName = (LPWSTR)XWF_GetItemName(nItemID);
     }
     catch (...)
+    {
+        xName = NULL;
+    }
+    //XWF_GetItemName returns NULL on failure rather than throwing, so the catch above alone
+    //doesn't cover it - both failure modes fall back to the same empty-name handling here
+    if (xName == NULL)
     {
         XWF_OutputMessage(L"Error retrieving item name. Item will have --noName--",0);
         xName = new wchar_t[8];
@@ -2152,7 +2311,7 @@ int extractMediaFileRecordDetails(LONG nItemID,wchar_t MD5Hash[33], int picture,
     //add source
     record->sourceID = new wchar_t[128];
     record->sourceID[0] = L'\0';
-    swprintf(record->sourceID,L"%ls",currSrcID);
+    swprintf(record->sourceID,128,L"%ls",currSrcID);
     record->XWFitemID = nItemID;
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"extractMediaFileRecordDetails End");}
     return 0;
@@ -2172,7 +2331,7 @@ void writeSQLMediaFileRecord(LONG nItemID,wchar_t MD5Hash[33], int picture)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"writeSQLMediaFileRecord Start");}
     VICSMediaFile currentMedia;
-    InitializeMediaFileRecord(currentMedia);
+    initializeMediaFileRecord(currentMedia);
     extractMediaFileRecordDetails(nItemID, MD5Hash, picture, &currentMedia);
     insertMediaFileRecord(vicsDB,currentMedia, picture);
     //clear up memory
@@ -2233,8 +2392,19 @@ void writeSQLMediaMetadataRecord(LONG nItemID,wchar_t MD5Hash[33], wchar_t* Prop
 bool replaceOriginalItem(LONG origID, LONG newID)
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"replaceOriginalItem Start");}
-    INT64 originalDeletedFlags = XWF_GetItemInformation(origID,XWF_ITEM_INFO_DELETION, NULL);
-    INT64 newDeletedFlags = XWF_GetItemInformation(newID,XWF_ITEM_INFO_DELETION, NULL);
+    BOOL origSuccess = FALSE, newSuccess = FALSE;
+    INT64 originalDeletedFlags = XWF_GetItemInformation(origID, XWF_ITEM_INFO_DELETION, &origSuccess);
+    INT64 newDeletedFlags = XWF_GetItemInformation(newID, XWF_ITEM_INFO_DELETION, &newSuccess);
+    if (!origSuccess)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in replaceOriginalItem for itemID: ", origID);
+        return false;
+    }
+    if (!newSuccess)
+    {
+        outputErrorMessage(L"XWF_GetItemInformation failed in replaceOriginalItem for itemID: ", newID);
+        return false;
+    }
     if (originalDeletedFlags > newDeletedFlags)
     {
         if (extractInfo.debugSet){debugWriteDetails(0, L"replaceOriginalItem End - True");}
@@ -2258,7 +2428,7 @@ bool replaceOriginalItem(LONG origID, LONG newID)
  * @param hashVals Hash values for the item.
  * @return 0 always.
  *
- * @see UpdateRecords
+ * @see updateRecords
  */
 
 int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
@@ -2280,9 +2450,10 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
             if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Duplicate Item Located - to be replaced");}
             errorRaised(duplicateItemID,REPORT_EXCLUDED_DUPLICATE);
             VICSMediaFile recUpdate;
-            InitializeMediaFileRecord(recUpdate);
+            initializeMediaFileRecord(recUpdate);
             int rc = extractMediaFileRecordDetails(nItemID,hashVals.MD5,picture,&recUpdate);
             updateMediaFileRecord(vicsDB,&recUpdate,picture,hashVals.MD5, duplicateItemID);
+            deallocateMediaFileRecord(recUpdate);
         }
         else
         {
@@ -2300,17 +2471,26 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
         //check if device type column is blank
         wchar_t buffer[128] ={0};
         LONG result = XWF_GetCellText(nItemID,NULL,0,DeviceTypeCol,(wchar_t*)&buffer,127);
+        if (extractInfo.debugSet)
+        {
+            wchar_t dbgMsg[200] = {0};
+            swprintf(dbgMsg, 200, L"Device Type value: '%ls'", buffer);
+            debugWriteDetails(nItemID, dbgMsg);
+        }
         if (result < 0)
         {
             //error
             outputErrorMessage(L"Unable to get Device Type Column Data for Item: ",nItemID);
         }
         else{
-            if (wcsncmp(L"",buffer,127)!=0 && wcsncmp(L"unknown",buffer,127)!=0)
+            if (buffer[0] != L'\0' &&
+                _wcsicmp(buffer, L"unknown")      != 0 &&
+                _wcsicmp(buffer, L"undetermined") != 0 &&
+                _wcsicmp(buffer, L"no device")    != 0)
             {
                 writeSQLMediaMetadataRecord(nItemID, hashVals.MD5, L"Device Type",(wchar_t*)buffer);
             }
-            else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type either blank or unknown");}
+            else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type blank or non-informative value, skipping");}
         }
     }
     else if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Device Type column unidentified");}
@@ -2337,7 +2517,7 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
  * @param MD5Hash  MD5 hex string for the item.
  * @return 0 always.
  *
- * @see UpdateRecords
+ * @see updateRecords
  */
 
 int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
@@ -2349,25 +2529,25 @@ int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
     picFile.createdTime = XWF_GetItemInformation(nItemID,32,&done);
     if (picFile.createdTime != 0)
     {
-            picFile.createdTime = Filetime2Unix(picFile.createdTime);
+            picFile.createdTime = filetime2Unix(picFile.createdTime);
     }
     done = FALSE;
     picFile.modifiedTime = XWF_GetItemInformation(nItemID,33,&done);
     if (picFile.modifiedTime != 0)
     {
-            picFile.modifiedTime = Filetime2Unix(picFile.modifiedTime);
+            picFile.modifiedTime = filetime2Unix(picFile.modifiedTime);
     }
     done = FALSE;
     picFile.accessedTime = XWF_GetItemInformation(nItemID,34,&done);
     if (picFile.accessedTime != 0)
     {
-            picFile.accessedTime = Filetime2Unix(picFile.accessedTime);
+            picFile.accessedTime = filetime2Unix(picFile.accessedTime);
     }
     done = FALSE;
     picFile.deletionTime = XWF_GetItemInformation(nItemID,36,&done);
     if (picFile.deletionTime != 0)
     {
-            picFile.deletionTime = Filetime2Unix(picFile.deletionTime);
+            picFile.deletionTime = filetime2Unix(picFile.deletionTime);
     }
     done = FALSE;
     //get description
@@ -2394,11 +2574,19 @@ int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
     //get filename/path
     picFile.fullPath = getFullPath(currSrcID,nItemID,false);
     removeInvalidChars(picFile.fullPath);
-    picFile.fullPath = replaceInvalidXMLChars(picFile.fullPath);
+    //fullPath is written into a CDATA section in writeXML, which needs no entity escaping
     //get physical location and offset
     INT64 ds;
     XWF_GetItemOfs(nItemID,(INT64*)&ds,(INT64*)&picFile.physicalSector);
-    picFile.fileSize=XWF_GetItemSize(nItemID);
+    INT64 fileSizeResult = XWF_GetItemSize(nItemID);
+    if (fileSizeResult < 0)
+    {
+        wchar_t errMsg[256];
+        swprintf(errMsg, 256, L"XWF_GetItemSize returned %lld in createC4AllRecord for itemID: %ld", fileSizeResult, nItemID);
+        outputErrorMessage(errMsg);
+        fileSizeResult = 0;
+    }
+    picFile.fileSize = fileSizeResult;
     if (picture == 1)
     {
         writeXML(picFile,picture,currPicFile,picCount);
@@ -2438,6 +2626,12 @@ int getFileName(LPWSTR evObject,LONG nItemID, wchar_t* retValue,long bufferSize)
 {
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of getFileName Function Output");}
     LPWSTR fileName = (LPWSTR)XWF_GetItemName(nItemID);
+    if (fileName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", nItemID);
+        swprintf(retValue, bufferSize, L"*NoName*");
+        return 0;
+    }
     int nameLen = wcslen(fileName);
     if (nameLen == 0)
     {
@@ -2470,7 +2664,7 @@ int getFileName(LPWSTR evObject,LONG nItemID, wchar_t* retValue,long bufferSize)
  * XML paths include the filename; VICS paths contain only the parent directory with
  * backslashes replaced by double-backslashes and pipe characters.
  *
- * @param evObject Evidence object wide string (used as path prefix).
+ * @param evObject Evidence object handle (unused, retained for API symmetry; passed through to getFileName).
  * @param nItemID  X-Ways item ID.
  * @param isVic    TRUE for VICS format, FALSE for XML format.
  * @return Newly allocated wide string containing the path (caller must delete[]).
@@ -2490,7 +2684,7 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
         int error = getFileName(evObject,nItemID,retValue,8192);
     }
     else{
-        swprintf(retValue,L"");
+        swprintf(retValue,8192,L"");
     }
     parent = XWF_GetItemParent(nItemID);
     do
@@ -2498,6 +2692,11 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
         if (parent != -1)
         {
             LPWSTR nameParent = (LPWSTR)XWF_GetItemName(parent);
+            if (nameParent == NULL)
+            {
+                outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", parent);
+                nameParent = L"(Unknown)";
+            }
             if (wcscmp(nameParent,L"(Root directory)")!=0)
             {
                 if (isVic)
@@ -2519,18 +2718,18 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"%ls\\\\%ls",newName,retValue);
+                        swprintf(temp,8192,L"%ls\\%ls",newName,retValue);
                     }
                     else
                     {
                         //if retValue is "" creates an error.
-                        swprintf(temp,L"%ls\\\\",newName);
+                        swprintf(temp,8192,L"%ls\\",newName);
                     }
                     delete[] newName;
                 }
                 else
                 {
-                    swprintf(temp,L"%ls\\%ls",nameParent,retValue);
+                    swprintf(temp,8192,L"%ls\\%ls",nameParent,retValue);
                 }
             }
             else
@@ -2540,35 +2739,41 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
                     int chkLen = wcslen(retValue);
                     if (chkLen > 0)
                     {
-                        swprintf(temp,L"\\\\%ls",retValue);
+                        swprintf(temp,8192,L"\\%ls",retValue);
                     }
                     else
                     {
-                        swprintf(temp,L"\\\\");
+                        swprintf(temp,8192,L"\\");
                     }
                 }
                 else
                 {
-                    swprintf(temp,L"\\%ls",retValue);
+                    swprintf(temp,8192,L"\\%ls",retValue);
                 }
             }
-            swprintf(retValue,L"%ls",temp);
+            swprintf(retValue,8192,L"%ls",temp);
             parent = XWF_GetItemParent(parent);
         }
     } while (parent != -1);
     //prepend with evidence object name
     HANDLE hEvidence = XWF_GetEvObj(currEvidence);
+    if (hEvidence == NULL)
+    {
+        outputErrorMessage(L"XWF_GetEvObj returned NULL in getFullPath for itemID: ", nItemID);
+        delete[] temp;
+        return retValue;
+    }
     LPWSTR partName = (LPWSTR)XWF_GetEvObjProp(hEvidence,6,NULL);
     if (partName != NULL)
     {
         if (isVic)
         {
             //swprintf(retValue,L"%ls\\\\%ls%ls",currSrcID,partName,temp);
-            swprintf(retValue,L"%ls%ls",partName,temp);
+            swprintf(retValue,8192,L"%ls%ls",partName,temp);
         }
         else
         {
-            swprintf(retValue,L"%ls\\%ls%ls",currSrcID,partName,temp);
+            swprintf(retValue,8192,L"%ls\\%ls%ls",currSrcID,partName,temp);
         }
     }
     else
@@ -2598,7 +2803,7 @@ wchar_t* getFullPath(LPWSTR evObject,LONG nItemID, BOOL isVic)
 
 int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashValue ,int picture)
 {
-    sqlite3_stmt* statement;
+    sqlite3_stmt* statement = NULL;
     //we need to extract media files
     int result = returnMediaFileRecords(database, &statement, picture, hashValue);
     if (result < 0){
@@ -2620,10 +2825,11 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
     sqlite3_finalize(statement);
 
     //add any media metadata records
-    result = returnMediaMetadataRecords(database, &statement, hashValue);
+    sqlite3_stmt* metaStatement = NULL;
+    result = returnMediaMetadataRecords(database, &metaStatement, hashValue);
     if (result < 0){
         //error
-        sqlite3_finalize(statement);
+        sqlite3_finalize(metaStatement);
         return -1;
     }
     //set up space for records
@@ -2634,9 +2840,10 @@ int extractIntoVicsRecord(sqlite3* database, VICSRecord* record, wchar_t* hashVa
     for (int i = 0;i<result;i++)
     {
         //cycle through the records and add them to main record
-        extractVICSMediaMetadataSQL(&record->vMediaMetaData[i],statement);
-        sqlResult = sqlite3_step(statement);
+        extractVICSMediaMetadataSQL(&record->vMediaMetaData[i],metaStatement);
+        sqlResult = sqlite3_step(metaStatement);
     }
+    if (result > 0) sqlite3_finalize(metaStatement);
 
     return 0;
 }
@@ -2659,7 +2866,9 @@ int writeRecords(sqlite3* database,FILE* vicFile, int picture)
     //get number of records returned
     int noRecords = returnMediaRecords(vicsDB,&statement,picture);
     if (noRecords < 0){
-        //error
+        //error - returnMediaRecords already finalizes/nulls statement on its own error paths where
+        //it was actually allocated, so nothing to do with it here; but the VICS file is still open
+        closeVICSFile(vicFile);
         return -1;
     }
     else if (noRecords == 0)
@@ -2669,18 +2878,29 @@ int writeRecords(sqlite3* database,FILE* vicFile, int picture)
         closeVICSFile(vicFile);
         return 0;
     }
+    bool wroteAnyRecord = false;
     for (int i=0;i<noRecords;i++)
     {
         VICSRecord currentRecord;
         extractVICSMediaSQL(currentRecord.vMedia,statement);
         int result = extractIntoVicsRecord(vicsDB,&currentRecord,(wchar_t*)&currentRecord.vMedia.MD5,picture);
         if (result == 0){
-            //success now write record
-            writeMediaRecord(vicFile, &currentRecord);
-        }
-        if (i != noRecords -1){
-            //not last record, add seperator
-            fprintf(vicFile,",\r\t\t");
+            //separator goes before each successful record (except the first), not after every
+            //iteration by index - a record can be skipped below (or extractIntoVicsRecord can
+            //fail above) without there being anything on either side of an index-based comma
+            if (wroteAnyRecord)
+            {
+                fprintf(vicFile,",\r\t\t");
+            }
+            int writeResult = writeMediaRecord(vicFile, &currentRecord);
+            if (writeResult == 0)
+            {
+                wroteAnyRecord = true;
+            }
+            else
+            {
+                XWF_OutputMessage(L"Error writing VICS media record; record skipped",0);
+            }
         }
         //update screen every 100 records
         if (i % 100==0) {XWF_ShouldStop();}

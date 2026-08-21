@@ -48,6 +48,7 @@
 #define IDC_CBO_MINVID              114
 #define IDC_LBX_TYPESTATUS          115
 #define IDC_LBX_FILEFORMAT          116
+#define IDC_TEXT_GRIFFEYELOCATION   117
 
 HWND optHwnd;
 HWND MaxPicSize, txtMaxPicSize, MaxVidSize, txtMaxVidSize, lstOverwrite, lstTxtOverwrite;
@@ -82,6 +83,15 @@ static HBRUSH hBrush = CreateSolidBrush(RGB(240,240,240));
 //globals
 char optionsDatabasePath[MAX_PATH];
 
+/** @brief Releases GDI resources allocated during options GUI creation. Call when the X-Tension is unloaded. */
+void cleanupOptions()
+{
+    if (hBrush != NULL) {
+        DeleteObject(hBrush);
+        hBrush = NULL;
+    }
+}
+
 
 //prototyping
 void CreateOptionsControls(HWND hwnd);
@@ -90,42 +100,6 @@ static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARA
 ExtractOptions loadOrCreateOptions(BOOL* success);
 void createOptions(char path[]);
 
-
-/**
- * @brief Returns true if the file at the given path can be opened for reading.
- *
- * @param filename Null-terminated path to the file.
- * @return true if the file exists and is accessible, false otherwise.
- */
-bool file_exists(const char* filename)
-{
-    if (FILE* file = fopen(filename,"r"))
-    {
-        fclose(file);
-        return true;
-    }
-    return false;
-}
-
-/**
- * @brief Returns the Griffeye CLI executable name found in the given folder.
- *
- * Checks for analyze-cli.exe then magnet-griffeye-cli.exe. The returned pointer
- * is a string literal and must not be freed by the caller.
- *
- * @param folder Null-terminated path to the Griffeye installation directory.
- * @return Executable filename string literal, or NULL if neither is found.
- */
-static const char* findGriffeyeExe(const char* folder)
-{
-    char check[MAX_PATH];
-    bool hasSlash = (folder[strlen(folder)-1] == '\\');
-    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", folder);
-    if (file_exists(check)) return "analyze-cli.exe";
-    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", folder);
-    if (file_exists(check)) return "magnet-griffeye-cli.exe";
-    return NULL;
-}
 
 /**
  * @brief Creates and runs the options window so that defaults can be changed.
@@ -137,6 +111,10 @@ static const char* findGriffeyeExe(const char* folder)
 int createOptionsWindow()
 {
     VisualStylesScope visualStyles;
+    //hBrush is freed (and nulled) by cleanupOptions() at the end of every run, so it must be
+    //recreated here on any run after the first - otherwise the window class below gets
+    //registered with a NULL background brush
+    if (hBrush == NULL) { hBrush = CreateSolidBrush(RGB(240,240,240)); }
     const char CLASS_NAME[] = C4A_TITLE " Options";
     WNDCLASSEX wc = {};
 
@@ -207,8 +185,21 @@ INT64 getSizeInBytes(HWND hwnCmbo, HWND hwndTxt)
         case 3:
             multiplier = 1024*1024*1024;
         break;
+        default:
+            multiplier = 1;
+        break;
     }
-    return (strtoll(numVal,NULL,10)*multiplier);
+    INT64 numericValue = strtoll(numVal,NULL,10);
+    //clamp rather than let the multiplication silently overflow/underflow (UB for a signed type)
+    if (numericValue > LLONG_MAX / multiplier)
+    {
+        numericValue = LLONG_MAX / multiplier;
+    }
+    else if (numericValue < LLONG_MIN / multiplier)
+    {
+        numericValue = LLONG_MIN / multiplier;
+    }
+    return (numericValue*multiplier);
 
 }
 
@@ -226,14 +217,14 @@ bool detailsValid()
     char buffer[1024];
     int length = GetWindowTextLength(ReportOutput);
     GetWindowText(ReportOutput,buffer,1024);
-    if(!DirExists(buffer)){
+    if(!dirExists(buffer)){
         MessageBox(NULL,"Report Output Path does not exist or cannot be accessed","Error ",MB_ICONERROR);
         return false;
     }
     //check valid griffeye location (optional — skip if empty)
-    char griffeyeTemp[MAX_PATH];
-    GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
-    if (strlen(griffeyeTemp) > 0)
+    wchar_t griffeyeTemp[MAX_PATH];
+    GetWindowTextW(GriffeyeLocation,griffeyeTemp,MAX_PATH);
+    if (wcslen(griffeyeTemp) > 0)
     {
         if (findGriffeyeExe(griffeyeTemp) == NULL)
         {
@@ -266,6 +257,7 @@ int getTypeStatus()
 {
     int retVal =0;
     int noItems = SendMessage(lstFileStatus, LB_GETSELCOUNT, 0, 0);
+    if (noItems == LB_ERR) { return retVal; }
     int* arrItems = new int[noItems];
     SendMessage(lstFileStatus,LB_GETSELITEMS,noItems,(LPARAM)arrItems);
     for (int i=0;i<noItems;i++)
@@ -294,6 +286,7 @@ int getTypeStatus()
             break;
         }
     }
+    delete[] arrItems;
     return retVal;
 }
 
@@ -306,6 +299,7 @@ int getFileTypeStatus()
 {
     int retVal =0;
     int noItems = SendMessage(lstFileFormat, LB_GETSELCOUNT, 0, 0);
+    if (noItems == LB_ERR) { return retVal; }
     int* arrItems = new int[noItems];
     SendMessage(lstFileFormat,LB_GETSELITEMS,noItems,(LPARAM)arrItems);
     for (int i=0;i<noItems;i++)
@@ -325,6 +319,7 @@ int getFileTypeStatus()
             break;
         }
     }
+    delete[] arrItems;
     return retVal;
 }
 
@@ -347,11 +342,13 @@ void BTN_OK_CLICK(HWND hwnd)
     opt.minPictureSize = getSizeInBytes(drpMinPic,MinPicSize);
     opt.minMovieSize = getSizeInBytes(drpMinVid,MinVidSize);
 
-    char tempPath[MAX_PATH], griffeyeTemp[MAX_PATH];
-    GetWindowText(ReportOutput,tempPath,MAX_PATH);
-    swprintf((wchar_t*)opt.errorReportPath,L"%s",tempPath);
+    //matches the 1024-byte buffer detailsValid() used to validate this same control,
+    //so a path that passed validation isn't silently truncated here before being saved
+    char tempPath[1024], griffeyeTemp[MAX_PATH];
+    GetWindowText(ReportOutput,tempPath,1024);
+    swprintf(opt.errorReportPath,2048,L"%s",tempPath);
     GetWindowText(GriffeyeLocation,griffeyeTemp,MAX_PATH);
-    swprintf((wchar_t*)opt.GriffeyePath,L"%s",griffeyeTemp);
+    swprintf(opt.GriffeyePath,2048,L"%s",griffeyeTemp);
     int owrite = SendMessage(lstOverwrite,CB_GETCURSEL, 0, 0);
     if (owrite == 0){
         opt.overwriteFiles = FALSE;
@@ -373,7 +370,7 @@ void BTN_OK_CLICK(HWND hwnd)
  */
 void BTN_GRIFFEYE_CLICK()
 {
-    TCHAR path[2048];
+    TCHAR path[2048]={0};
     BROWSEINFO folderDialog = {0};
     folderDialog.lpszTitle = ("Select Griffeye Folder");
     folderDialog.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
@@ -381,8 +378,11 @@ void BTN_GRIFFEYE_CLICK()
     LPITEMIDLIST pidl = SHBrowseForFolder(&folderDialog);
     if (pidl != 0)
     {
-        SHGetPathFromIDList(pidl,path);
-        SetWindowText(GriffeyeLocation,path);
+        if (SHGetPathFromIDList(pidl,path))
+        {
+            SetWindowText(GriffeyeLocation,path);
+        }
+        CoTaskMemFree(pidl);
     }
 }
 
@@ -391,7 +391,7 @@ void BTN_GRIFFEYE_CLICK()
  */
 void BTN_REPORTOUTPUT_CLICK()
 {
-    TCHAR path[2048];
+    TCHAR path[2048]={0};
     BROWSEINFO folderDialog = {0};
     folderDialog.lpszTitle = ("Select Report Output Folder");
     folderDialog.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
@@ -399,8 +399,11 @@ void BTN_REPORTOUTPUT_CLICK()
     LPITEMIDLIST pidl = SHBrowseForFolder(&folderDialog);
     if (pidl != 0)
     {
-        SHGetPathFromIDList(pidl,path);
-        SetWindowText(ReportOutput,path);
+        if (SHGetPathFromIDList(pidl,path))
+        {
+            SetWindowText(ReportOutput,path);
+        }
+        CoTaskMemFree(pidl);
     }
 }
 
@@ -583,7 +586,7 @@ int drawFirstLine(HWND hwnd)
     txtMinPicSize = CreateWindowEx(0,"Static","Minimum Picture size to export:",WS_CHILD|WS_VISIBLE|SS_RIGHT,LeftHandStartX + ((MainWindowWidth-100)/2),FirstLineY,250,20,hwnd,0,GetModuleHandle(NULL),0);
     if (!txtMinPicSize) { outputControlOutputError("txtMinPicSize"); }
 
-    MinPicSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, FirstLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXPICSIZE,GetModuleHandle(NULL),NULL);
+    MinPicSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, FirstLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MINPICSIZE,GetModuleHandle(NULL),NULL);
     if (!MinPicSize) { outputControlOutputError("MinPicSize"); }
 
 
@@ -629,7 +632,7 @@ int drawSecondLine(HWND hwnd)
     txtMinVidSize = CreateWindowEx(0,"Static","Minimum Video size to export:",WS_CHILD|WS_VISIBLE|SS_RIGHT,LeftHandStartX + ((MainWindowWidth-100)/2),SecondLineY,250,20,hwnd,0,GetModuleHandle(NULL),0);
     if (!txtMinVidSize) { outputControlOutputError("txtMinVidSize"); }
 
-    MinVidSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, SecondLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MAXPICSIZE,GetModuleHandle(NULL),NULL);
+    MinVidSize = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","0",WS_CHILD|WS_VISIBLE,LeftHandStartX + ((MainWindowWidth-100)/2)+  260, SecondLineY ,60,24,hwnd,(HMENU)IDC_TEXT_MINVIDSIZE,GetModuleHandle(NULL),NULL);
     if (!MinVidSize) { outputControlOutputError("MinVidSize"); }
 
 
@@ -682,7 +685,7 @@ int drawFourthLine(HWND hwnd)
     ReportOutput = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE,LeftHandStartX+170, FourthLineY ,MainWindowWidth - 230,20,hwnd,(HMENU)IDC_TEXT_REPORTOUTPUT,GetModuleHandle(NULL),NULL);
     if (!ReportOutput) {outputControlOutputError("ReportOutput");}
 
-    char tempPath[MAX_PATH];
+    char tempPath[2048];
     snprintf(tempPath, sizeof(tempPath), "%ls",extractOpt.errorReportPath);
     SetWindowText(ReportOutput,tempPath);
     cmdReportOutput = CreateWindowEx(0,"BUTTON","...",WS_CHILD|WS_VISIBLE,MainWindowWidth - 50,FourthLineY,20,20,hwnd,(HMENU)IDC_BTN_REPORTOUTPUT,GetModuleHandle(NULL),0);
@@ -704,7 +707,7 @@ int drawFifthLine(HWND hwnd)
 
     char path[2048]={0};
     snprintf(path,sizeof(path),"%ls",extractOpt.GriffeyePath);
-    GriffeyeLocation = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",path,WS_CHILD|WS_VISIBLE,LeftHandStartX+170, FifthLineY ,MainWindowWidth - 230,20,hwnd,(HMENU)IDC_TEXT_REPORTOUTPUT,GetModuleHandle(NULL),NULL);
+    GriffeyeLocation = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",path,WS_CHILD|WS_VISIBLE,LeftHandStartX+170, FifthLineY ,MainWindowWidth - 230,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYELOCATION,GetModuleHandle(NULL),NULL);
     if (!GriffeyeLocation) {outputControlOutputError("GriffeyeLocation");}
 
     cmdGriffeyeLocation = CreateWindowEx(0,"BUTTON","...",WS_CHILD|WS_VISIBLE,MainWindowWidth - 50,FifthLineY,20,20,hwnd,(HMENU)IDC_BTN_GRIFFEYE,GetModuleHandle(NULL),0);
@@ -857,21 +860,22 @@ static int CALLBACK BrowserCallbackProc(HWND hwnd,UINT uMsg,LPARAM lParam, LPARA
  */
 char* createOptionsFolderString()
 {
-    char* appdataPath = new char[MAX_PATH];
+    char* appdataPath = new char[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
-        strncat(appdataPath,"\\X-Ways\\",MAX_PATH);
-        if (!DirExists(appdataPath))
+        strncat(appdataPath,"\\X-Ways\\",31);
+        if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
-        strcat(appdataPath,"Clees4All\\");
-        if (!DirExists(appdataPath))
+        strncat(appdataPath,"Clees4All\\",31);
+        if (!dirExists(appdataPath))
         {
             CreateDirectory(appdataPath, NULL);
         }
     }
     else{
+        delete[] appdataPath;
         return nullptr;
     }
     return appdataPath;
@@ -886,12 +890,13 @@ char* createOptionsFolderString()
  */
 char* generateOptionsFolderString()
 {
-    char* appdataPath = new char[MAX_PATH];
+    char* appdataPath = new char[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
-        strncat(appdataPath,"\\X-Ways\\Clees4All\\",MAX_PATH);
+        strncat(appdataPath,"\\X-Ways\\Clees4All\\",31);
     }
     else{
+        delete[] appdataPath;
         return nullptr;
     }
     return appdataPath;
@@ -912,7 +917,7 @@ ExtractOptions loadOrCreateOptions(BOOL* success)
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     strcpy(optionsDatabasePath, optPath);
-    if (SQLDatabaseExists(optPath))
+    if (sqlDatabaseExists(optPath))
     {
         //database there
         retOpt = loadOptions(optPath);
@@ -953,6 +958,7 @@ int writeExtractionDetails(ExtractionDetails record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
+    if (path == nullptr) {return SQLITE_ERROR;}
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);
@@ -980,6 +986,7 @@ int loadLastExtractionSettings(ExtractionDetails* record)
 {
     sqlite3 *sqlDB;
     char* path = createOptionsFolderString();
+    if (path == nullptr) {return SQLITE_ERROR;}
     char optPath[MAX_PATH];
     snprintf(optPath,sizeof(optPath),"%s\\%s",path,"opt.sqlite");
     int rc = sqlite3_open_v2(optPath,&sqlDB,SQLITE_OPEN_FULLMUTEX|SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL);

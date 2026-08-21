@@ -1,5 +1,8 @@
 
 #include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <cwchar>
 
 /** @brief Number of nanoseconds in a second. */
 #define Nano2Seconds 10000000LL
@@ -15,7 +18,7 @@
  * @param szPath Null-terminated path to check.
  * @return       TRUE if the path exists and is a directory, FALSE otherwise.
  */
-BOOL DirExists(LPCTSTR szPath)
+BOOL dirExists(LPCTSTR szPath)
 {
     DWORD dwAttrib = GetFileAttributes(szPath);
     return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
@@ -39,7 +42,7 @@ BOOL ifFileExists(const char* path)
  * @param szPath Null-terminated wide path to check.
  * @return       TRUE if the path exists and is a directory, FALSE otherwise.
  */
-BOOL DirExistsW(LPCWSTR szPath)
+BOOL dirExistsW(LPCWSTR szPath)
 {
     DWORD dwAttrib = GetFileAttributesW(szPath);
     return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
@@ -63,7 +66,7 @@ BOOL ifFileExistsW(const wchar_t* path)
  * @param fTime FILETIME value expressed as a 64-bit integer.
  * @return      Equivalent Unix timestamp in seconds since the Unix epoch.
  */
-INT64 Filetime2Unix(INT64 fTime)
+INT64 filetime2Unix(INT64 fTime)
 {
     INT64 temp;
     temp = fTime / Nano2Seconds;
@@ -86,6 +89,47 @@ char* convertWideToChar(const wchar_t* wString)
     char* retStr = new char[bufferSize];
     WideCharToMultiByte(CP_UTF8, 0, wString, -1, retStr, bufferSize, NULL, NULL);
     return retStr;
+}
+
+/**
+ * @brief Escapes a UTF-8 string for embedding inside a JSON string literal.
+ *
+ * Escapes backslash, double-quote, and control characters per the JSON spec.
+ * Bytes >= 0x80 (UTF-8 continuation/lead bytes) are passed through unchanged.
+ *
+ * The returned buffer is allocated with new[] and must be freed by the caller
+ * using delete[].
+ *
+ * @param input Null-terminated UTF-8 string to escape.
+ * @return      Newly allocated null-terminated escaped string.
+ */
+char* jsonEscapeString(const char* input)
+{
+    size_t len = strlen(input);
+    char* out = new char[len * 6 + 1]; // worst case: every byte -> \u00XX
+    size_t o = 0;
+    for (size_t i = 0; i < len; ++i)
+    {
+        unsigned char c = (unsigned char)input[i];
+        switch (c)
+        {
+            case '\"': out[o++] = '\\'; out[o++] = '\"'; break;
+            case '\\': out[o++] = '\\'; out[o++] = '\\'; break;
+            case '\b': out[o++] = '\\'; out[o++] = 'b';  break;
+            case '\f': out[o++] = '\\'; out[o++] = 'f';  break;
+            case '\n': out[o++] = '\\'; out[o++] = 'n';  break;
+            case '\r': out[o++] = '\\'; out[o++] = 'r';  break;
+            case '\t': out[o++] = '\\'; out[o++] = 't';  break;
+            default:
+                if (c < 0x20)
+                    o += sprintf(out + o, "\\u%04x", c);
+                else
+                    out[o++] = (char)c;
+                break;
+        }
+    }
+    out[o] = '\0';
+    return out;
 }
 
 /**
@@ -124,7 +168,7 @@ wchar_t* extendBuffer(wchar_t* currBuffer, INT64 currSize, INT64 newSize)
  * @param filePath Null-terminated path to the file.
  * @return         File size in bytes, or -1 if the attributes could not be retrieved.
  */
-INT64 FileSize(const char* filePath)
+INT64 getFileSize(const char* filePath)
 {
     WIN32_FILE_ATTRIBUTE_DATA fad;
     if (!GetFileAttributesExA(filePath, GetFileExInfoStandard, &fad))
@@ -133,4 +177,25 @@ INT64 FileSize(const char* filePath)
     size.HighPart = fad.nFileSizeHigh;
     size.LowPart = fad.nFileSizeLow;
     return size.QuadPart;
+}
+
+/**
+ * @brief Detects which supported Griffeye CLI executable is present in a folder.
+ *
+ * @param folder Wide string path to the Griffeye installation directory; may be empty.
+ * @return       Filename of the found executable, or NULL if @p folder is empty or
+ *               neither supported executable is present.
+ */
+const char* findGriffeyeExe(const wchar_t* folder)
+{
+    if (folder == NULL || folder[0] == L'\0') return NULL;
+    //stay in wide chars throughout so this works for non-ASCII install paths - a narrow
+    //conversion here (via snprintf/fopen) would depend on the current ANSI/OEM codepage
+    bool hasSlash = (folder[wcslen(folder)-1] == L'\\');
+    wchar_t check[MAX_PATH];
+    swprintf(check, MAX_PATH, hasSlash ? L"%lsanalyze-cli.exe" : L"%ls\\analyze-cli.exe", folder);
+    if (FILE* f = _wfopen(check, L"r")) { fclose(f); return "analyze-cli.exe"; }
+    swprintf(check, MAX_PATH, hasSlash ? L"%lsmagnet-griffeye-cli.exe" : L"%ls\\magnet-griffeye-cli.exe", folder);
+    if (FILE* f = _wfopen(check, L"r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
+    return NULL;
 }

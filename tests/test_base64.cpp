@@ -19,7 +19,7 @@ static void test_single_byte()
     unsigned char data[] = { 'M' };
     char* result = b64Encode(data, 1);
     CHECK(result != NULL);
-    CHECK_CONTAINS(result, "TQ==");
+    CHECK_STR_EQ(result, "TQ==");
     delete[] result;
 }
 
@@ -28,7 +28,7 @@ static void test_two_bytes()
     unsigned char data[] = { 'M', 'a' };
     char* result = b64Encode(data, 2);
     CHECK(result != NULL);
-    CHECK_CONTAINS(result, "TWE=");
+    CHECK_STR_EQ(result, "TWE=");
     delete[] result;
 }
 
@@ -37,7 +37,7 @@ static void test_three_bytes_no_padding()
     unsigned char data[] = { 'M', 'a', 'n' };
     char* result = b64Encode(data, 3);
     CHECK(result != NULL);
-    CHECK_CONTAINS(result, "TWFu");
+    CHECK_STR_EQ(result, "TWFu");
     delete[] result;
 }
 
@@ -47,7 +47,7 @@ static void test_rfc4648_vector()
     unsigned char data[] = "foobar";
     char* result = b64Encode(data, 6);
     CHECK(result != NULL);
-    CHECK_CONTAINS(result, "Zm9vYmFy");
+    CHECK_STR_EQ(result, "Zm9vYmFy");
     delete[] result;
 }
 
@@ -75,7 +75,7 @@ static void test_known_all_zeros()
     unsigned char data[] = { 0, 0, 0 };
     char* result = b64Encode(data, 3);
     CHECK(result != NULL);
-    CHECK_CONTAINS(result, "AAAA");
+    CHECK_STR_EQ(result, "AAAA");
     delete[] result;
 }
 

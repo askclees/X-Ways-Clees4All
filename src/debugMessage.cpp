@@ -1,17 +1,21 @@
 //standard includes
 #include <cstdio>
 #include <windows.h>
-#include <mutex>
 
 //project headers
 #include "X-Tension.h"
 #include "debugMessage.h"
 
-/** @brief Mutex serialising writes to the debug log and X-Ways output window. */
-std::mutex dbgMessage;
+/** @brief Critical section serialising writes to the debug log and X-Ways output window. */
+CRITICAL_SECTION dbgMessage;
 
-/** @brief Mutex serialising increments to the per-error-type counters. */
-std::mutex errorTotal;
+/** @brief Critical section serialising increments to the per-error-type counters. */
+CRITICAL_SECTION errorTotal;
+
+/** @brief Initialises dbgMessage and errorTotal. Must be called before any debug/error logging is attempted. */
+void initDebugLocks()    { InitializeCriticalSection(&dbgMessage); InitializeCriticalSection(&errorTotal); }
+/** @brief Releases the resources held by dbgMessage and errorTotal. */
+void destroyDebugLocks() { DeleteCriticalSection(&dbgMessage);     DeleteCriticalSection(&errorTotal); }
 
 /** @brief Handle to the open debug log file, or NULL if no log is active. */
 FILE* debugLogFile;
@@ -70,9 +74,11 @@ int startDebugLog(const char* filePath)
  */
 int endDebugLog()
 {
-    if (debugLogFile !=NULL)
+    if (debugLogFile != NULL)
     {
-        return fclose(debugLogFile);
+        int rc = fclose(debugLogFile);
+        debugLogFile = NULL;
+        return rc;
     }
     else
     {
@@ -81,19 +87,19 @@ int endDebugLog()
 }
 
 /**
- * @brief Writes a message to a debug log file, falling back to the X-Ways output window.
+ * @brief Writes a message to a debug log file.
  *
- * If @p f is NULL the message is sent to the X-Ways output window instead.
+ * If @p f is NULL the message is silently discarded and 1 is returned.
  *
- * @param f       File to write to, or NULL to write to the X-Ways output window.
+ * @param f       File to write to, or NULL.
  * @param message Null-terminated message string.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */
 int debugWriteDetails(FILE* f, const char* message)
 {
-    dbgMessage.lock();
+    EnterCriticalSection(&dbgMessage);
     if (f !=NULL)
     {
         int check  = fprintf(f, "%s",message);
@@ -102,15 +108,12 @@ int debugWriteDetails(FILE* f, const char* message)
             XWF_OutputMessage(L"Fprintf error",0);
         }
         fflush(f);
-        dbgMessage.unlock();
+        LeaveCriticalSection(&dbgMessage);
         return 0;
     }
     else
     {
-        //no file yet, output to log window.
-        //may be used for debugging case window data.
-        XWF_OutputMessage((wchar_t*)message,0x04);
-        dbgMessage.unlock();
+        LeaveCriticalSection(&dbgMessage);
         return 1;
     }
 }
@@ -121,7 +124,7 @@ int debugWriteDetails(FILE* f, const char* message)
  * Convenience overload that uses the global debugLogFile handle.
  *
  * @param message Null-terminated message string.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */
@@ -133,19 +136,31 @@ int debugWriteDetails(const char* message)
 /**
  * @brief Writes item ID, item name and module name to a debug log file.
  *
+ * If @p nItemID is 0 only the module name is written (XWF_GetItemName is
+ * not called, as it is invalid outside an active case context).
+ *
  * @param f       File to write to.
- * @param nItemID X-Ways item ID the message relates to.
+ * @param nItemID X-Ways item ID the message relates to, or 0 to omit item details.
  * @param module  Name of the Clees4All module generating the message.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */
 int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module)
 {
-    LPWSTR ItemName;
-    ItemName = (LPWSTR)XWF_GetItemName(nItemID);
     char* buffer = new char[1024];
-    snprintf(buffer, 1024, "ItemID: %ld ItemName: %ls Module: %ls\r\n", nItemID, ItemName, module);
+    if (nItemID == 0)
+    {
+        snprintf(buffer, 1024, "Module: %ls\r\n", module);
+    }
+    else
+    {
+        LPWSTR ItemName = (LPWSTR)XWF_GetItemName(nItemID);
+        if (ItemName != NULL)
+            snprintf(buffer, 1024, "ItemID: %ld ItemName: %ls Module: %ls\r\n", nItemID, ItemName, module);
+        else
+            snprintf(buffer, 1024, "ItemID: %ld ItemName: (null) Module: %ls\r\n", nItemID, module);
+    }
     int result = debugWriteDetails(f,buffer);
     delete[] buffer;
     return result;
@@ -155,10 +170,11 @@ int debugWriteDetails(FILE* f,LONG nItemID, const wchar_t* module)
  * @brief Writes item ID, item name and module name to the default debug log file.
  *
  * Convenience overload that uses the global debugLogFile handle.
+ * If @p nItemID is 0 only the module name is written.
  *
- * @param nItemID X-Ways item ID the message relates to.
+ * @param nItemID X-Ways item ID the message relates to, or 0 to omit item details.
  * @param module  Name of the Clees4All module generating the message.
- * @return        0 if written to the file, 1 if written to the X-Ways output window.
+ * @return        0 if written to the file, 1 if no file handle is available (message not written).
  *
  * @see startDebugLog, endDebugLog
  */
@@ -239,10 +255,10 @@ int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message
 void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
 {
     wchar_t errorMessage[2048];
-    swprintf(errorMessage,2048,L"%ls %lu",errMsg, nItemID);
-    dbgMessage.lock();
+    swprintf(errorMessage,2048,L"%ls %ld",errMsg, nItemID);
+    EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage(errorMessage,0);
-    dbgMessage.unlock();
+    LeaveCriticalSection(&dbgMessage);
 }
 
 /**
@@ -252,9 +268,9 @@ void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
  */
 void outputErrorMessage(const wchar_t* errMsg)
 {
-    dbgMessage.lock();
+    EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage((wchar_t*)errMsg,0);
-    dbgMessage.unlock();
+    LeaveCriticalSection(&dbgMessage);
 }
 
 /**
@@ -267,9 +283,9 @@ void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail)
 {
     wchar_t errorMessage[2048];
     swprintf(errorMessage,2048,L"%ls%ls",errMsg,detail);
-    dbgMessage.lock();
+    EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage(errorMessage,0);
-    dbgMessage.unlock();
+    LeaveCriticalSection(&dbgMessage);
 }
 
 /**
@@ -289,9 +305,9 @@ void errorRaised(LONG nItemID,int errorCode)
     {
         outputErrorMessage(L"Unable to set report table for itemID: ",nItemID);
     }
-    errorTotal.lock();
+    EnterCriticalSection(&errorTotal);
     errorLog[errorCode]++;
-    errorTotal.unlock();
+    LeaveCriticalSection(&errorTotal);
 }
 
 /**
@@ -308,7 +324,7 @@ void errorReport()
     for (int i=0;i<numErrorTables;i++)
     {
         wchar_t messageBuffer[1024]={0};
-        swprintf(messageBuffer,L"%ls:\t\t%i",ReportTableList[i][1],errorLog[i]);
+        swprintf(messageBuffer,1024,L"%ls:\t\t%i",ReportTableList[i][1],errorLog[i]);
         //output message to window and print to log
         XWF_OutputMessage(messageBuffer,0);
         XWF_OutputMessage(messageBuffer,0x10);

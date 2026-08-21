@@ -52,9 +52,14 @@
 #define IDC_BTN_EMBCHK              123
 #define IDC_BTN_EMBMISCHK           124
 #define IDC_LBL_EXTRACTOPT          125
+#define IDC_TEXT_GRIFFEYESETTINGS   126
 
-#define IDC_TEXT_EVNAME 300
-#define IDC_TEXT_NEW_NAME 600
+#define IDC_TEXT_EVNAME         300
+#define IDC_ENTRY_PANEL         400
+#define IDC_ENTRY_SCROLLBAR     401
+#define IDC_TEXT_NEW_NAME       600
+
+#define MAX_VISIBLE_ENTRIES 10
 
 //windows form sizes
 #define MainWindowWidth 900
@@ -81,6 +86,8 @@
 #define boxMultiplier   25
 
 HWND mainHwnd;
+HWND entryPanel = NULL;
+HWND entryScrollBar = NULL;
 HWND PicturePath,VideoPath, btnOK,picChkBox,vidChkBox,parentChkBox,cmdVidSelect,cmdPicSelect,dbgChkBox, compChkBox, vicChkBox, C4PChkBox, GriffeyeCase, GriffeyePath;
 HWND* TxtActualName, *TxtNewName, *lblActual, *lblNew;
 HWND txtPicOutput,txtVidOutput, txtGriffeyeCaseName, txtGriffeyeCaseLocation, cmdGriffeyePath, griffChkBox;
@@ -94,9 +101,10 @@ char* CaseDir;
 static HBRUSH hBrush = CreateSolidBrush(RGB(240,240,240));
 WORD versionNumber;
 //prototyping
-void CreateControls(HWND hwnd);
+void createControls(HWND hwnd);
 LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam);
-LPWSTR GetFolderPath();
+LRESULT CALLBACK EntryPanelProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LPWSTR getFolderPath();
 int startProcess();
 void fillCaseDetails();
 int getGriffeyeDetails();
@@ -111,7 +119,7 @@ const wchar_t* GriffeyeConfigPath = L"C:\\ProgramData\\Griffeye Technologies\\Gr
  * @param pszText Text to display in the tooltip.
  * @return Handle to the created tooltip window, or NULL on failure.
  */
-HWND CreateToolTip(int toolID, HWND hDlg, PTSTR pszText)
+HWND createToolTip(int toolID, HWND hDlg, PTSTR pszText)
 {
     if (!toolID || !hDlg || !pszText)
     {
@@ -154,6 +162,10 @@ HWND CreateToolTip(int toolID, HWND hDlg, PTSTR pszText)
 int createWindow(WORD version)
 {
     VisualStylesScope visualStyles;
+    //hBrush is freed (and nulled) by cleanupGUI() at the end of every run, so it must be
+    //recreated here on any run after the first - otherwise the window classes below get
+    //registered with a NULL background brush
+    if (hBrush == NULL) { hBrush = CreateSolidBrush(RGB(240,240,240)); }
     versionNumber = version;
     const char CLASS_NAME[] = C4A_TITLE;
     WNDCLASSEX wc = {};
@@ -169,8 +181,19 @@ int createWindow(WORD version)
     wc.lpszClassName = CLASS_NAME;
     wc.hInstance = extractInfo.thisDLL;
 
+    WNDCLASSEX ep = {};
+    ep.cbSize = sizeof(WNDCLASSEX);
+    ep.lpfnWndProc = EntryPanelProc;
+    ep.hbrBackground = hBrush;
+    ep.hCursor = LoadCursor(NULL, IDC_ARROW);
+    ep.style = CS_HREDRAW | CS_VREDRAW;
+    ep.lpszClassName = "EntryScrollPanel";
+    ep.hInstance = extractInfo.thisDLL;
+    RegisterClassEx(&ep);
+
     RegisterClassEx(&wc);
 
+    int panelRows = extractInfo.noNames > MAX_VISIBLE_ENTRIES ? MAX_VISIBLE_ENTRIES : extractInfo.noNames;
     mainHwnd =CreateWindowEx(
         0, //dwexstyle
         CLASS_NAME, //class name
@@ -179,7 +202,7 @@ int createWindow(WORD version)
         100,//x
         100,//y
         MainWindowWidth,//width
-        MainWindowLength + (extractInfo.noNames * (boxMultiplier+5)),//height
+        MainWindowLength + (panelRows * (boxMultiplier+5)),//height
         NULL, //parent
         NULL,//hmenu
         NULL,//hinstance
@@ -203,9 +226,25 @@ int createWindow(WORD version)
     return 0;
 }
 
+/**
+ * @brief Window procedure for the scrollable evidence entry panel.
+ *
+ * Handles vertical scrolling of the entry controls when there are more than
+ * MAX_VISIBLE_ENTRIES evidence objects.
+ */
+LRESULT CALLBACK EntryPanelProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    if (uMsg == WM_CTLCOLORSTATIC)
+    {
+        SetBkColor((HDC)wParam, RGB(240, 240, 240));
+        return (LRESULT)hBrush;
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
 //button click functions
 /** @brief Disables and clears the Griffeye-related controls when the Griffeye checkbox is unchecked. */
-void btn_griffchk_unselect()
+void btnGriffchkUnselect()
 {
     EnableWindow(txtGriffeyeCaseLocation,FALSE);
     EnableWindow(GriffeyePath,FALSE);
@@ -228,7 +267,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg)
     {
         case WM_CREATE:
-            CreateControls(hwnd);
+            createControls(hwnd);
             return 0;
         case WM_COMMAND:
             switch(LOWORD(wParam))
@@ -243,6 +282,11 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (!extractInfo.C4ALLExport && !extractInfo.VICExport && !extractInfo.VICSCompressed)
                     {
                         MessageBox(NULL,"You have to select at least one output type!!","Error!! ",MB_ICONERROR);
+                        break;
+                    }
+                    if (extractInfo.C4ALLExport && extractInfo.noNames > MAX_OUTPUT_FILES)
+                    {
+                        MessageBox(NULL,"C4All XML output cannot be used with more than 64 evidence objects in the case. Deselect C4All XML output, or use Project VICS JSON output instead.","Error!! ",MB_ICONERROR);
                         break;
                     }
                     if (extractInfo.debugSet) {XWF_OutputMessage(L"CleesForAll Debug Msg: PreStartProcess",0); }
@@ -409,7 +453,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 SendDlgItemMessage(hwnd,IDC_BTN_VICCHK,BM_SETCHECK,0,0);
                                 SendDlgItemMessage(hwnd,IDC_BTN_C4PCHK,BM_SETCHECK,0,0);
                                 SendDlgItemMessage(hwnd,IDC_BTN_GRIFFCHK,BM_SETCHECK,0,0);
-                                btn_griffchk_unselect();
+                                btnGriffchkUnselect();
                             }
                             else
                             {
@@ -426,7 +470,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         case BN_CLICKED:
                             {
-                                LPWSTR outputFolder = GetFolderPath();
+                                LPWSTR outputFolder = getFolderPath();
                                 if (outputFolder != NULL) {
                                     SetWindowTextW(VideoPath,outputFolder);
                                     CoTaskMemFree(outputFolder);
@@ -442,7 +486,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         case BN_CLICKED:
                             {
-                                LPWSTR outputFolder = GetFolderPath();
+                                LPWSTR outputFolder = getFolderPath();
                                 if (outputFolder != NULL) {
                                     SetWindowTextW(GriffeyePath,outputFolder);
                                     CoTaskMemFree(outputFolder);
@@ -471,7 +515,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                             else{
                                 //not checked
-                                btn_griffchk_unselect();
+                                btnGriffchkUnselect();
                             }
                         break;
                     }
@@ -483,7 +527,7 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         case BN_CLICKED:
                             {
-                                LPWSTR outputFolder = GetFolderPath();
+                                LPWSTR outputFolder = getFolderPath();
                                 if (outputFolder != NULL) {
                                     SetWindowTextW(PicturePath,outputFolder);
                                     CoTaskMemFree(outputFolder);
@@ -566,6 +610,57 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 break;
             }
             return 0;
+        case WM_MOUSEWHEEL:
+            if (entryScrollBar != NULL)
+            {
+                POINT screenPt;
+                screenPt.x = (int)(short)LOWORD(lParam);
+                screenPt.y = (int)(short)HIWORD(lParam);
+                RECT panelRect, sbRect;
+                GetWindowRect(entryPanel, &panelRect);
+                GetWindowRect(entryScrollBar, &sbRect);
+                if (PtInRect(&panelRect, screenPt) || PtInRect(&sbRect, screenPt))
+                {
+                    int wheelDelta = (int)(short)HIWORD(wParam);
+                    SCROLLINFO si = {};
+                    si.cbSize = sizeof(si);
+                    si.fMask = SIF_ALL;
+                    GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                    int oldPos = si.nPos;
+                    si.nPos -= (wheelDelta / WHEEL_DELTA) * 3 * boxMultiplier;
+                    si.fMask = SIF_POS;
+                    SetScrollInfo(entryScrollBar, SB_CTL, &si, TRUE);
+                    GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                    if (si.nPos != oldPos)
+                        ScrollWindow(entryPanel, 0, oldPos - si.nPos, NULL, NULL);
+                }
+            }
+            return 0;
+        case WM_VSCROLL:
+            if (entryScrollBar != NULL && (HWND)lParam == entryScrollBar)
+            {
+                SCROLLINFO si = {};
+                si.cbSize = sizeof(si);
+                si.fMask = SIF_ALL;
+                GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                int oldPos = si.nPos;
+                switch (LOWORD(wParam))
+                {
+                    case SB_LINEUP:        si.nPos -= boxMultiplier; break;
+                    case SB_LINEDOWN:      si.nPos += boxMultiplier; break;
+                    case SB_PAGEUP:        si.nPos -= (int)si.nPage; break;
+                    case SB_PAGEDOWN:      si.nPos += (int)si.nPage; break;
+                    case SB_THUMBTRACK:
+                    case SB_THUMBPOSITION: si.nPos = (int)HIWORD(wParam); break;
+                    default: break;
+                }
+                si.fMask = SIF_POS;
+                SetScrollInfo(entryScrollBar, SB_CTL, &si, TRUE);
+                GetScrollInfo(entryScrollBar, SB_CTL, &si);
+                if (si.nPos != oldPos)
+                    ScrollWindow(entryPanel, 0, oldPos - si.nPos, NULL, NULL);
+            }
+            return 0;
         case WM_DESTROY:
             DestroyWindow(PicturePath);
             DestroyWindow(VideoPath);
@@ -594,9 +689,10 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         case WM_GETMINMAXINFO:
             {
                 MINMAXINFO FAR *mInfo = (MINMAXINFO FAR *)lParam;
-                mInfo->ptMinTrackSize.y = (MainWindowLength+(extractInfo.noNames * boxMultiplier));//+(extractInfo.noNames * 30);
+                int panelRows = extractInfo.noNames > MAX_VISIBLE_ENTRIES ? MAX_VISIBLE_ENTRIES : extractInfo.noNames;
+                mInfo->ptMinTrackSize.y = MainWindowLength + (panelRows * boxMultiplier);
                 mInfo->ptMinTrackSize.x = MainWindowWidth;
-                mInfo->ptMaxTrackSize.y = (MainWindowLength+(extractInfo.noNames * boxMultiplier));
+                mInfo->ptMaxTrackSize.y = MainWindowLength + (panelRows * boxMultiplier);
                 mInfo->ptMaxTrackSize.x = MainWindowWidth * 2;
             }
         break;
@@ -614,22 +710,6 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hwnd,uMsg,wParam, lParam);
 }
 
-/** @brief Checks whether a supported Griffeye CLI executable exists at the configured path. */
-static bool griffeyeExeAvailable()
-{
-    const wchar_t* folder = extractOpt.GriffeyePath;
-    if (folder[0] == L'\0') return false;
-    char narrowFolder[MAX_PATH];
-    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
-    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
-    char check[MAX_PATH];
-    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
-    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return true; }
-    return false;
-}
-
 /**
  * @brief Populates all dialog controls to reflect a previously saved ExtractionDetails record.
  * @param record Extraction settings to apply to the UI.
@@ -645,7 +725,7 @@ void setExtractionOptions(ExtractionDetails record)
     if (record.checkParent){SendMessageA(parentChkBox,BM_SETCHECK,BST_CHECKED,0);}
     else {SendMessageA(parentChkBox,BM_SETCHECK,BST_UNCHECKED,0);}
     {
-        bool exeFound = griffeyeExeAvailable();
+        bool exeFound = (findGriffeyeExe(extractOpt.GriffeyePath) != NULL);
         EnableWindow(griffChkBox, exeFound ? TRUE : FALSE);
         bool griffOn = record.createGriffeye && exeFound;
         SendMessageA(griffChkBox, BM_SETCHECK, griffOn ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -684,11 +764,18 @@ bool createOuputControls(HWND hwnd, int startOffset)
 {
     CaseDir = new char[512];
     wchar_t* CaseDirWide = new wchar_t[512];
+    CaseDirWide[0] = L'\0';
     INT64 lenCaseDir = XWF_GetCaseProp(NULL,5,(PVOID)CaseDirWide,512);
     if (lenCaseDir < 0)
     {
         XWF_OutputMessage(L"Error retrieving case directory",0);
+        lenCaseDir = 0;
     }
+    else if (lenCaseDir >= 512)
+    {
+        lenCaseDir = 511;
+    }
+    CaseDirWide[lenCaseDir] = L'\0';
     for (int i = lenCaseDir;i>0;i--)
     {
         if (CaseDirWide[i]==L'\\')
@@ -697,7 +784,7 @@ bool createOuputControls(HWND hwnd, int startOffset)
             break;
         }
     }
-    sprintf(CaseDir,"%ls\\Clees4All\\",CaseDirWide);
+    snprintf(CaseDir,512,"%ls\\Clees4All\\",CaseDirWide);
     delete[] CaseDirWide;
     PicturePath = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",CaseDir,WS_CHILD|WS_VISIBLE,lblPicStartX + lblPicWidth + 20,startOffset,MainWindowWidth - (lblPicStartX + lblPicWidth) - 80,20,hwnd,(HMENU)IDC_TEXT_PICTUREPATH,GetModuleHandle(NULL),NULL);
     if (!PicturePath)
@@ -845,7 +932,11 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     wchar_t caseNameW[128] = {0};
     char caseName[128]={0};
     INT64 result = XWF_GetCaseProp(NULL,1,&caseNameW,128);
-    sprintf(caseName,"%ls",caseNameW);
+    if (result < 0)
+    {
+        XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving case name",0);
+    }
+    snprintf(caseName,128,"%ls",caseNameW);
     GriffeyeCase = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",caseName,WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_GROUP,lblVidStartX + 160,start,150,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYECASE,GetModuleHandle(NULL),NULL);
     if (!GriffeyeCase)
     {
@@ -899,7 +990,11 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     wchar_t NameW[128] = {0};
     char Name[128]={0};
     result = XWF_GetCaseProp(NULL,3,&NameW,128);
-    sprintf(Name,"%ls",NameW);
+    if (result < 0)
+    {
+        XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving investigator name",0);
+    }
+    snprintf(Name,128,"%ls",NameW);
     GriffeyeInvName = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",Name,WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+50,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYEINVNAME,GetModuleHandle(NULL),NULL);
     if (!GriffeyeInvName)
     {
@@ -980,7 +1075,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
         sprintf(message,"Static Text Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
     }
-    GriffeyeSettings = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+175,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYEINVORG,GetModuleHandle(NULL),NULL);
+    GriffeyeSettings = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+175,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYESETTINGS,GetModuleHandle(NULL),NULL);
     if (!GriffeyeSettings)
     {
         int result=GetLastError();
@@ -995,13 +1090,19 @@ bool createGriffeyeEntries(HWND hwnd, int start)
  * @brief Creates all controls in the main dialog by calling the individual control-group creators.
  * @param hwnd Parent window handle.
  */
-void CreateControls(HWND hwnd)
+void createControls(HWND hwnd)
 {
+    int panelRows = extractInfo.noNames > MAX_VISIBLE_ENTRIES ? MAX_VISIBLE_ENTRIES : extractInfo.noNames;
+    int panelHeight = panelRows * boxMultiplier;
+    RECT clientRect = {};
+    GetClientRect(hwnd, &clientRect);
+    int clientW = clientRect.right;
+
     createOuputControls(hwnd,outputStart);
     createOptionsControls(hwnd);
-    createGriffeyeEntries(hwnd,MainWindowLength - 280 + (extractInfo.noNames*boxMultiplier));
+    createGriffeyeEntries(hwnd,MainWindowLength - 280 + panelHeight);
 
-    btnOK= CreateWindowEx(0,"BUTTON","&OK",WS_CHILD|WS_VISIBLE|WS_TABSTOP,(MainWindowWidth / 2)-20,MainWindowLength - 80 + (extractInfo.noNames*boxMultiplier),40,40,hwnd,(HMENU)IDC_BTN_OK,GetModuleHandle(NULL),NULL);
+    btnOK= CreateWindowEx(0,"BUTTON","&OK",WS_CHILD|WS_VISIBLE|WS_TABSTOP,(MainWindowWidth / 2)-20,MainWindowLength - 80 + panelHeight,40,40,hwnd,(HMENU)IDC_BTN_OK,GetModuleHandle(NULL),NULL);
     if (!btnOK)
     {
         int result=GetLastError();
@@ -1009,7 +1110,7 @@ void CreateControls(HWND hwnd)
         sprintf(message,"OK Button Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
     }
-    vicChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 200 + (extractInfo.noNames*boxMultiplier),200,40,hwnd,(HMENU)IDC_BTN_VICCHK,GetModuleHandle(NULL),NULL);
+    vicChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 200 + panelHeight,200,40,hwnd,(HMENU)IDC_BTN_VICCHK,GetModuleHandle(NULL),NULL);
     if (!vicChkBox)
     {
         int result=GetLastError();
@@ -1017,7 +1118,7 @@ void CreateControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
-    compChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format (Compressed)",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 170 + (extractInfo.noNames*boxMultiplier),300,40,hwnd,(HMENU)IDC_BTN_VICSZIP,GetModuleHandle(NULL),NULL);
+    compChkBox = CreateWindowEx(0,"BUTTON","Export VICS Format (Compressed)",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 170 + panelHeight,300,40,hwnd,(HMENU)IDC_BTN_VICSZIP,GetModuleHandle(NULL),NULL);
     if (!compChkBox)
     {
         int result=GetLastError();
@@ -1025,7 +1126,7 @@ void CreateControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
-    C4PChkBox = CreateWindowEx(0,"BUTTON","Export C4P XML",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 140 + (extractInfo.noNames*boxMultiplier),200,40,hwnd,(HMENU)IDC_BTN_C4PCHK,GetModuleHandle(NULL),NULL);
+    C4PChkBox = CreateWindowEx(0,"BUTTON","Export C4P XML",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,MainWindowWidth - 300,MainWindowLength - 140 + panelHeight,200,40,hwnd,(HMENU)IDC_BTN_C4PCHK,GetModuleHandle(NULL),NULL);
     if (!C4PChkBox)
     {
         int result=GetLastError();
@@ -1033,6 +1134,26 @@ void CreateControls(HWND hwnd)
         sprintf(message,"Textbox Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
     }
+    int scrollbarWidth = (extractInfo.noNames > MAX_VISIBLE_ENTRIES) ? GetSystemMetrics(SM_CXVSCROLL) : 0;
+    entryPanel = CreateWindowEx(0, "EntryScrollPanel", NULL,
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+        0, evidenceStartY, clientW - scrollbarWidth, panelHeight,
+        hwnd, (HMENU)IDC_ENTRY_PANEL, NULL, NULL);
+    if (extractInfo.noNames > MAX_VISIBLE_ENTRIES)
+    {
+        entryScrollBar = CreateWindowEx(0, "SCROLLBAR", NULL, WS_CHILD | WS_VISIBLE | SBS_VERT,
+            clientW - scrollbarWidth, evidenceStartY, scrollbarWidth, panelHeight,
+            hwnd, (HMENU)IDC_ENTRY_SCROLLBAR, GetModuleHandle(NULL), NULL);
+        SCROLLINFO si = {};
+        si.cbSize = sizeof(si);
+        si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+        si.nMin = 0;
+        si.nMax = extractInfo.noNames * boxMultiplier - 1;
+        si.nPage = panelHeight;
+        si.nPos  = 0;
+        SetScrollInfo(entryScrollBar, SB_CTL, &si, TRUE);
+    }
+
     TxtActualName = new HWND[extractInfo.noNames];
     TxtNewName = new HWND[extractInfo.noNames];
     lblActual = new HWND[extractInfo.noNames];
@@ -1040,10 +1161,11 @@ void CreateControls(HWND hwnd)
     for (int i=0; i< extractInfo.noNames;i++)
     {
         char* txtEvCurr;
-        txtEvCurr = new char[wcslen(extractInfo.nameList[i].actualName)+2];
+        size_t txtEvCurrSize = wcslen(extractInfo.nameList[i].actualName)+2;
+        txtEvCurr = new char[txtEvCurrSize];
         txtEvCurr[0] = '\0';
-        sprintf(txtEvCurr,"%ls",extractInfo.nameList[i].actualName);
-        lblActual[i] = CreateWindowEx(0,"Static","Evidence Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX - 10,evidenceStartY + (i*boxMultiplier),140,30,hwnd,0,GetModuleHandle(NULL),0);
+        snprintf(txtEvCurr,txtEvCurrSize,"%ls",extractInfo.nameList[i].actualName);
+        lblActual[i] = CreateWindowEx(0,"Static","Evidence Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX - 10,i*boxMultiplier,140,30,entryPanel,0,GetModuleHandle(NULL),0);
         if (!lblActual[i])
         {
             int result=GetLastError();
@@ -1051,7 +1173,7 @@ void CreateControls(HWND hwnd)
             sprintf(message,"Static Text Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
         }
-        TxtActualName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"Static",txtEvCurr,WS_CHILD|WS_VISIBLE,lblVidStartX + 140,evidenceStartY + (i*boxMultiplier),210,20,hwnd,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
+        TxtActualName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"Static",txtEvCurr,WS_CHILD|WS_VISIBLE,lblVidStartX + 140,i*boxMultiplier,210,20,entryPanel,(HMENU)(IDC_TEXT_EVNAME+i),GetModuleHandle(NULL),NULL);
         if (!TxtActualName[i])
         {
             int result=GetLastError();
@@ -1059,7 +1181,7 @@ void CreateControls(HWND hwnd)
             sprintf(message,"Textbox Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create debug checkbox",MB_ICONERROR);
         }
-        lblNew[i] = CreateWindowEx(0,"Static","Source ID Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,(MainWindowWidth/2) - 20,evidenceStartY + (i*boxMultiplier),130,20,hwnd,0,GetModuleHandle(NULL),0);
+        lblNew[i] = CreateWindowEx(0,"Static","Source ID Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,(MainWindowWidth/2) - 20,i*boxMultiplier,130,20,entryPanel,0,GetModuleHandle(NULL),0);
         if (!lblNew[i])
         {
             int result=GetLastError();
@@ -1067,7 +1189,7 @@ void CreateControls(HWND hwnd)
             sprintf(message,"Static Text Creation Error: %d",result);
             MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
         }
-        TxtNewName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",txtEvCurr,WS_CHILD|WS_VISIBLE,(MainWindowWidth/2)+120,evidenceStartY + (i*boxMultiplier),190,20,hwnd,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
+        TxtNewName[i] = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",txtEvCurr,WS_CHILD|WS_VISIBLE,(MainWindowWidth/2)+120,i*boxMultiplier,190,20,entryPanel,(HMENU)(IDC_TEXT_NEW_NAME+i),GetModuleHandle(NULL),NULL);
         if (!TxtNewName[i])
         {
             int result=GetLastError();
@@ -1088,7 +1210,7 @@ void CreateControls(HWND hwnd)
  * @return Wide-character string allocated by the shell containing the chosen folder path,
  *         or NULL if the user cancelled. Caller must free with CoTaskMemFree().
  */
-LPWSTR GetFolderPath()
+LPWSTR getFolderPath()
 {
     // CoCreate the File Open Dialog object.
     IFileDialog *pfd = NULL;
@@ -1152,6 +1274,10 @@ int startProcess()
     char buffer[1024];
     if(extractInfo.createGriffeye)
     {
+        //free any allocations left over from a previous, failed attempt to start processing
+        if (extractInfo.GriffeyeCaseLocation != NULL) { delete[] extractInfo.GriffeyeCaseLocation; extractInfo.GriffeyeCaseLocation = NULL; }
+        if (extractInfo.GriffeyeSettingsName != NULL) { delete[] extractInfo.GriffeyeSettingsName; extractInfo.GriffeyeSettingsName = NULL; }
+        if (extractInfo.GriffeyeCaseName != NULL) { delete[] extractInfo.GriffeyeCaseName; extractInfo.GriffeyeCaseName = NULL; }
         int length = GetWindowTextLength(GriffeyeCase);
         if (length == 0)
         {
@@ -1160,22 +1286,22 @@ int startProcess()
         }
         length = GetWindowTextLength(GriffeyePath);
         GetWindowText(GriffeyePath,buffer,1024);
-        if(!DirExists(buffer))
+        if(!dirExists(buffer))
         {
             MessageBox(NULL,"Griffeye Case Location does not exist","Error!! ",MB_ICONERROR);
             return 1;
         }
         extractInfo.GriffeyeCaseLocation = new wchar_t[length + 40];
-        swprintf(extractInfo.GriffeyeCaseLocation,L"%s",buffer);
+        swprintf(extractInfo.GriffeyeCaseLocation,length + 40,L"%s",buffer);
         buffer[0]='\0';
         length = GetWindowTextLength(GriffeyeSettings);
         GetWindowText(GriffeyeSettings,buffer,1024);
         if (length != 0){
             wchar_t pathBuffer[2048];
-            swprintf(pathBuffer,L"%ls%s",GriffeyeConfigPath,buffer);
+            swprintf(pathBuffer,2048,L"%ls%s",GriffeyeConfigPath,buffer);
             if (ifFileExistsW(pathBuffer)){
                 extractInfo.GriffeyeSettingsName = new wchar_t[length + 10];
-                swprintf(extractInfo.GriffeyeSettingsName,L"%s",buffer);
+                swprintf(extractInfo.GriffeyeSettingsName,length + 10,L"%s",buffer);
                 buffer[0]='\0';
             }
             else{
@@ -1187,14 +1313,13 @@ int startProcess()
         length = GetWindowTextLength(GriffeyeCase);
         GetWindowText(GriffeyeCase,buffer,1024);
         extractInfo.GriffeyeCaseName = new wchar_t[length + 10];
-        swprintf(extractInfo.GriffeyeCaseName,L"%s",buffer);
+        swprintf(extractInfo.GriffeyeCaseName,length + 10,L"%s",buffer);
         buffer[0]='\0';
     }
     if (extractInfo.extractPictures)
     {
-        int length = GetWindowTextLength(PicturePath);
         GetWindowText(PicturePath,buffer,1024);
-        if(!DirExists(buffer))
+        if(!dirExists(buffer))
         {
             if (strcmp(buffer,CaseDir)==0)
             {
@@ -1205,7 +1330,11 @@ int startProcess()
                 }
                 else if (res == IDYES)
                 {
-                    CreateDirectoryA(buffer,NULL);
+                    if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+                    {
+                        MessageBox(NULL,"Unable to create picture output directory","Error!! ",MB_ICONERROR);
+                        return 1;
+                    }
                 }
             }
             else
@@ -1214,23 +1343,28 @@ int startProcess()
                 return 1;
             }
         }
-        if (buffer[length-1]!= '\\')
+        size_t pathLen = strlen(buffer);
+        if ((pathLen == 0 || buffer[pathLen-1]!= '\\') && pathLen < sizeof(buffer)-1)
         {
-            strcat(buffer,"\\");
+            buffer[pathLen] = '\\';
+            buffer[pathLen+1] = '\0';
         }
-        swprintf(extractInfo.C4PPath,L"%s",buffer);
+        swprintf(extractInfo.C4PPath,1024,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
-            CreateDirectoryA(buffer,NULL);
+            strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
+            if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                MessageBox(NULL,"Unable to create picture output Files directory","Error!! ",MB_ICONERROR);
+                return 1;
+            }
         }
         buffer[0]='\0';
     }
     if (extractInfo.extractVideos)
     {
-        int length = GetWindowTextLength(VideoPath);
         GetWindowText(VideoPath,buffer,1024);
-        if(!DirExists(buffer))
+        if(!dirExists(buffer))
         {
             if (strcmp(buffer,CaseDir)==0)
             {
@@ -1241,7 +1375,11 @@ int startProcess()
                 }
                 else if (res == IDYES)
                 {
-                    CreateDirectoryA(buffer,NULL);
+                    if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+                    {
+                        MessageBox(NULL,"Unable to create video output directory","Error!! ",MB_ICONERROR);
+                        return 1;
+                    }
                 }
             }
             else
@@ -1250,15 +1388,21 @@ int startProcess()
                 return 1;
             }
         }
-        if (buffer[length-1]!= '\\')
+        size_t pathLen = strlen(buffer);
+        if ((pathLen == 0 || buffer[pathLen-1]!= '\\') && pathLen < sizeof(buffer)-1)
         {
-            strcat(buffer,"\\");
+            buffer[pathLen] = '\\';
+            buffer[pathLen+1] = '\0';
         }
-        swprintf(extractInfo.C4MPath,L"%s",buffer);
+        swprintf(extractInfo.C4MPath,1024,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
-            strcat(buffer,"Files");
-            CreateDirectoryA(buffer,NULL);
+            strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
+            if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                MessageBox(NULL,"Unable to create video output Files directory","Error!! ",MB_ICONERROR);
+                return 1;
+            }
 
         }
         buffer[0]='\0';
@@ -1267,7 +1411,7 @@ int startProcess()
     for (int i = 0;i<extractInfo.noNames;i++)
     {
         GetWindowText(TxtNewName[i],buffer,1024);
-        swprintf(extractInfo.nameList[i].prefName,L"%s",buffer);
+        swprintf(extractInfo.nameList[i].prefName,1024,L"%s",buffer);
         buffer[0]='\0';
     }
     HRESULT error = CoCreateGuid(&vCaseData.caseGuid);
@@ -1324,24 +1468,29 @@ void fillCaseDetails()
  */
 int getGriffeyeDetails()
 {
-    char appdataPath[MAX_PATH];
+    char appdataPath[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
-        if (!DirExists(appdataPath))
+        if (!dirExists(appdataPath))
         {
             CreateDirectoryA(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (DirExists(appdataPath))
+        if (dirExists(appdataPath))
         {
             //folder exists, check if options database does!
-            char optPath[MAX_PATH];
-            sprintf(optPath,"%s\\%s",appdataPath,"griffeyeDetails.txt");
+            char optPath[MAX_PATH + 64];
+            snprintf(optPath,sizeof(optPath),"%s\\%s",appdataPath,"griffeyeDetails.txt");
             if (ifFileExists(optPath))
             {
                 //file exists, read lines
                 FILE* detailsFile = fopen(optPath,"r");
+                if (detailsFile == NULL)
+                {
+                    XWF_OutputMessage(L"Error opening Griffeye details file for reading",0);
+                    return 0;
+                }
                 char line[256];
                 int len;
                 //currently working on 4 lines
@@ -1349,7 +1498,7 @@ int getGriffeyeDetails()
                 {
                     //line 1 - inv title
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1359,7 +1508,7 @@ int getGriffeyeDetails()
                 {
                     //line 2 - contact email
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1369,7 +1518,7 @@ int getGriffeyeDetails()
                 {
                     //line 3 - phone number
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1379,7 +1528,7 @@ int getGriffeyeDetails()
                 {
                     //line 2 - organisation
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1398,21 +1547,26 @@ int getGriffeyeDetails()
  */
 int saveGriffeyeDetails()
 {
-    char appdataPath[MAX_PATH];
+    char appdataPath[MAX_PATH + 32];
     if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA,NULL,0,appdataPath)))
     {
         strcat(appdataPath,"\\X-Ways\\");
-        if (!DirExists(appdataPath))
+        if (!dirExists(appdataPath))
         {
             CreateDirectoryA(appdataPath, NULL);
         }
         strcat(appdataPath,"Clees4All\\");
-        if (DirExists(appdataPath))
+        if (dirExists(appdataPath))
         {
             //folder exists, check if options database does!
-            char optPath[MAX_PATH];
-            sprintf(optPath,"%s\\%s",appdataPath,"griffeyeDetails.txt");
+            char optPath[MAX_PATH + 64];
+            snprintf(optPath,sizeof(optPath),"%s\\%s",appdataPath,"griffeyeDetails.txt");
             FILE* details = fopen(optPath,"w");
+            if (details == NULL)
+            {
+                XWF_OutputMessage(L"Error opening Griffeye details file for writing",0);
+                return 0;
+            }
             char item[256];
             GetWindowText(GriffeyeInvTitle,item,256);
             fprintf(details,"%s\n",item);
@@ -1434,5 +1588,9 @@ void cleanupGUI()
     if (CaseDir != NULL) {
         delete[] CaseDir;
         CaseDir = NULL;
+    }
+    if (hBrush != NULL) {
+        DeleteObject(hBrush);
+        hBrush = NULL;
     }
 }

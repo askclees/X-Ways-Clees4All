@@ -58,4 +58,7 @@ void outputErrorMessage(const wchar_t* errMsg, wchar_t* detail);
 void errorRaised(LONG nItemID,int errorCode);
 void errorReport();
 
+void initDebugLocks();
+void destroyDebugLocks();
+
 #endif // DEBUGMESSAGE_H_INCLUDED

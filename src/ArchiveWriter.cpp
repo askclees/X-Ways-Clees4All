@@ -1,8 +1,9 @@
 
 //standard libraries
-#include <mutex>
+#include <windows.h>
 #include <set>
 #include <string>
+#include <utility>
 
 //project includes
 #include "ArchiveWriter.h"
@@ -31,11 +32,18 @@ struct archive* ArchVid=nullptr;
 /** @brief libarchive write object used when picture and video paths are the same. */
 struct archive* ArchAll=nullptr;
 
-/** @brief Set of MD5 hash strings for files already written to the archive, used for deduplication. */
-std::set<std::string> hashList;
+/** @brief Set of (destination archive, MD5 hash) pairs for files already written, used for deduplication.
+ *  Keyed per destination archive object so a hash written to one archive (e.g. ArchVid) doesn't
+ *  suppress writing it to a different, separate archive (e.g. ArchPic). */
+std::set<std::pair<struct archive*, std::string>> hashList;
 
-/** @brief Mutex preventing simultaneous writes to a zip archive. */
-std::mutex archiveLock;
+/** @brief Critical section preventing simultaneous writes to a zip archive. */
+CRITICAL_SECTION archiveLock;
+
+/** @brief Initialises archiveLock. Must be called before any archive writes are attempted. */
+void initArchiveLocks()    { InitializeCriticalSection(&archiveLock); }
+/** @brief Releases the resources held by archiveLock. */
+void destroyArchiveLocks() { DeleteCriticalSection(&archiveLock); }
 
 
 /**
@@ -53,7 +61,7 @@ int setArchivePath(wchar_t* path, int flags)
     wchar_t* tempStr;
     int pathLen = wcslen(path) + 64;
     tempStr = new wchar_t[pathLen];
-    swprintf(tempStr,L"%lsJSON export.zip",path);
+    swprintf(tempStr,pathLen,L"%lsJSON export.zip",path);
     if (flags & SET_PIC_PATH)
     {
         archivePic = convertWideToChar(tempStr);
@@ -86,9 +94,15 @@ int setupZipArchives()
         if (ArchAll == NULL)
             return ERROR_CREATE;
         if (archive_write_set_format_zip(ArchAll) != ARCHIVE_OK)
+        {
+            closeZipArchive(&ArchAll);
             return ERROR_FORMAT;
+        }
         if (archive_write_open_filename(ArchAll, archivePic) != ARCHIVE_OK)
+        {
+            closeZipArchive(&ArchAll);
             return ERROR_OPEN;
+        }
     }
     else
     {
@@ -98,19 +112,40 @@ int setupZipArchives()
             if (ArchPic == NULL)
                 return ERROR_CREATE;
             if (archive_write_set_format_zip(ArchPic) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchPic);
                 return ERROR_FORMAT;
+            }
             if (archive_write_open_filename(ArchPic, archivePic) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchPic);
                 return ERROR_OPEN;
+            }
         }
         if (archiveVid != nullptr)
         {
             ArchVid = archive_write_new();
+            //ArchPic may already be open at this point - on any failure below it must be
+            //freed too, otherwise its open file handle leaks for the rest of the X-Ways
+            //session (setupZipArchives isn't retried, and caseCleanup is never reached
+            //since the caller aborts XT_Prepare on a non-SUCCESS return)
             if (ArchVid == NULL)
+            {
+                if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
                 return ERROR_CREATE;
+            }
             if (archive_write_set_format_zip(ArchVid) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchVid);
+                if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
                 return ERROR_FORMAT;
+            }
             if (archive_write_open_filename(ArchVid, archiveVid) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchVid);
+                if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
                 return ERROR_OPEN;
+            }
         }
     }
     return SUCCESS;
@@ -149,6 +184,10 @@ int createZipArchiveEntry(struct archive** archFile, struct archive_entry** entr
 /**
  * @brief Closes all open zip archives.
  *
+ * Also clears the dedup hashList, since its keys are paired with the archive pointers
+ * being freed here - a stale entry could otherwise collide with an unrelated archive
+ * object a later run happens to allocate at the same address.
+ *
  * @return SUCCESS always.
  *
  * @see closeZipArchive
@@ -158,6 +197,7 @@ int closeZipArchives()
     closeZipArchive(&ArchPic);
     closeZipArchive(&ArchVid);
     closeZipArchive(&ArchAll);
+    hashList.clear();
     return SUCCESS;
 }
 
@@ -199,9 +239,43 @@ int closeZipArchiveEntry(struct archive** archFile, struct archive_entry* entry)
  */
 int closeZipArchive(struct archive** archFile)
 {
-    if (archive_write_free(*archFile)!=ARCHIVE_OK)
-        return ERROR_CLOSE;
-    return SUCCESS;
+    //archive_write_free releases all resources regardless of its return code, so the pointer
+    //must always be nulled here - otherwise a stale pointer from this run can be mistaken for
+    //a live archive by setupZipArchives()/selectArchiveObject() on a later run in the same
+    //X-Ways session (e.g. switching between a combined and a separate picture/video output
+    //config leaves whichever archive pointer the new config doesn't use dangling)
+    int result = (archive_write_free(*archFile)!=ARCHIVE_OK) ? ERROR_CLOSE : SUCCESS;
+    *archFile = NULL;
+    return result;
+}
+
+/**
+ * @brief Frees and nulls the shared archive object that a short/failed write left in an
+ *        indeterminate state.
+ *
+ * libarchive requires archive_write_free() after a write error - the entry's declared
+ * size (set up front via archive_entry_set_size) no longer matches the bytes actually
+ * written, so the zip stream can't be trusted for any further entries. Nulling the
+ * relevant global here makes selectArchiveObject() return NULL afterwards, so later
+ * writeArchiveFile/writeJSONFile calls fail fast with ERROR_WRITE instead of silently
+ * corrupting more entries into the same archive.
+ *
+ * @param picFile True if the failed write was for a picture, false for video.
+ */
+void invalidateArchiveObject(bool picFile)
+{
+    if (ArchAll != nullptr)
+    {
+        closeZipArchive(&ArchAll);
+    }
+    else if (picFile)
+    {
+        if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
+    }
+    else
+    {
+        if (ArchVid != nullptr) { closeZipArchive(&ArchVid); }
+    }
 }
 
 /**
@@ -262,31 +336,57 @@ struct archive* selectArchiveObject(bool picFile)
  * @param inFilePath Path to the source file on disk.
  * @param filename   Path for the file within the archive.
  * @param picFile    True if the file is a picture.
- * @return           SUCCESS on success, or ERROR_OPEN if the file size could
- *                   not be determined or the file could not be opened.
+ * @return           SUCCESS on success, ERROR_OPEN if the file size could not
+ *                   be determined or the file could not be opened, ERROR_WRITE
+ *                   if the archive entry header could not be written, or
+ *                   ERROR_READ if reading the source file fails partway through.
  *
- * @see FileSize, createZipArchiveEntry
+ * @see getFileSize, createZipArchiveEntry
  */
 int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
 {
     struct archive *outa = selectArchiveObject(picFile);
+    if (outa == nullptr)
+        return ERROR_WRITE;
     struct archive_entry *entry;
     size_t bytesRead=0;
 
-    INT64 fSize = FileSize(inFilePath);
+    INT64 fSize = getFileSize(inFilePath);
     if (fSize < 0)
         return ERROR_OPEN;
-    int result = createZipArchiveEntry(&outa,&entry,filename,fSize);
-    unsigned char* buffer = new unsigned char[max_read+1];
     FILE* inputFile = fopen(inFilePath,"rb");
-    if (inputFile != NULL)
+    if (inputFile == NULL)
+        return ERROR_OPEN;
+    int result = createZipArchiveEntry(&outa,&entry,filename,fSize);
+    if (result != SUCCESS)
     {
-        while ((bytesRead = fread(buffer,1,max_read, inputFile)) > 0)
-        {
-            archive_write_data(outa,buffer,bytesRead);
-        }
         fclose(inputFile);
+        return result;
     }
+    unsigned char* buffer = new unsigned char[max_read+1];
+    while ((bytesRead = fread(buffer,1,max_read, inputFile)) > 0)
+    {
+        la_ssize_t written = archive_write_data(outa,buffer,bytesRead);
+        if (written < 0 || (size_t)written != bytesRead)
+        {
+            fclose(inputFile);
+            closeZipArchiveEntry(&outa, entry);
+            delete[] buffer;
+            //the entry's declared size no longer matches what was actually written -
+            //the archive object can't be trusted for any further entries
+            invalidateArchiveObject(picFile);
+            return ERROR_WRITE;
+        }
+    }
+    if (ferror(inputFile))
+    {
+        fclose(inputFile);
+        closeZipArchiveEntry(&outa, entry);
+        delete[] buffer;
+        invalidateArchiveObject(picFile);
+        return ERROR_READ;
+    }
+    fclose(inputFile);
     closeZipArchiveEntry(&outa, entry);
     delete[] buffer;
     return SUCCESS;
@@ -312,16 +412,25 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
  */
 int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,HANDLE hdlCurrVol)
 {
-    archiveLock.lock();
+    EnterCriticalSection(&archiveLock);
+    struct archive *outa = selectArchiveObject(picFile);
+    if (outa == nullptr)
+    {
+        //a previous write on this archive failed and invalidated it - fail fast rather than
+        //dereferencing a freed archive object
+        LeaveCriticalSection(&archiveLock);
+        return ERROR_WRITE;
+    }
     char* filePath = generateCompressedPath(fileName);
     bool fileFound = false;
     std::wstring wFileName(fileName);
     std::string hashValue(wFileName.begin(), wFileName.end());
-    fileFound = hashList.count(hashValue);
+    auto hashKey = std::make_pair(outa, hashValue);
+    fileFound = hashList.count(hashKey);
 
     if (fileFound)
     {
-        archiveLock.unlock();
+        LeaveCriticalSection(&archiveLock);
         delete[] filePath;
         return SUCCESS;
     }
@@ -332,16 +441,15 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
     {
         errorRaised(nItemID,REPORT_FILEOPEN_ERROR);
         //clear file lock to prevent deadlock
-        archiveLock.unlock();
+        LeaveCriticalSection(&archiveLock);
         delete[] filePath;
         return 1;
     }
-    struct archive *outa = selectArchiveObject(picFile);
     struct archive_entry *entry;
     if (createZipArchiveEntry(&outa,&entry,filePath,fileSize) != SUCCESS)
     {
         XWF_Close(hItem);
-        archiveLock.unlock();
+        LeaveCriticalSection(&archiveLock);
         delete[] filePath;
         return ERROR_WRITE;
     }
@@ -361,9 +469,28 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
             readSize = fileSize - currOffset;
         }
         DWORD read = XWF_Read(hItem,currOffset,buffer,readSize);
-        if (read > 0)
+        if (read != readSize)
         {
-            archive_write_data(outa,buffer,read);
+            XWF_Close(hItem);
+            delete[] buffer;
+            closeZipArchiveEntry(&outa, entry);
+            //entry's declared size (fileSize) no longer matches what was actually written -
+            //the archive object can't be trusted for any further entries
+            invalidateArchiveObject(picFile);
+            LeaveCriticalSection(&archiveLock);
+            delete[] filePath;
+            return ERROR_WRITE;
+        }
+        la_ssize_t written = archive_write_data(outa,buffer,read);
+        if (written < 0 || (DWORD)written != read)
+        {
+            XWF_Close(hItem);
+            delete[] buffer;
+            closeZipArchiveEntry(&outa, entry);
+            invalidateArchiveObject(picFile);
+            LeaveCriticalSection(&archiveLock);
+            delete[] filePath;
+            return ERROR_WRITE;
         }
         currOffset += readSize;
     }
@@ -371,9 +498,9 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
     XWF_Close(hItem);
     delete[] buffer;
     closeZipArchiveEntry(&outa, entry);
-    hashList.insert(hashValue);
+    hashList.insert(hashKey);
     //end of function, unlock file
-    archiveLock.unlock();
+    LeaveCriticalSection(&archiveLock);
     delete[] filePath;
     return SUCCESS;
 }
