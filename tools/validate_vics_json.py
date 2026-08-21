@@ -196,6 +196,7 @@ def build_csv_index(csv_path, db_path, columns, delimiter, encoding, batch_size,
         CREATE TABLE csv_rows (
             id INTEGER PRIMARY KEY,
             match_key TEXT NOT NULL,
+            path_name_key TEXT NOT NULL,
             md5 TEXT,
             size INTEGER,
             created TEXT,
@@ -235,7 +236,8 @@ def build_csv_index(csv_path, db_path, columns, delimiter, encoding, batch_size,
             # labels can't be compared directly. It's still stored/reported
             # on the row for reference (and used to group timestamps for
             # per-evidence time zone calibration).
-            key = md5 + '::' + normalize_path_key(path, strip_extraction_annotation(name))
+            path_name_key = normalize_path_key(path, strip_extraction_annotation(name))
+            key = md5 + '::' + path_name_key
             size = parse_int(row.get(columns['size'])) if columns['size'] else None
             created, created_ht = parse_csv_timestamp_naive(row.get(columns['created'])) \
                 if columns['created'] else (None, False)
@@ -245,7 +247,7 @@ def build_csv_index(csv_path, db_path, columns, delimiter, encoding, batch_size,
                 if columns['accessed'] else (None, False)
 
             batch.append((
-                key, md5, size,
+                key, path_name_key, md5, size,
                 created.isoformat() if created else None, int(created_ht),
                 modified.isoformat() if modified else None, int(modified_ht),
                 accessed.isoformat() if accessed else None, int(accessed_ht),
@@ -262,6 +264,7 @@ def build_csv_index(csv_path, db_path, columns, delimiter, encoding, batch_size,
 
     log("  ...building lookup index (this can take a while on huge CSVs)")
     conn.execute('CREATE INDEX idx_csv_key ON csv_rows(match_key, matched)')
+    conn.execute('CREATE INDEX idx_csv_pathname_key ON csv_rows(path_name_key, matched)')
     conn.commit()
     log(f"CSV index built: {row_num:,} rows")
     return conn, row_num
@@ -270,9 +273,9 @@ def build_csv_index(csv_path, db_path, columns, delimiter, encoding, batch_size,
 def _flush_csv_batch(conn, batch):
     conn.executemany(
         'INSERT INTO csv_rows '
-        '(match_key, md5, size, created, created_has_time, modified, modified_has_time, '
+        '(match_key, path_name_key, md5, size, created, created_has_time, modified, modified_has_time, '
         'accessed, accessed_has_time, row_num, evidence, path, name) '
-        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         batch)
     conn.commit()
 
@@ -370,13 +373,25 @@ def process_entry(json_path, media, mf, cur, evidence_offsets, default_offset_ho
     file_name = mf.get('FileName') or ''
     file_path = mf.get('FilePath') or ''
     full_path_display = file_path + file_name
-    key = md5 + '::' + normalize_path_key(strip_leading_segment(file_path), file_name)
+    path_name_key = normalize_path_key(strip_leading_segment(file_path), file_name)
+    key = md5 + '::' + path_name_key
 
     cur.execute(
         'SELECT id, md5, size, evidence, '
         'created, created_has_time, modified, modified_has_time, accessed, accessed_has_time '
         'FROM csv_rows WHERE match_key=? AND matched=0 LIMIT 1', (key,))
     row = cur.fetchone()
+    if row is None:
+        # MD5 is part of the primary key, so a row whose content hash
+        # differs would never be found above even though it's genuinely
+        # the same file - fall back to a path+name-only lookup so that
+        # case shows up as an explicit md5_mismatch instead of being
+        # indistinguishable from the file being absent entirely.
+        cur.execute(
+            'SELECT id, md5, size, evidence, '
+            'created, created_has_time, modified, modified_has_time, accessed, accessed_has_time '
+            'FROM csv_rows WHERE path_name_key=? AND matched=0 LIMIT 1', (path_name_key,))
+        row = cur.fetchone()
     if row is None:
         stats['not_found'] += 1
         report_writer.writerow([json_path, md5, full_path_display, 'NOT_FOUND_IN_CSV', ''])
