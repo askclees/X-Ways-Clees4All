@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <cwchar>
 
 /** @brief Number of nanoseconds in a second. */
 #define Nano2Seconds 10000000LL
@@ -188,13 +189,13 @@ INT64 getFileSize(const char* filePath)
 const char* findGriffeyeExe(const wchar_t* folder)
 {
     if (folder == NULL || folder[0] == L'\0') return NULL;
-    char narrowFolder[MAX_PATH];
-    snprintf(narrowFolder, MAX_PATH, "%ls", folder);
-    bool hasSlash = (narrowFolder[strlen(narrowFolder)-1] == '\\');
-    char check[MAX_PATH];
-    snprintf(check, MAX_PATH, hasSlash ? "%sanalyze-cli.exe" : "%s\\analyze-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return "analyze-cli.exe"; }
-    snprintf(check, MAX_PATH, hasSlash ? "%smagnet-griffeye-cli.exe" : "%s\\magnet-griffeye-cli.exe", narrowFolder);
-    if (FILE* f = fopen(check, "r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
+    //stay in wide chars throughout so this works for non-ASCII install paths - a narrow
+    //conversion here (via snprintf/fopen) would depend on the current ANSI/OEM codepage
+    bool hasSlash = (folder[wcslen(folder)-1] == L'\\');
+    wchar_t check[MAX_PATH];
+    swprintf(check, MAX_PATH, hasSlash ? L"%lsanalyze-cli.exe" : L"%ls\\analyze-cli.exe", folder);
+    if (FILE* f = _wfopen(check, L"r")) { fclose(f); return "analyze-cli.exe"; }
+    swprintf(check, MAX_PATH, hasSlash ? L"%lsmagnet-griffeye-cli.exe" : L"%ls\\magnet-griffeye-cli.exe", folder);
+    if (FILE* f = _wfopen(check, L"r")) { fclose(f); return "magnet-griffeye-cli.exe"; }
     return NULL;
 }

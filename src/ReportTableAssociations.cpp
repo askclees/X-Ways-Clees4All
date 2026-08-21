@@ -105,8 +105,10 @@ ReportTableList stringToEntryList(wchar_t* buffer, int bufferLen)
 {
     ReportTableList retVal;
     int length = wcsnlen(buffer,bufferLen);
+    //if buffer isn't null-terminated within bufferLen, don't read the (possibly out-of-bounds) byte past it
+    int loopEnd = (length < bufferLen) ? length + 1 : bufferLen;
     int start = 0;
-    for (int i=0;i<length+1 && retVal.numEntries<128;i++)
+    for (int i=0;i<loopEnd && retVal.numEntries<128;i++)
     {
         if (buffer[i]==L',' || buffer[i]==L'\0' )
         {
@@ -120,6 +122,17 @@ ReportTableList stringToEntryList(wchar_t* buffer, int bufferLen)
                 start++;
             }
         }
+    }
+    //if the buffer was filled exactly to bufferLen with no embedded NUL, the loop above never
+    //sees a terminator to flush the final entry (loopEnd==bufferLen, so i never reaches the
+    //position after the last character) - flush it here so it isn't silently dropped
+    if (start < length && retVal.numEntries<128)
+    {
+        int itemSize = length - start;
+        if (itemSize > 127) itemSize = 127;
+        wcsncpy(retVal.entries[retVal.numEntries],&buffer[start],itemSize);
+        retVal.entries[retVal.numEntries][itemSize] = L'\0';
+        retVal.numEntries++;
     }
     return retVal;
 }

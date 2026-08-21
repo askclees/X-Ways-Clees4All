@@ -52,6 +52,7 @@
 #define IDC_BTN_EMBCHK              123
 #define IDC_BTN_EMBMISCHK           124
 #define IDC_LBL_EXTRACTOPT          125
+#define IDC_TEXT_GRIFFEYESETTINGS   126
 
 #define IDC_TEXT_EVNAME         300
 #define IDC_ENTRY_PANEL         400
@@ -161,6 +162,10 @@ HWND createToolTip(int toolID, HWND hDlg, PTSTR pszText)
 int createWindow(WORD version)
 {
     VisualStylesScope visualStyles;
+    //hBrush is freed (and nulled) by cleanupGUI() at the end of every run, so it must be
+    //recreated here on any run after the first - otherwise the window classes below get
+    //registered with a NULL background brush
+    if (hBrush == NULL) { hBrush = CreateSolidBrush(RGB(240,240,240)); }
     versionNumber = version;
     const char CLASS_NAME[] = C4A_TITLE;
     WNDCLASSEX wc = {};
@@ -277,6 +282,11 @@ LRESULT CALLBACK WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (!extractInfo.C4ALLExport && !extractInfo.VICExport && !extractInfo.VICSCompressed)
                     {
                         MessageBox(NULL,"You have to select at least one output type!!","Error!! ",MB_ICONERROR);
+                        break;
+                    }
+                    if (extractInfo.C4ALLExport && extractInfo.noNames > MAX_OUTPUT_FILES)
+                    {
+                        MessageBox(NULL,"C4All XML output cannot be used with more than 64 evidence objects in the case. Deselect C4All XML output, or use Project VICS JSON output instead.","Error!! ",MB_ICONERROR);
                         break;
                     }
                     if (extractInfo.debugSet) {XWF_OutputMessage(L"CleesForAll Debug Msg: PreStartProcess",0); }
@@ -926,7 +936,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     {
         XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving case name",0);
     }
-    sprintf(caseName,"%ls",caseNameW);
+    snprintf(caseName,128,"%ls",caseNameW);
     GriffeyeCase = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",caseName,WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_GROUP,lblVidStartX + 160,start,150,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYECASE,GetModuleHandle(NULL),NULL);
     if (!GriffeyeCase)
     {
@@ -984,7 +994,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
     {
         XWF_OutputMessage(L"XWF_GetCaseProp failed retrieving investigator name",0);
     }
-    sprintf(Name,"%ls",NameW);
+    snprintf(Name,128,"%ls",NameW);
     GriffeyeInvName = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT",Name,WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+50,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYEINVNAME,GetModuleHandle(NULL),NULL);
     if (!GriffeyeInvName)
     {
@@ -1065,7 +1075,7 @@ bool createGriffeyeEntries(HWND hwnd, int start)
         sprintf(message,"Static Text Creation Error: %d",result);
         MessageBox(NULL,message,"Failed to create textbox",MB_ICONERROR);
     }
-    GriffeyeSettings = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+175,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYEINVORG,GetModuleHandle(NULL),NULL);
+    GriffeyeSettings = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",WS_CHILD|WS_VISIBLE|WS_TABSTOP,lblVidStartX + 160,start+175,MainWindowWidth - (lblVidStartX + 140) - 350,20,hwnd,(HMENU)IDC_TEXT_GRIFFEYESETTINGS,GetModuleHandle(NULL),NULL);
     if (!GriffeyeSettings)
     {
         int result=GetLastError();
@@ -1151,9 +1161,10 @@ void createControls(HWND hwnd)
     for (int i=0; i< extractInfo.noNames;i++)
     {
         char* txtEvCurr;
-        txtEvCurr = new char[wcslen(extractInfo.nameList[i].actualName)+2];
+        size_t txtEvCurrSize = wcslen(extractInfo.nameList[i].actualName)+2;
+        txtEvCurr = new char[txtEvCurrSize];
         txtEvCurr[0] = '\0';
-        sprintf(txtEvCurr,"%ls",extractInfo.nameList[i].actualName);
+        snprintf(txtEvCurr,txtEvCurrSize,"%ls",extractInfo.nameList[i].actualName);
         lblActual[i] = CreateWindowEx(0,"Static","Evidence Name:",WS_CHILD|WS_VISIBLE|SS_RIGHT,lblVidStartX - 10,i*boxMultiplier,140,30,entryPanel,0,GetModuleHandle(NULL),0);
         if (!lblActual[i])
         {
@@ -1263,6 +1274,10 @@ int startProcess()
     char buffer[1024];
     if(extractInfo.createGriffeye)
     {
+        //free any allocations left over from a previous, failed attempt to start processing
+        if (extractInfo.GriffeyeCaseLocation != NULL) { delete[] extractInfo.GriffeyeCaseLocation; extractInfo.GriffeyeCaseLocation = NULL; }
+        if (extractInfo.GriffeyeSettingsName != NULL) { delete[] extractInfo.GriffeyeSettingsName; extractInfo.GriffeyeSettingsName = NULL; }
+        if (extractInfo.GriffeyeCaseName != NULL) { delete[] extractInfo.GriffeyeCaseName; extractInfo.GriffeyeCaseName = NULL; }
         int length = GetWindowTextLength(GriffeyeCase);
         if (length == 0)
         {
@@ -1277,16 +1292,16 @@ int startProcess()
             return 1;
         }
         extractInfo.GriffeyeCaseLocation = new wchar_t[length + 40];
-        swprintf(extractInfo.GriffeyeCaseLocation,L"%s",buffer);
+        swprintf(extractInfo.GriffeyeCaseLocation,length + 40,L"%s",buffer);
         buffer[0]='\0';
         length = GetWindowTextLength(GriffeyeSettings);
         GetWindowText(GriffeyeSettings,buffer,1024);
         if (length != 0){
             wchar_t pathBuffer[2048];
-            swprintf(pathBuffer,L"%ls%s",GriffeyeConfigPath,buffer);
+            swprintf(pathBuffer,2048,L"%ls%s",GriffeyeConfigPath,buffer);
             if (ifFileExistsW(pathBuffer)){
                 extractInfo.GriffeyeSettingsName = new wchar_t[length + 10];
-                swprintf(extractInfo.GriffeyeSettingsName,L"%s",buffer);
+                swprintf(extractInfo.GriffeyeSettingsName,length + 10,L"%s",buffer);
                 buffer[0]='\0';
             }
             else{
@@ -1298,7 +1313,7 @@ int startProcess()
         length = GetWindowTextLength(GriffeyeCase);
         GetWindowText(GriffeyeCase,buffer,1024);
         extractInfo.GriffeyeCaseName = new wchar_t[length + 10];
-        swprintf(extractInfo.GriffeyeCaseName,L"%s",buffer);
+        swprintf(extractInfo.GriffeyeCaseName,length + 10,L"%s",buffer);
         buffer[0]='\0';
     }
     if (extractInfo.extractPictures)
@@ -1315,7 +1330,11 @@ int startProcess()
                 }
                 else if (res == IDYES)
                 {
-                    CreateDirectoryA(buffer,NULL);
+                    if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+                    {
+                        MessageBox(NULL,"Unable to create picture output directory","Error!! ",MB_ICONERROR);
+                        return 1;
+                    }
                 }
             }
             else
@@ -1330,11 +1349,15 @@ int startProcess()
             buffer[pathLen] = '\\';
             buffer[pathLen+1] = '\0';
         }
-        swprintf(extractInfo.C4PPath,L"%s",buffer);
+        swprintf(extractInfo.C4PPath,1024,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
-            CreateDirectoryA(buffer,NULL);
+            if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                MessageBox(NULL,"Unable to create picture output Files directory","Error!! ",MB_ICONERROR);
+                return 1;
+            }
         }
         buffer[0]='\0';
     }
@@ -1352,7 +1375,11 @@ int startProcess()
                 }
                 else if (res == IDYES)
                 {
-                    CreateDirectoryA(buffer,NULL);
+                    if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+                    {
+                        MessageBox(NULL,"Unable to create video output directory","Error!! ",MB_ICONERROR);
+                        return 1;
+                    }
                 }
             }
             else
@@ -1367,11 +1394,15 @@ int startProcess()
             buffer[pathLen] = '\\';
             buffer[pathLen+1] = '\0';
         }
-        swprintf(extractInfo.C4MPath,L"%s",buffer);
+        swprintf(extractInfo.C4MPath,1024,L"%s",buffer);
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             strncat(buffer,"Files",sizeof(buffer)-strlen(buffer)-1);
-            CreateDirectoryA(buffer,NULL);
+            if (!CreateDirectoryA(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                MessageBox(NULL,"Unable to create video output Files directory","Error!! ",MB_ICONERROR);
+                return 1;
+            }
 
         }
         buffer[0]='\0';
@@ -1380,7 +1411,7 @@ int startProcess()
     for (int i = 0;i<extractInfo.noNames;i++)
     {
         GetWindowText(TxtNewName[i],buffer,1024);
-        swprintf(extractInfo.nameList[i].prefName,L"%s",buffer);
+        swprintf(extractInfo.nameList[i].prefName,1024,L"%s",buffer);
         buffer[0]='\0';
     }
     HRESULT error = CoCreateGuid(&vCaseData.caseGuid);
@@ -1467,7 +1498,7 @@ int getGriffeyeDetails()
                 {
                     //line 1 - inv title
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1477,7 +1508,7 @@ int getGriffeyeDetails()
                 {
                     //line 2 - contact email
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1487,7 +1518,7 @@ int getGriffeyeDetails()
                 {
                     //line 3 - phone number
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }
@@ -1497,7 +1528,7 @@ int getGriffeyeDetails()
                 {
                     //line 2 - organisation
                     len = strlen(line);
-                    if (line[len-1] == '\n')
+                    if (len > 0 && line[len-1] == '\n')
                     {
                         line[len-1] = '\0';
                     }

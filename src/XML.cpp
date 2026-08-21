@@ -44,6 +44,34 @@ void closeXML(FILE* xmlFile)
 }
 
 /**
+ * @brief Writes a wide string as one or more XML CDATA sections, safely escaping any
+ *        embedded "]]>" sequence that would otherwise close the section early.
+ *
+ * A literal "]]>" inside the text is split across two adjacent CDATA sections
+ * (standard XML CDATA-escaping technique: "]]>" becomes "]]" + "]]><![CDATA[" + ">"),
+ * so the emitted XML always parses correctly regardless of the source path/filename.
+ *
+ * @param tmpOutput FILE pointer to the XML output file.
+ * @param text      NULL-terminated wide string to write inside CDATA section(s).
+ */
+static void writeCDATA(FILE* tmpOutput, const wchar_t* text)
+{
+    fwprintf(tmpOutput,L"<![CDATA[");
+    if (text != NULL)
+    {
+        const wchar_t* cursor = text;
+        const wchar_t* match;
+        while ((match = wcsstr(cursor,L"]]>")) != NULL)
+        {
+            fwprintf(tmpOutput,L"%.*ls]]]]><![CDATA[>",(int)(match - cursor),cursor);
+            cursor = match + 3;
+        }
+        fwprintf(tmpOutput,L"%ls",cursor);
+    }
+    fwprintf(tmpOutput,L"]]>");
+}
+
+/**
  * @brief Writes a single XML record for a picture or video file to the output FILE.
  *
  * @param fr        Reference to the FileRecord containing the metadata to write.
@@ -64,7 +92,17 @@ LONG writeXML(FileRecord &fr,int picture, FILE* tmpOutput, INT64 counter)
     }
     char path_buffer[128]={0};
     generateRelativeFilePath((char*)&path_buffer,128,(wchar_t*)&fr.hashValue,false);
-    fwprintf(tmpOutput,L"\t\t\t<path><![CDATA[%s\\]]></path>\r\n",path_buffer);
+    //path_buffer is a hex hash/backslash path built entirely from generateRelativeFilePath,
+    //so a plain byte-widening loop (rather than a printf %hs conversion, whose support varies
+    //across CRT implementations) is safe here
+    wchar_t widePath[130];
+    int pathBufLen = strlen(path_buffer);
+    for (int i=0;i<pathBufLen;i++) { widePath[i] = (wchar_t)(unsigned char)path_buffer[i]; }
+    widePath[pathBufLen] = L'\\';
+    widePath[pathBufLen+1] = L'\0';
+    fwprintf(tmpOutput,L"\t\t\t<path>");
+    writeCDATA(tmpOutput,widePath);
+    fwprintf(tmpOutput,L"</path>\r\n");
     if (picture==1){
         fwprintf(tmpOutput,L"\t\t\t<picture>%ls</picture>\r\n",fr.hashValue);
     }
@@ -74,7 +112,9 @@ LONG writeXML(FileRecord &fr,int picture, FILE* tmpOutput, INT64 counter)
     fwprintf(tmpOutput,L"\t\t\t<category>0</category>\r\n");
     fwprintf(tmpOutput,L"\t\t\t<id>%llu</id>\r\n",counter);
     fwprintf(tmpOutput,L"\t\t\t<fileoffset>0</fileoffset>\r\n");
-    fwprintf(tmpOutput,L"\t\t\t<fullpath><![CDATA[%ls]]></fullpath>\r\n",fr.fullPath);
+    fwprintf(tmpOutput,L"\t\t\t<fullpath>");
+    writeCDATA(tmpOutput,fr.fullPath);
+    fwprintf(tmpOutput,L"</fullpath>\r\n");
     fwprintf(tmpOutput,L"\t\t\t<created>%llu</created>\r\n",fr.createdTime);
     fwprintf(tmpOutput,L"\t\t\t<accessed>%llu</accessed>\r\n",fr.accessedTime);
     fwprintf(tmpOutput,L"\t\t\t<written>%llu</written>\r\n",fr.modifiedTime);

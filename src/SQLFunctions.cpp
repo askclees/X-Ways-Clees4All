@@ -312,7 +312,9 @@ int setupVics(sqlite3** sqlDB)
 /**
  * @brief Creates an SQLite record for each evidence object in the case.
  *
- * Records are inserted via insertEvObjRecord.
+ * Records are inserted via insertEvObjRecord, which binds record.Name/record.SourceID
+ * with SQLITE_STATIC (no ownership transfer) and finalizes the statement before
+ * returning; both heap buffers are freed here afterward.
  *
  * @param sqlDB Handle to the in-memory SQLite database.
  * @param evObj Handle to the evidence object whose properties are to be recorded.
@@ -347,6 +349,8 @@ void createSQLNameList(sqlite3* sqlDB, HANDLE evObj)
         XWF_OutputMessage(L"Error adding evidence object to list",0);
     }
     delete[] buffer;
+    delete[] record.Name;
+    delete[] record.SourceID;
 }
 
 /**
@@ -410,7 +414,13 @@ BOOL checkParentSelected(sqlite3* sqlDB, DWORD parentID)
     rc = sqlite3_prepare_v2(sqlDB,sqlQuery,strlen(sqlQuery)+1,&statement,NULL);
     if (rc == SQLITE_OK)
     {
-        sqlite3_step(statement);
+        rc = sqlite3_step(statement);
+        if (rc != SQLITE_ROW)
+        {
+            //no such parentID, or an error - either way, not selected
+            sqlite3_finalize(statement);
+            return false;
+        }
         int result = sqlite3_column_int(statement,0);
         sqlite3_finalize(statement);
         if (result == 0)
@@ -463,13 +473,17 @@ void setParentSelected(sqlite3* sqlDB, DWORD parentID)
 /**
  * @brief Inserts a SQLite record for an evidence object.
  *
- * Note: a possible memory leak may occur if an error is encountered.
+ * The prepared statement is finalized on every return path, including bind and
+ * step failures, so no leak occurs within this function itself. record.Name and
+ * record.SourceID are bound with SQLITE_STATIC (the caller retains ownership);
+ * see createSQLNameList for the actual lifetime of those buffers.
  *
  * @param sqlDB  Handle to the in-memory SQLite database.
  * @param record Reference to an EvidenceProps struct containing the data to insert.
- * @return 0 on success, -1 if the query could not be prepared, -2 if the query could not be executed.
+ * @return 0 on success, -1 if the query could not be prepared or bound, -2 if the query could not be executed.
  *
  * @see checkParentObjectsSelected
+ * @see createSQLNameList
  */
 int insertEvObjRecord(sqlite3* sqlDB, EvidenceProps &record)
 {
@@ -669,6 +683,10 @@ ObjectNames* retrieveEvidenceNames(sqlite3* sqlDB,int *retCounter)
     int noObjs=0;
     int rc = 0;
     sqlite3_stmt *statement;
+    //default to empty; only overwritten with the real count on the success path below,
+    //so a stale caller-side value can't survive a failure here and outlive this (possibly
+    //smaller or empty) array
+    *retCounter = 0;
     //get count of objects in table
     rc = sqlite3_exec(sqlDB,"Select count(*) from EvidenceObjects where parentID = 0  and selected = 1 ;",countCallback, &noObjs, &zErrMsg);
     if (rc != SQLITE_OK)
@@ -839,7 +857,7 @@ int updateFileNumber(sqlite3* sqlDB,DWORD objID,int fileNo)
 int getFileNumber(sqlite3* sqlDB,DWORD objID)
 {
     int rc = 0;
-    int result = 0;
+    int result = -1; //default to the documented error value; overwritten on a successful row read below
     sqlite3_stmt *statement;
     char sqlQuery[1024]={0};
     //get all items which are selected and are not root objects
@@ -916,6 +934,11 @@ int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText)
 {
     //get file details
     LPWSTR xName = (LPWSTR)XWF_GetItemName(objID);
+    if (xName == NULL)
+    {
+        outputErrorMessage(L"XWF_GetItemName returned NULL for itemID: ", objID);
+        xName = L"*NoName*";
+    }
     int nameLen = wcslen(xName);
     wchar_t* filePath = getFullPath(srcText,objID,1);
     int pathLen = wcslen(filePath);
@@ -932,7 +955,7 @@ int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText)
         delete[] sqlQuery;
         return -1;
     }
-    rc = sqlite3_bind_text16(statement,1,xName,(nameLen+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,1,xName,nameLen*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
         XWF_OutputMessage(L"Error Binding file name",0);
@@ -941,7 +964,7 @@ int recordError(sqlite3* sqlDB,int errorCode, LONG objID, LPWSTR srcText)
         delete[] sqlQuery;
         return -3;
     }
-    rc = sqlite3_bind_text16(statement,2,filePath,(pathLen+1)*sizeof(wchar_t),SQLITE_STATIC);
+    rc = sqlite3_bind_text16(statement,2,filePath,pathLen*sizeof(wchar_t),SQLITE_STATIC);
     if (rc != SQLITE_OK)
     {
         XWF_OutputMessage(L"Error Binding file path",0);
@@ -996,19 +1019,30 @@ int createOptionsExtractionTable(sqlite3* sqlDB)
  * @brief Inserts or replaces the current schema version record in the SchemaVersion table.
  *
  * @param sqlDB Handle to the options SQLite database.
- * @return 0 on success, -2 if the insert fails.
+ * @return 0 on success, -2 if clearing or inserting the schema version record fails.
  *
  * @see createOptionsSchemaTable
  * @see updateOptionsSchema
  */
 int insertOptionsSchemaRecord(sqlite3* sqlDB)
 {
-    char* errMsg;
+    char* errMsg = NULL;
     char sqlQuery[2048];
     int rc = sqlite3_exec(sqlDB,"DELETE FROM SchemaVersion", NULL, NULL, &errMsg);
+    if (rc != SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error clearing SchemaVersion table",0);
+        if (errMsg != NULL) { sqlite3_free(errMsg); errMsg = NULL; }
+        return -2;
+    }
     sprintf(sqlQuery,"INSERT INTO SchemaVersion VALUES (%i)",optionsSchemaVersion);
     rc = sqlite3_exec(sqlDB,sqlQuery, NULL, NULL, &errMsg);
-    if (rc!=SQLITE_OK) {return -2;}
+    if (rc!=SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error inserting SchemaVersion record",0);
+        if (errMsg != NULL) { sqlite3_free(errMsg); errMsg = NULL; }
+        return -2;
+    }
     return 0;
 }
 
@@ -1088,7 +1122,8 @@ int clearExtractionOptionsTable(sqlite3* db)
  *
  * @param sqlDB  Handle to the options SQLite database.
  * @param record ExtractOptions struct containing the values to store.
- * @return 0 on success, -1 if the statement could not be prepared, -2 if execution fails.
+ * @return 0 on success, -1 if the statement could not be prepared, -2 if execution fails,
+ *         -3 if a bind call fails.
  *
  * @see saveOptions
  * @see updateOptionsSchema
@@ -1103,20 +1138,26 @@ int insertOptionsExtraction(sqlite3* sqlDB, ExtractOptions record)
         XWF_OutputMessage(L"Error preparing ExtractionOptions Insert Record",0);
         return -1;
     }
-    rc =sqlite3_bind_int64(stmt, 1, record.minPictureSize);
-    rc =sqlite3_bind_int64(stmt, 2, record.maxPictureSize);
-    rc =sqlite3_bind_int64(stmt, 3, record.minMovieSize);
-    rc =sqlite3_bind_int64(stmt, 4, record.maxMovieSize);
-    rc =sqlite3_bind_text16(stmt, 5, record.errorReportPath,
+    rc = sqlite3_bind_int64(stmt, 1, record.minPictureSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(stmt, 2, record.maxPictureSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(stmt, 3, record.minMovieSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(stmt, 4, record.maxMovieSize);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(stmt, 5, record.errorReportPath,
                             wcslen(record.errorReportPath)*sizeof(wchar_t), SQLITE_STATIC);
     int overwrite = 0;
     if (record.overwriteFiles) {overwrite = 1;}
-    rc =sqlite3_bind_int(stmt, 6, overwrite);
-    rc =sqlite3_bind_text16(stmt, 7, record.GriffeyePath,
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 6, overwrite);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(stmt, 7, record.GriffeyePath,
                             wcslen(record.GriffeyePath)*sizeof(wchar_t), SQLITE_STATIC);
     //1.51 added new fields
-    rc =sqlite3_bind_int(stmt, 8, record.TypeStatusFlags);
-    rc =sqlite3_bind_int(stmt, 9, record.FileTypeFlag);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 8, record.TypeStatusFlags);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 9, record.FileTypeFlag);
+    if (rc != SQLITE_OK)
+    {
+        XWF_OutputMessage(L"Error binding ExtractionOptions Insert Record values",0);
+        sqlite3_finalize(stmt);
+        return -3;
+    }
     rc = sqlite3_step(stmt);
     if (rc!=SQLITE_DONE)
     {
@@ -1208,7 +1249,8 @@ int intToBool(int value)
  *
  * @param db     Handle to the options SQLite database.
  * @param record Pointer to an ExtractionDetails struct containing the settings to persist.
- * @return 0 on success, -1 if the statement could not be prepared.
+ * @return 0 on success, -1 if the statement could not be prepared, -2 if a bind call fails,
+ *         -3 if execution fails.
  *
  * @see readExtractionSettings
  * @see clearExtractionDetails
@@ -1219,41 +1261,44 @@ int insertExtractionDetails(sqlite3* db, ExtractionDetails *record)
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db,updateQuery,-1,&stmt,NULL);
     if (rc != SQLITE_OK) {
-        int extError = sqlite3_extended_errcode(db);
         wchar_t* errormsg = (wchar_t*) sqlite3_errmsg16(db);
         XWF_OutputMessage(errormsg,0);
         XWF_OutputMessage(L"Cannot clear previously used last settings from lastSettings Table",0);
         return -1;
     }
     //bind variables
-    // rc = sqlite3_bind_text16(statement,1,xName,(nameLen+1)*sizeof(wchar_t),SQLITE_STATIC);
     rc = sqlite3_bind_text16(stmt,1,record->C4PPath,-1,SQLITE_STATIC);
-    rc = sqlite3_bind_text16(stmt,2,record->C4MPath,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(stmt,2,record->C4MPath,-1,SQLITE_STATIC);
     //set extraction options
-    rc = sqlite3_bind_int(stmt,3,boolToInt(record->extractPictures));
-    if (rc != SQLITE_OK){
-            int extError = sqlite3_extended_errcode(db);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,3,boolToInt(record->extractPictures));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,4,boolToInt(record->extractVideos));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,5,boolToInt(record->checkParent));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,6,boolToInt(record->ignoreThumbs));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,7,boolToInt(record->exceptMismatch));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,8,boolToInt(record->exportReportTables));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,9,boolToInt(record->debugSet));
+    //griffeye option
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_GRIFFEYE,boolToInt(record->createGriffeye));
+    //output formats
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START,boolToInt(record->VICExport));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+1,boolToInt(record->C4ALLExport));
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+2,boolToInt(record->VICSCompressed));
+    if (rc != SQLITE_OK)
+    {
         wchar_t* errormsg = (wchar_t*) sqlite3_errmsg16(db);
         XWF_OutputMessage(errormsg,0);
-        XWF_OutputMessage(L"Cannot clear previously used last settings from lastSettings Table",0);
+        XWF_OutputMessage(L"Error binding lastSettings Insert Record values",0);
+        sqlite3_finalize(stmt);
+        return -2;
     }
-    rc = sqlite3_bind_int(stmt,4,boolToInt(record->extractVideos));
-    rc = sqlite3_bind_int(stmt,5,boolToInt(record->checkParent));
-    rc = sqlite3_bind_int(stmt,6,boolToInt(record->ignoreThumbs));
-    rc = sqlite3_bind_int(stmt,7,boolToInt(record->exceptMismatch));
-    rc = sqlite3_bind_int(stmt,8,boolToInt(record->exportReportTables));
-    rc = sqlite3_bind_int(stmt,9,boolToInt(record->debugSet));
-    //griffeye option
-    rc = sqlite3_bind_int(stmt,OPTION_GRIFFEYE,boolToInt(record->createGriffeye));
-    //output formats
-    rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START,boolToInt(record->VICExport));
-    rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+1,boolToInt(record->C4ALLExport));
-    rc = sqlite3_bind_int(stmt,OPTION_EXTRACT_START+2,boolToInt(record->VICSCompressed));
-
 
     rc = sqlite3_step(stmt);
     if (rc!= SQLITE_OK && rc != SQLITE_DONE){
-        //error
+        wchar_t* errormsg = (wchar_t*) sqlite3_errmsg16(db);
+        XWF_OutputMessage(errormsg,0);
+        XWF_OutputMessage(L"Error executing lastSettings Insert Record",0);
+        sqlite3_finalize(stmt);
+        return -3;
     }
     sqlite3_finalize(stmt);
     return 0;
@@ -1473,12 +1518,16 @@ ExtractOptions extractOldSchemaOptions(sqlite3* db, bool* error)
         else{
             retOpt.overwriteFiles = TRUE;
         }
-        int bytes = sqlite3_column_bytes(statement,2);
-        char* temp = (char*)sqlite3_column_text(statement,2);
-        swprintf(retOpt.errorReportPath, L"%s",temp);
-        bytes = sqlite3_column_bytes(statement,4);
-        char* temp2 = (char*)sqlite3_column_text(statement,4);
-        swprintf(retOpt.GriffeyePath, L"%s",temp2);
+        wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,2);
+        if (temp != NULL) {
+            wcsncpy(retOpt.errorReportPath, temp, 2047);
+            retOpt.errorReportPath[2047] = L'\0';
+        }
+        wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,4);
+        if (temp2 != NULL) {
+            wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+            retOpt.GriffeyePath[2047] = L'\0';
+        }
     }
     sqlite3_finalize(statement);
     return retOpt;
@@ -1524,12 +1573,16 @@ ExtractOptions extractV1SchemaOptions(sqlite3* db, bool* error)
         else{
             retOpt.overwriteFiles = TRUE;
         }
-        int bytes = sqlite3_column_bytes(statement,4);
-        char* temp = (char*)sqlite3_column_text(statement,4);
-        swprintf(retOpt.errorReportPath, L"%s",temp);
-        bytes = sqlite3_column_bytes(statement,6);
-        char* temp2 = (char*)sqlite3_column_text(statement,6);
-        swprintf(retOpt.GriffeyePath, L"%s",temp2);
+        wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,4);
+        if (temp != NULL) {
+            wcsncpy(retOpt.errorReportPath, temp, 2047);
+            retOpt.errorReportPath[2047] = L'\0';
+        }
+        wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,6);
+        if (temp2 != NULL) {
+            wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+            retOpt.GriffeyePath[2047] = L'\0';
+        }
     }
     sqlite3_finalize(statement);
     return retOpt;
@@ -1574,12 +1627,16 @@ ExtractOptions extractV2SchemaOptions(sqlite3* db, bool* error)
         else{
             retOpt.overwriteFiles = TRUE;
         }
-        int bytes = sqlite3_column_bytes(statement,4);
-        char* temp = (char*)sqlite3_column_text(statement,4);
-        swprintf(retOpt.errorReportPath, L"%s",temp);
-        bytes = sqlite3_column_bytes(statement,6);
-        char* temp2 = (char*)sqlite3_column_text(statement,6);
-        swprintf(retOpt.GriffeyePath, L"%s",temp2);
+        wchar_t* temp = (wchar_t*)sqlite3_column_text16(statement,4);
+        if (temp != NULL) {
+            wcsncpy(retOpt.errorReportPath, temp, 2047);
+            retOpt.errorReportPath[2047] = L'\0';
+        }
+        wchar_t* temp2 = (wchar_t*)sqlite3_column_text16(statement,6);
+        if (temp2 != NULL) {
+            wcsncpy(retOpt.GriffeyePath, temp2, 2047);
+            retOpt.GriffeyePath[2047] = L'\0';
+        }
         retOpt.TypeStatusFlags = sqlite3_column_int(statement,7);
         retOpt.FileTypeFlag = sqlite3_column_int(statement,8);
     }
@@ -1809,13 +1866,14 @@ void outputErrorStats(sqlite3* sqlDB,WORD versionNo)
         if (rc != SQLITE_OK)
         {
             XWF_OutputMessage(L"Error preparing query for error table",0);
-            return;
+            continue;
         }
         rc = sqlite3_step(statement);
         if (rc != SQLITE_ROW)
         {
             XWF_OutputMessage(L"Error executing query for error table",0);
-            return;
+            sqlite3_finalize(statement);
+            continue;
         }
         int noErrors = sqlite3_column_int(statement,0);
         wchar_t tempMessage[512]={0};
@@ -1927,51 +1985,39 @@ int updateMediaFileRecord(sqlite3* vicsDB, VICSMediaFile* record, int picture, w
         return -3;
     }
     //bind record variables
-    rc = sqlite3_bind_text16(statement,1,record->fileName,(wcslen(record->fileName)+1)*sizeof(wchar_t),SQLITE_STATIC);
-    if (rc != SQLITE_OK){
-        XWF_OutputMessage(L"Error Binding file name",0);
-        sqlite3_finalize(statement);
-        delete[] sqlQuery;
-        return -3;
-    }
-    rc = sqlite3_bind_text16(statement,2,record->filePath,(wcslen(record->filePath)+1)*sizeof(wchar_t),SQLITE_STATIC);
-    if (rc != SQLITE_OK){
-        XWF_OutputMessage(L"Error Binding file name",0);
-        sqlite3_finalize(statement);
-        delete[] sqlQuery;
-        return -3;
-    }
+    rc = sqlite3_bind_text16(statement,1,record->fileName,wcslen(record->fileName)*sizeof(wchar_t),SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,2,record->filePath,wcslen(record->filePath)*sizeof(wchar_t),SQLITE_STATIC);
     //bind filetimes
     ULARGE_INTEGER timestamp;
     timestamp.HighPart = record->created.dwHighDateTime;
     timestamp.LowPart = record->created.dwLowDateTime;
-    sqlite3_bind_int64(statement,3,timestamp.QuadPart);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,3,timestamp.QuadPart);
     timestamp.HighPart = record->written.dwHighDateTime;
     timestamp.LowPart = record->written.dwLowDateTime;
-    sqlite3_bind_int64(statement,4,timestamp.QuadPart);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,4,timestamp.QuadPart);
     timestamp.HighPart = record->accessed.dwHighDateTime;
     timestamp.LowPart = record->accessed.dwLowDateTime;
-    sqlite3_bind_int64(statement,5,timestamp.QuadPart);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,5,timestamp.QuadPart);
     //bind other attributes
-    if (record->unallocated) { sqlite3_bind_int(statement,6,1);} else {sqlite3_bind_int(statement,6,0);}
-    rc = sqlite3_bind_text16(statement,7,record->sourceID,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,6,record->unallocated ? 1 : 0);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,7,record->sourceID,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,8,record->physicalLocation);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,9,record->deleted ? 1 : 0);
+    //bind parent attributes
+    if (rc == SQLITE_OK) rc = (record->parentMD5[0] != '\0') ? sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC) : sqlite3_bind_text16(statement,10,L"",-1,SQLITE_TRANSIENT);
+    if (rc == SQLITE_OK) rc = (record->parentName != NULL) ? sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC) : sqlite3_bind_text16(statement,11,L"",-1,SQLITE_TRANSIENT);
+    if (rc == SQLITE_OK) rc = (record->parentFilePath != NULL) ? sqlite3_bind_text16(statement,12,record->parentFilePath,-1,SQLITE_STATIC) : sqlite3_bind_text16(statement,12,L"",-1,SQLITE_TRANSIENT);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,13,record->parentPhysLoc);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,14,record->XWFitemID);
+    //bind parameters
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,15,MD5,-1,SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,16,dupItemID);
     if (rc != SQLITE_OK){
-        XWF_OutputMessage(L"Error Binding Source ID",0);
+        XWF_OutputMessage(L"Error binding media file update values",0);
         sqlite3_finalize(statement);
         delete[] sqlQuery;
         return -3;
     }
-    sqlite3_bind_int64(statement,8,record->physicalLocation);
-    if (record->deleted) { sqlite3_bind_int(statement,9,1);} else {sqlite3_bind_int(statement,9,0);}
-    //bind parent attributes
-    if (record->parentMD5[0] != '\0') { sqlite3_bind_text16(statement,10,record->parentMD5,-1, SQLITE_STATIC); } else { sqlite3_bind_text16(statement,10,"",-1,SQLITE_TRANSIENT); }
-    if (record->parentName != NULL) { sqlite3_bind_text16(statement,11,record->parentName,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,11,"",-1,SQLITE_TRANSIENT); }
-    if (record->parentFilePath != NULL) { sqlite3_bind_text16(statement,12,record->parentFilePath,-1,SQLITE_STATIC); } else { sqlite3_bind_text16(statement,12,"",-1,SQLITE_TRANSIENT); }
-    sqlite3_bind_int64(statement,13,record->parentPhysLoc);
-    sqlite3_bind_int(statement,14,record->XWFitemID);
-    //bind parameters
-    rc = sqlite3_bind_text16(statement,15,MD5,-1,SQLITE_STATIC);
-    rc = sqlite3_bind_int(statement,16,dupItemID);
     //step statement
     rc = sqlite3_step(statement);
     if (rc != SQLITE_DONE)
@@ -2303,10 +2349,13 @@ int returnMediaFileRecords(sqlite3* database, sqlite3_stmt** statement, int pict
         if (rc == SQLITE_ROW){
             return retVal;
         }
-        else if (rc == SQLITE_OK){
+        else if (rc == SQLITE_OK || rc == SQLITE_DONE){
             return 0;
         }
         else{
+            //SQL Error - prepare succeeded but step failed; release the statement
+            sqlite3_finalize(*statement);
+            *statement = NULL;
             return -2;
         }
     }
@@ -2350,7 +2399,7 @@ int returnMediaRecords(sqlite3* database, sqlite3_stmt** statement, int picture)
         return -1;
     }
     snprintf(sqlQuery,256, "Select * from %s;",tablename);
-    int rc = sqlite3_prepare_v2(database,sqlQuery,(strlen(sqlQuery)+1)*sizeof(wchar_t),statement,NULL);
+    int rc = sqlite3_prepare_v2(database,sqlQuery,strlen(sqlQuery)+1,statement,NULL);
     if (rc == SQLITE_OK)
     {
         rc = sqlite3_step(*statement);
@@ -2417,6 +2466,9 @@ int returnMediaMetadataRecords(sqlite3* database, sqlite3_stmt** statement, wcha
             return 0;
         }
         else{
+            //SQL Error - prepare succeeded but step failed; release the statement
+            sqlite3_finalize(*statement);
+            *statement = NULL;
             return -2;
         }
     }

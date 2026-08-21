@@ -82,10 +82,12 @@ static int generateFilePath(char* buffer, int maxSize,wchar_t* fileName, bool pi
         pos = snprintf(buffer, maxSize, "%ls\\", extractInfo.C4MPath);
     }
     if (pos < 0) pos = 0;
+    else if (pos > maxSize) pos = maxSize;
     //generate subfolder to split out number of files.
     generateRelativeFilePath(tempBuffer, 128, fileName, false);
     int written = snprintf(buffer + pos, maxSize - pos, "%s", tempBuffer);
     if (written > 0) pos += written;
+    if (pos > maxSize) pos = maxSize;
     //lock folder critical section to stop folder being created twice.
     EnterCriticalSection(&lockFolder);
     if (!ifFileExists(buffer))
@@ -191,8 +193,8 @@ static int writeOutputFileSmall(FILE* fileOut, INT64 fileSize,HANDLE hItem,LONG 
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"Start of writeOutputFileSmall Function Output");}
     BYTE* buffer = new BYTE[fileSize+1];
     DWORD read = XWF_Read(hItem,0,buffer,fileSize);
-    //sometime file is 1 byte different, account for this.
-    if (read==0 || read < fileSize-1)
+    //sometime file is 1 byte different, account for this. A 0-byte file legitimately reads 0 bytes.
+    if (fileSize != 0 && (read==0 || read < fileSize-1))
     {
         XWF_Close(hItem);
         delete[] buffer;
@@ -294,7 +296,7 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
     char outputPath[2048];
     FILE* outputFile;
     generateFilePath(&outputPath[0],2048, fileName, picFile);
-    if (ifFileExists(outputPath))
+    if (!extractOpt.overwriteFiles && ifFileExists(outputPath))
     {
         //no need to re-write file
         //1.41 check filesize first

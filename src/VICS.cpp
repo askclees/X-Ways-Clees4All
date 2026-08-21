@@ -48,6 +48,13 @@ FILE* openVICSFile(char* filePath, const wchar_t* progVersion)
         delete[] caseNumEsc;
         delete[] caseNumStr;
     }
+	if (vCaseData.ContactName != nullptr) {
+        char* nameStr = convertWideToChar(vCaseData.ContactName);
+        char* nameEsc = jsonEscapeString(nameStr);
+        fprintf(newFile,"\"ContactName\":\"%s\",\r\n\t",nameEsc);
+        delete[] nameEsc;
+        delete[] nameStr;
+    }
 	if (vCaseData.ContactPhone != nullptr) {
         char* phoneStr = convertWideToChar(vCaseData.ContactPhone);
         char* phoneEsc = jsonEscapeString(phoneStr);
@@ -107,13 +114,18 @@ int closeVICSFile(FILE* vFile)
 	int check = fprintf(vFile,"\t]\r\n\t}]\r\n\t}");
 	if (check<0)
 	{
+		fclose(vFile);
 		return 2;
 	}
 	return fclose(vFile);
 }
 
 /**
- * @brief Initialises all fields of a VICSMedia record to their zero/null defaults.
+ * @brief Initialises most fields of a VICSMedia record to their zero/null defaults.
+ *
+ * Does not touch PhotoDNA - it already has its own in-class default initializer
+ * ({0}), so every caller here passes a freshly-constructed VICSMedia where it's
+ * already empty.
  *
  * @param record Reference to the VICSMedia struct to initialise.
  */
@@ -253,25 +265,22 @@ void initializeSegmentRecord(VICSSegment& record)
 void deallocateVICSRecord(VICSRecord record)
 {
     deallocateMediaRecord(record.vMedia);
-    if (record.noMediaFiles !=0)
+    //vMediaFiles/vMediaMetaData are allocated unconditionally (even as new T[0]) by the caller,
+    //so they must always be deleted here too - delete[] on a valid pointer is always safe/required,
+    //whether or not the count is 0
+    for (int i=0;i<record.noMediaFiles;i++)
     {
-        for (int i=0;i<record.noMediaFiles;i++)
-        {
-            deallocateMediaFileRecord(record.vMediaFiles[i]);
-        }
-        delete[] record.vMediaFiles;
-        record.noMediaFiles= 0;
+        deallocateMediaFileRecord(record.vMediaFiles[i]);
     }
+    delete[] record.vMediaFiles;
+    record.noMediaFiles= 0;
     //1.41 add cleaning of media metadata records
-    if (record.noMediaMetadata !=0)
+    for (int i=0;i<record.noMediaMetadata;i++)
     {
-        for (int i=0;i<record.noMediaMetadata;i++)
-        {
-            deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
-        }
-        delete[] record.vMediaMetaData;
-        record.noMediaMetadata= 0;
+        deallocateMediaMetadataRecord(record.vMediaMetaData[i]);
     }
+    delete[] record.vMediaMetaData;
+    record.noMediaMetadata= 0;
 }
 
 /**
@@ -319,23 +328,23 @@ void deallocateMediaFileRecord(VICSMediaFile &record)
  */
 void freeVicsCaseData()
 {
-    if (vCaseData.CaseNumber != nullptr)    { delete[] vCaseData.CaseNumber; }
-    if (vCaseData.ContactEmail != nullptr)  { delete[] vCaseData.ContactEmail; }
-    if (vCaseData.ContactName != nullptr)   { delete[] vCaseData.ContactName; }
-    if (vCaseData.ContactOrg != nullptr)    { delete[] vCaseData.ContactOrg; }
-    if (vCaseData.ContactPhone != nullptr)  { delete[] vCaseData.ContactPhone; }
-    if (vCaseData.ContactTitle != nullptr)  { delete[] vCaseData.ContactTitle; }
+    if (vCaseData.CaseNumber != nullptr)    { delete[] vCaseData.CaseNumber;   vCaseData.CaseNumber = nullptr; }
+    if (vCaseData.ContactEmail != nullptr)  { delete[] vCaseData.ContactEmail; vCaseData.ContactEmail = nullptr; }
+    if (vCaseData.ContactName != nullptr)   { delete[] vCaseData.ContactName;  vCaseData.ContactName = nullptr; }
+    if (vCaseData.ContactOrg != nullptr)    { delete[] vCaseData.ContactOrg;   vCaseData.ContactOrg = nullptr; }
+    if (vCaseData.ContactPhone != nullptr)  { delete[] vCaseData.ContactPhone; vCaseData.ContactPhone = nullptr; }
+    if (vCaseData.ContactTitle != nullptr)  { delete[] vCaseData.ContactTitle; vCaseData.ContactTitle = nullptr; }
 }
 
 /**
  * @brief Returns the total character count of all variable-length wide string fields in a VICSMediaFile record.
  *
- * Used by insertMediaFileRecord to determine the required SQL query buffer size.
+ * Currently unused: insertMediaFileRecord now builds its query with bound parameters
+ * (a small fixed-size buffer for the query text only), so it no longer needs to size a
+ * buffer from record content length. Left over from before that refactor.
  *
  * @param record Reference to the VICSMediaFile struct to measure.
  * @return Total character count of all non-null wchar_t* fields.
- *
- * @see insertMediaFileRecord
  */
 INT64 getMediaFileRecordSize(VICSMediaFile &record)
 {
@@ -351,12 +360,12 @@ INT64 getMediaFileRecordSize(VICSMediaFile &record)
 /**
  * @brief Returns the total character count of all variable-length wide string fields in a VICSMedia record.
  *
- * Used by insertMediaRecord to determine the required SQL query buffer size.
+ * Currently unused: insertMediaRecord now builds its query with bound parameters
+ * (a small fixed-size buffer for the query text only), so it no longer needs to size a
+ * buffer from record content length. Left over from before that refactor.
  *
  * @param record Reference to the VICSMedia struct to measure.
  * @return Total character count of all non-null wchar_t* fields.
- *
- * @see insertMediaRecord
  */
 INT64 getMediaRecordSize(VICSMedia &record)
 {
@@ -601,8 +610,10 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
 {
     recMedia.MediaID = sqlite3_column_int64(statement,0);
     recMedia.Category = sqlite3_column_int(statement,1);
+    //a valid SHA1 is exactly 40 hex characters (80 bytes as UTF-16); reject anything else
+    //rather than silently truncating a corrupted value
     int CheckSize = sqlite3_column_bytes16(statement,2);
-    if (CheckSize < 10)
+    if (CheckSize != 80)
     {
         recMedia.SHA1[0] = L'\0';
     }
@@ -611,8 +622,12 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
         wcsncpy(recMedia.SHA1, (wchar_t*)sqlite3_column_text16(statement,2), 40);
         recMedia.SHA1[40] = L'\0';
     }
-    wcsncpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3), 32);
-    recMedia.MD5[32] = L'\0';
+    CheckSize = sqlite3_column_bytes16(statement,3);
+    if (CheckSize == 0) { recMedia.MD5[0] = L'\0'; }
+    else {
+            wcsncpy(recMedia.MD5, (wchar_t*)sqlite3_column_text16(statement,3), 32);
+            recMedia.MD5[32] = L'\0';
+        }
     recMedia.VictimID = sqlite3_column_int(statement,4);
     recMedia.OffenderID = sqlite3_column_int(statement,5);
     recMedia.IsDistributed = sqlite3_column_int(statement,6);
@@ -636,18 +651,22 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
         }
     recMedia.MediaSize = sqlite3_column_int64(statement,10);
     CheckSize = sqlite3_column_bytes16(statement,11);
-    recMedia.RelativeFilePath =  new wchar_t[CheckSize + 1];
-    wcscpy(recMedia.RelativeFilePath,(wchar_t*)sqlite3_column_text16(statement,11));
+    if (CheckSize == 0) { recMedia.RelativeFilePath = NULL; }
+    else {
+            recMedia.RelativeFilePath =  new wchar_t[CheckSize + 2];
+            wcscpy(recMedia.RelativeFilePath,(wchar_t*)sqlite3_column_text16(statement,11));
+        }
     INT64 timeTmp = sqlite3_column_int64(statement,12);
     FILETIME tmpFileTime;
     memcpy(&tmpFileTime,&timeTmp,sizeof(tmpFileTime));
     recMedia.DateUpdated = tmpFileTime;
     recMedia.timeZone = sqlite3_column_int64(statement,13);
     CheckSize = sqlite3_column_bytes16(statement,14);
-    if (CheckSize == 0) { recMedia.PrecatSource = NULL; }
+    if (CheckSize == 0) { recMedia.PrecatSource = NULL; recMedia.IsPreCat = FALSE; }
     else {
             recMedia.PrecatSource = new wchar_t[CheckSize + 2];
             wcscpy(recMedia.PrecatSource, (wchar_t*)sqlite3_column_text16(statement,14));
+            recMedia.IsPreCat = TRUE;
         }
     recMedia.IsSuspected = sqlite3_column_int64(statement,15);
     CheckSize = sqlite3_column_bytes16(statement,16);
@@ -674,16 +693,26 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
  */
 void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement)
 {
-    wcsncpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
-    recMediaFile.MD5[32] = L'\0';
+    int CheckSize = sqlite3_column_bytes16(statement,0);
+    if (CheckSize == 0) { recMediaFile.MD5[0] = L'\0'; }
+    else {
+            wcsncpy(recMediaFile.MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+            recMediaFile.MD5[32] = L'\0';
+        }
     //Filename
-    int CheckSize = sqlite3_column_bytes16(statement,1);
-    recMediaFile.fileName =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.fileName, (wchar_t*)sqlite3_column_text16(statement,1));
+    CheckSize = sqlite3_column_bytes16(statement,1);
+    if (CheckSize == 0) { recMediaFile.fileName = NULL; }
+    else {
+            recMediaFile.fileName =  new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.fileName, (wchar_t*)sqlite3_column_text16(statement,1));
+        }
     //file path
     CheckSize = sqlite3_column_bytes16(statement,2);
-    recMediaFile.filePath =  new wchar_t[CheckSize + 2];
-    wcscpy(recMediaFile.filePath, (wchar_t*)sqlite3_column_text16(statement,2));
+    if (CheckSize == 0) { recMediaFile.filePath = NULL; }
+    else {
+            recMediaFile.filePath =  new wchar_t[CheckSize + 2];
+            wcscpy(recMediaFile.filePath, (wchar_t*)sqlite3_column_text16(statement,2));
+        }
     //Created
     INT64 timeTmp = sqlite3_column_int64(statement,3);
     FILETIME tmpFileTime;
@@ -750,13 +779,24 @@ void extractVICSMediaFileSQL(VICSMediaFile &recMediaFile,sqlite3_stmt* statement
  */
 void extractVICSMediaMetadataSQL(VICSMediaMetadata* record,sqlite3_stmt* statement)
 {
-    wcscpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0));
-    int CheckSize = sqlite3_column_bytes16(statement,1);
-    record->PropertyName =  new wchar_t[CheckSize + 2];
-    wcscpy(record->PropertyName, (wchar_t*)sqlite3_column_text16(statement,1));
+    int CheckSize = sqlite3_column_bytes16(statement,0);
+    if (CheckSize == 0) { record->MD5[0] = L'\0'; }
+    else {
+            wcsncpy(record->MD5, (wchar_t*)sqlite3_column_text16(statement,0), 32);
+            record->MD5[32] = L'\0';
+        }
+    CheckSize = sqlite3_column_bytes16(statement,1);
+    if (CheckSize == 0) { record->PropertyName = NULL; }
+    else {
+            record->PropertyName =  new wchar_t[CheckSize + 2];
+            wcscpy(record->PropertyName, (wchar_t*)sqlite3_column_text16(statement,1));
+        }
     CheckSize = sqlite3_column_bytes16(statement,2);
-    record->PropertyValue =  new wchar_t[CheckSize + 2];
-    wcscpy(record->PropertyValue, (wchar_t*)sqlite3_column_text16(statement,2));
+    if (CheckSize == 0) { record->PropertyValue = NULL; }
+    else {
+            record->PropertyValue =  new wchar_t[CheckSize + 2];
+            wcscpy(record->PropertyValue, (wchar_t*)sqlite3_column_text16(statement,2));
+        }
 }
 
 /**

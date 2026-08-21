@@ -360,12 +360,10 @@ LONG DLL_EXPORT XT_Finalize(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void
 
 LONG DLL_EXPORT XT_Done(void* lpReserved)
 {
-    //check if process was exited
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function Start");}
-    if (extractInfo.processStart == FALSE)
-    {
-        return 0;
-    }
+    //caseCleanup must run even if the user closed the options dialog without clicking Start
+    //(or firstRunSetup failed) - it's what resets firstTime and frees extractInfo.nameList, and
+    //is written defensively (NULL-checked) so it's safe to call on a run that never fully started
     int retVal = caseCleanup();
     errorReport();
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function End");}
@@ -444,7 +442,7 @@ int createC4POutput()
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].picOutput == NULL)
             {
                 wchar_t errorMessage[2048];
-                swprintf(errorMessage,L"Unable to open file for picture output. Filepath : %s",filepath);
+                swprintf(errorMessage,2048,L"Unable to open file for picture output. Filepath : %s",filepath);
                 XWF_OutputMessage(errorMessage,0);
                 if (extractInfo.debugSet){debugWriteDetails("createC4POutput Function End - Return -1");}
                 return -1;
@@ -460,7 +458,7 @@ int createC4POutput()
             if (extractInfo.outputFiles[extractInfo.outputFileCounter].vidOutput == NULL)
             {
                 wchar_t errorMessage[2048];
-                swprintf(errorMessage,L"Unable to open file for movie output. Filepath : %s",filepath);
+                swprintf(errorMessage,2048,L"Unable to open file for movie output. Filepath : %s",filepath);
                 XWF_OutputMessage(errorMessage,0);
                 if (extractInfo.debugSet){debugWriteDetails("createC4POutput Function End - Return -1");}
                 return -1;
@@ -634,6 +632,18 @@ int getCaseOptions()
 {
     if (extractInfo.debugSet){debugWriteDetails("Start of getCaseOptions Function");}
     vicPicCounter = 0;
+    vicMovieCounter = 0;
+    //C4PPath/C4MPath are freed and NULLed by caseCleanup() at the end of every run, but only
+    //ever allocated once, in XT_Init, for the very first run - free-if-non-null then reallocate
+    //fresh here (safe on both the first run, where XT_Init already allocated it, and any later
+    //run in the same X-Ways session, where it's NULL) so processing never writes through a
+    //dangling/NULL pointer
+    if (extractInfo.C4PPath != NULL) { delete[] extractInfo.C4PPath; }
+    extractInfo.C4PPath = new wchar_t[1024];
+    extractInfo.C4PPath[0] = L'\0';
+    if (extractInfo.C4MPath != NULL) { delete[] extractInfo.C4MPath; }
+    extractInfo.C4MPath = new wchar_t[1024];
+    extractInfo.C4MPath[0] = L'\0';
     extractInfo.extractPictures= TRUE;
     extractInfo.extractVideos= TRUE;
     //before we create window, get evidence object list
@@ -679,12 +689,20 @@ int getCaseOptions()
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4PPath);
-            CreateDirectory(buffer,NULL);
+            if (!CreateDirectory(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                XWF_OutputMessage(L"Unable to create picture output Files directory",0);
+                return -1;
+            }
         }
         if (extractInfo.C4ALLExport || extractInfo.VICExport)
         {
             snprintf(buffer,sizeof(buffer),"%lsFiles",extractInfo.C4MPath);
-            CreateDirectory(buffer,NULL);
+            if (!CreateDirectory(buffer,NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                XWF_OutputMessage(L"Unable to create video output Files directory",0);
+                return -1;
+            }
         }
     }
     //update database with new names
@@ -704,6 +722,16 @@ int getCaseOptions()
     //create C4P/M output files if applicable
     if (extractInfo.C4ALLExport)
     {
+        if (extractInfo.noNames > MAX_OUTPUT_FILES)
+        {
+            //the GUI path already blocks this before Start is pressed (see IDC_BTN_OK in GUI.cpp), so
+            //extractInfo.processStart never gets set there. This covers the command-line (xtparam:) path,
+            //which skips that dialog and sets processStart unconditionally in getCommandLineOptions() -
+            //aborting here (propagated up through firstRunSetup/XT_Prepare) is the only way left to stop
+            //before any item is processed with a NULL currPicFile/currVidFile.
+            XWF_OutputMessage(L"C4All XML output cannot be used with more than 64 evidence objects in the case; aborting",0);
+            return -1;
+        }
         int check = createC4POutput();
         if (check !=0)
         {
@@ -715,7 +743,15 @@ int getCaseOptions()
     {
         setArchivePath(extractInfo.C4PPath, SET_PIC_PATH);
         setArchivePath(extractInfo.C4MPath, SET_VID_PATH);
-        setupZipArchives();
+        int archiveCheck = setupZipArchives();
+        if (archiveCheck != SUCCESS)
+        {
+            //ArchPic/ArchVid can end up NULL if only one of the two archives failed to open
+            //(e.g. one output path is unwritable); later archive writes would otherwise
+            //dereference that NULL pointer, so abort here instead
+            XWF_OutputMessage(L"Error setting up compressed archive output",0);
+            return -1;
+        }
     }
     if (extractInfo.debugSet){debugWriteDetails("End of GetCaseOptions function");}
     return 0;
@@ -733,18 +769,27 @@ int getCommandLineOptions()
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions Start");}
     int numArgv;
-    //get commandline options and change to lower case
-    LPWSTR cmdLine = GetCommandLineW();
-    int cmdLineLen = wcslen(cmdLine);
+    //get commandline options and change to lower case - GetCommandLineW() returns a pointer to
+    //the process's own command-line string (documented as such by Microsoft), not a caller-owned
+    //buffer, so it must be copied before being lowercased in place; mutating it directly would
+    //permanently corrupt it for any other in-process code (X-Ways itself, other X-Tensions) that
+    //calls GetCommandLineW() later in the session
+    LPWSTR origCmdLine = GetCommandLineW();
+    int cmdLineLen = wcslen(origCmdLine);
+    wchar_t* cmdLine = new wchar_t[cmdLineLen + 1];
+    wcscpy(cmdLine, origCmdLine);
     for (int j = 0;j<cmdLineLen;j++)
     {
         cmdLine[j]=towlower(cmdLine[j]);
     }
     //split options into delimited sets
     LPWSTR* argv = CommandLineToArgvW(cmdLine,&numArgv);
+    delete[] cmdLine;
     if (argv == NULL)
     {
         XWF_OutputMessage(L"CommandLineToArgvW Failed\n",0);
+        if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions End - CommandLineToArgvW Failed");}
+        return 0;
     }
     if (numArgv == 1)
     {
@@ -792,7 +837,7 @@ int getCommandLineOptions()
     }
     for (int i = 0;i<extractInfo.noNames;i++)
     {
-        swprintf(extractInfo.nameList[i].prefName,L"%ls",extractInfo.nameList[i].actualName);
+        swprintf(extractInfo.nameList[i].prefName,1024,L"%ls",extractInfo.nameList[i].actualName);
         XWF_OutputMessage(extractInfo.nameList[i].prefName,0);
     }
     HRESULT error = CoCreateGuid(&vCaseData.caseGuid);
@@ -1116,7 +1161,7 @@ int checkItemType(LONG nItemID, int* picture)
             if (retVal == -1){
                     return ERROR_GETITEMTYPEDESC;
             }
-            if (wcsncmp(descr,L"Macromedia Flash",16)!=0)
+            if (wcsncmp(descr,L"Macromedia Flash",16)!=0 || !extractInfo.extractVideos)
             {
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"checkItemType End Return TYPE_OTHER");}
                 return TYPE_OTHER;
@@ -1188,7 +1233,7 @@ bool validType(LONG nItemID, int* picture)
         if (typeValid == TYPE_OTHER)    {return 0;}
         else{
         //some kind of error
-            if (typeValid == ERROR_GETITEMTYPE){
+            if (typeValid == ERROR_GETITEMTYPE || typeValid == ERROR_GETITEMTYPEDESC){
                 //add file to report table for easier finding
                 errorRaised(nItemID,REPORT_ERROR_TYPE);
                 if (extractInfo.debugSet){debugWriteDetails(nItemID, L"validType - End return false");}
@@ -1446,11 +1491,16 @@ LONG mainItemProcess(LONG nItemID, int picture, INT64 fileSize)
         }
         if (extractInfo.VICSCompressed)
         {//create compressed file here
+            int archiveResult;
             if (picture ==1){
-                writeArchiveFile(nItemID,true,currHash.MD5,fileSize, hdlCurrVol);
+                archiveResult = writeArchiveFile(nItemID,true,currHash.MD5,fileSize, hdlCurrVol);
             }
             else{
-                writeArchiveFile(nItemID,false,currHash.MD5,fileSize, hdlCurrVol);
+                archiveResult = writeArchiveFile(nItemID,false,currHash.MD5,fileSize, hdlCurrVol);
+            }
+            if (archiveResult == ERROR_WRITE)
+            {
+                errorRaised(nItemID,REPORT_FILESIZE_MISMATCH);
             }
         }
     }
@@ -1524,7 +1574,9 @@ int createGriffeyeCase()
     }
     char cmdOutput[8192];
     char tempString[1024];
-    snprintf(cmdOutput,sizeof(cmdOutput),"\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
+    size_t pathLen = wcslen(extractOpt.GriffeyePath);
+    bool pathHasSlash = (pathLen > 0 && extractOpt.GriffeyePath[pathLen-1] == L'\\');
+    snprintf(cmdOutput,sizeof(cmdOutput),pathHasSlash ? "\"%ls%s\" import --case-folder \"%ls\" --name \"%ls\"" : "\"%ls\\%s\" import --case-folder \"%ls\" --name \"%ls\"",extractOpt.GriffeyePath,griffeyeExe,extractInfo.GriffeyeCaseLocation, extractInfo.GriffeyeCaseName);
     int sourceNo = 1;
 
     wchar_t path[32768] ={0};
@@ -1552,7 +1604,11 @@ int createGriffeyeCase()
         snprintf(tempString,sizeof(tempString)," --import-settings-file %ls", extractInfo.GriffeyeSettingsName);
         strncat(cmdOutput,tempString,sizeof(cmdOutput)-strlen(cmdOutput)-1);
     }
-    XWF_OutputMessage((wchar_t*)cmdOutput,4);
+    //cmdOutput must stay narrow (CreateProcess below is the ANSI variant) - convert to wide
+    //for logging rather than reinterpret-casting the narrow bytes as UTF-16
+    wchar_t cmdOutputW[8192];
+    swprintf(cmdOutputW,8192,L"%s",cmdOutput);
+    XWF_OutputMessage(cmdOutputW,4);
     PROCESS_INFORMATION ProcessInfo;
     STARTUPINFO StartupInfo;
     ZeroMemory(&StartupInfo, sizeof(StartupInfo));
@@ -1597,8 +1653,13 @@ int caseCleanup()
             closeXML(extractInfo.outputFiles[i].vidOutput);
 
         }
-        firstTime = 0;
     }
+    //must run regardless of whether C4All XML output was used (outputFileCounter stays 0
+    //when C4ALLExport is off, e.g. compressVICS-only mode) - otherwise XT_Prepare's
+    //"if (firstTime == 0)" check skips firstRunSetup (and therefore setupVics/getCaseOptions)
+    //entirely on the next case processed in the same X-Ways session, reusing the just-closed
+    //vicsDB handle and stale case configuration
+    firstTime = 0;
     if (picResults) { fclose(picResults); picResults = NULL; }
     if (vidResults) { fclose(vidResults); vidResults = NULL; }
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
@@ -1622,9 +1683,11 @@ int caseCleanup()
         debugWriteDetails(dbPathMsg);
         loadOrSaveDb(vicsDB, sqlOutputPath, 1);
     }
+    //vicsDB is opened unconditionally in setupVics, so it must be closed unconditionally here too -
+    //not just when VICS export is selected
+    sqlite3_close(vicsDB);
     if (extractInfo.VICExport || extractInfo.VICSCompressed)
     {
-        sqlite3_close(vicsDB);
         if (vicPicFile)   { fclose(vicPicFile);   vicPicFile   = NULL; }
         if (vicMovieFile) { fclose(vicMovieFile);  vicMovieFile = NULL; }
         if (extractInfo.VICSCompressed)
@@ -1656,15 +1719,22 @@ int caseCleanup()
         delete[] extractInfo.nameList;
         extractInfo.nameList = NULL;
     }
-    if (extractInfo.VICSCompressed)
-    {
-        closeZipArchives();
-    }
+    //always called (not just when VICSCompressed was set this run) - closeZipArchive nulls each
+    //pointer after freeing, so this is safe even when nothing was actually opened, and it's the
+    //only thing that prevents a stale archive pointer from a run that DID use VICSCompressed
+    //from surviving into a later run in the same X-Ways session that doesn't
+    closeZipArchives();
     cleanupArchivePaths();
     extractInfo.noNames = 0;
     freeVicsCaseData();
-    delete [] extractInfo.C4PPath;
-    delete [] extractInfo.C4MPath;
+    if (extractInfo.C4PPath != NULL) {
+        delete[] extractInfo.C4PPath;
+        extractInfo.C4PPath = NULL;
+    }
+    if (extractInfo.C4MPath != NULL) {
+        delete[] extractInfo.C4MPath;
+        extractInfo.C4MPath = NULL;
+    }
     //clean up Griffeye case variables
     if (extractInfo.GriffeyeCaseLocation != NULL) {
         delete[] extractInfo.GriffeyeCaseLocation;
@@ -1901,12 +1971,18 @@ int returnHashValue(LONG nItemID, wchar_t* md5Buffer, wchar_t* SHA1Buffer, wchar
         //photoDNA Computed
         wchar_t tempBuffer[145]={0};
         int checkVal = getHashValue(nItemID,tempBuffer,144,hashTypePDNA,false);
-        unsigned char* tBuffer = new unsigned char[145];
-        sprintf((char*)tBuffer,"%ls",tempBuffer);
-        char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
-        swprintf(PDNABuffer,L"%s",result);
-        delete[] tBuffer;
-        delete[] result;
+        if (checkVal == 0)
+        {
+            unsigned char* tBuffer = new unsigned char[145];
+            snprintf((char*)tBuffer,145,"%ls",tempBuffer);
+            char* result = b64Encode(tBuffer, strlen((char*)tBuffer));
+            if (result != NULL)
+            {
+                swprintf(PDNABuffer,256,L"%s",result);
+                delete[] result;
+            }
+            delete[] tBuffer;
+        }
     }
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"returnHashValue 0");}
     return 0;
@@ -2001,7 +2077,7 @@ void writeSQLMediaRecord(LONG nItemID, hashValueStruct hashVals, int picture)
     char relativeBuffer[128]={0};
     int retVal = generateRelativeFilePath(&relativeBuffer[0],128,currentRecord.MD5,false);
     //merge paths
-    swprintf(currentRecord.RelativeFilePath,L"%s\\%ls",relativeBuffer,currentRecord.MD5);
+    swprintf(currentRecord.RelativeFilePath,128,L"%s\\%ls",relativeBuffer,currentRecord.MD5);
     INT64 sizeResult = XWF_GetItemSize(nItemID);
     if (sizeResult < 0)
     {
@@ -2172,6 +2248,12 @@ void getItemFileName(long nItemID, VICSMediaFile* record)
     }
     catch (...)
     {
+        xName = NULL;
+    }
+    //XWF_GetItemName returns NULL on failure rather than throwing, so the catch above alone
+    //doesn't cover it - both failure modes fall back to the same empty-name handling here
+    if (xName == NULL)
+    {
         XWF_OutputMessage(L"Error retrieving item name. Item will have --noName--",0);
         xName = new wchar_t[8];
         xName[0] = L'\0';
@@ -2229,7 +2311,7 @@ int extractMediaFileRecordDetails(LONG nItemID,wchar_t MD5Hash[33], int picture,
     //add source
     record->sourceID = new wchar_t[128];
     record->sourceID[0] = L'\0';
-    swprintf(record->sourceID,L"%ls",currSrcID);
+    swprintf(record->sourceID,128,L"%ls",currSrcID);
     record->XWFitemID = nItemID;
     if (extractInfo.debugSet){debugWriteDetails(nItemID, L"extractMediaFileRecordDetails End");}
     return 0;
@@ -2371,6 +2453,7 @@ int createVICSRecord(LONG nItemID, int picture, hashValueStruct hashVals)
             initializeMediaFileRecord(recUpdate);
             int rc = extractMediaFileRecordDetails(nItemID,hashVals.MD5,picture,&recUpdate);
             updateMediaFileRecord(vicsDB,&recUpdate,picture,hashVals.MD5, duplicateItemID);
+            deallocateMediaFileRecord(recUpdate);
         }
         else
         {
@@ -2491,7 +2574,7 @@ int createC4AllRecord(LONG nItemID, int picture,wchar_t MD5Hash[33])
     //get filename/path
     picFile.fullPath = getFullPath(currSrcID,nItemID,false);
     removeInvalidChars(picFile.fullPath);
-    picFile.fullPath = replaceInvalidXMLChars(picFile.fullPath);
+    //fullPath is written into a CDATA section in writeXML, which needs no entity escaping
     //get physical location and offset
     INT64 ds;
     XWF_GetItemOfs(nItemID,(INT64*)&ds,(INT64*)&picFile.physicalSector);
@@ -2581,7 +2664,7 @@ int getFileName(LPWSTR evObject,LONG nItemID, wchar_t* retValue,long bufferSize)
  * XML paths include the filename; VICS paths contain only the parent directory with
  * backslashes replaced by double-backslashes and pipe characters.
  *
- * @param evObject Evidence object wide string (used as path prefix).
+ * @param evObject Evidence object handle (unused, retained for API symmetry; passed through to getFileName).
  * @param nItemID  X-Ways item ID.
  * @param isVic    TRUE for VICS format, FALSE for XML format.
  * @return Newly allocated wide string containing the path (caller must delete[]).
@@ -2783,7 +2866,9 @@ int writeRecords(sqlite3* database,FILE* vicFile, int picture)
     //get number of records returned
     int noRecords = returnMediaRecords(vicsDB,&statement,picture);
     if (noRecords < 0){
-        //error
+        //error - returnMediaRecords already finalizes/nulls statement on its own error paths where
+        //it was actually allocated, so nothing to do with it here; but the VICS file is still open
+        closeVICSFile(vicFile);
         return -1;
     }
     else if (noRecords == 0)
@@ -2793,18 +2878,29 @@ int writeRecords(sqlite3* database,FILE* vicFile, int picture)
         closeVICSFile(vicFile);
         return 0;
     }
+    bool wroteAnyRecord = false;
     for (int i=0;i<noRecords;i++)
     {
         VICSRecord currentRecord;
         extractVICSMediaSQL(currentRecord.vMedia,statement);
         int result = extractIntoVicsRecord(vicsDB,&currentRecord,(wchar_t*)&currentRecord.vMedia.MD5,picture);
         if (result == 0){
-            //success now write record
-            writeMediaRecord(vicFile, &currentRecord);
-        }
-        if (i != noRecords -1){
-            //not last record, add seperator
-            fprintf(vicFile,",\r\t\t");
+            //separator goes before each successful record (except the first), not after every
+            //iteration by index - a record can be skipped below (or extractIntoVicsRecord can
+            //fail above) without there being anything on either side of an index-based comma
+            if (wroteAnyRecord)
+            {
+                fprintf(vicFile,",\r\t\t");
+            }
+            int writeResult = writeMediaRecord(vicFile, &currentRecord);
+            if (writeResult == 0)
+            {
+                wroteAnyRecord = true;
+            }
+            else
+            {
+                XWF_OutputMessage(L"Error writing VICS media record; record skipped",0);
+            }
         }
         //update screen every 100 records
         if (i % 100==0) {XWF_ShouldStop();}

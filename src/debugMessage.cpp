@@ -255,7 +255,7 @@ int debugWriteDetails(LONG nItemID, const wchar_t* module,const wchar_t* message
 void outputErrorMessage(const wchar_t* errMsg, LONG nItemID)
 {
     wchar_t errorMessage[2048];
-    swprintf(errorMessage,2048,L"%ls %lu",errMsg, nItemID);
+    swprintf(errorMessage,2048,L"%ls %ld",errMsg, nItemID);
     EnterCriticalSection(&dbgMessage);
     XWF_OutputMessage(errorMessage,0);
     LeaveCriticalSection(&dbgMessage);
@@ -324,7 +324,7 @@ void errorReport()
     for (int i=0;i<numErrorTables;i++)
     {
         wchar_t messageBuffer[1024]={0};
-        swprintf(messageBuffer,L"%ls:\t\t%i",ReportTableList[i][1],errorLog[i]);
+        swprintf(messageBuffer,1024,L"%ls:\t\t%i",ReportTableList[i][1],errorLog[i]);
         //output message to window and print to log
         XWF_OutputMessage(messageBuffer,0);
         XWF_OutputMessage(messageBuffer,0x10);
