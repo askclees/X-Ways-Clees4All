@@ -162,6 +162,10 @@ HWND createToolTip(int toolID, HWND hDlg, PTSTR pszText)
 int createWindow(WORD version)
 {
     VisualStylesScope visualStyles;
+    //hBrush is freed (and nulled) by cleanupGUI() at the end of every run, so it must be
+    //recreated here on any run after the first - otherwise the window classes below get
+    //registered with a NULL background brush
+    if (hBrush == NULL) { hBrush = CreateSolidBrush(RGB(240,240,240)); }
     versionNumber = version;
     const char CLASS_NAME[] = C4A_TITLE;
     WNDCLASSEX wc = {};

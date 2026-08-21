@@ -111,6 +111,10 @@ void createOptions(char path[]);
 int createOptionsWindow()
 {
     VisualStylesScope visualStyles;
+    //hBrush is freed (and nulled) by cleanupOptions() at the end of every run, so it must be
+    //recreated here on any run after the first - otherwise the window class below gets
+    //registered with a NULL background brush
+    if (hBrush == NULL) { hBrush = CreateSolidBrush(RGB(240,240,240)); }
     const char CLASS_NAME[] = C4A_TITLE " Options";
     WNDCLASSEX wc = {};
 

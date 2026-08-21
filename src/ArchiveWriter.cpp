@@ -94,9 +94,15 @@ int setupZipArchives()
         if (ArchAll == NULL)
             return ERROR_CREATE;
         if (archive_write_set_format_zip(ArchAll) != ARCHIVE_OK)
+        {
+            closeZipArchive(&ArchAll);
             return ERROR_FORMAT;
+        }
         if (archive_write_open_filename(ArchAll, archivePic) != ARCHIVE_OK)
+        {
+            closeZipArchive(&ArchAll);
             return ERROR_OPEN;
+        }
     }
     else
     {
@@ -106,19 +112,40 @@ int setupZipArchives()
             if (ArchPic == NULL)
                 return ERROR_CREATE;
             if (archive_write_set_format_zip(ArchPic) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchPic);
                 return ERROR_FORMAT;
+            }
             if (archive_write_open_filename(ArchPic, archivePic) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchPic);
                 return ERROR_OPEN;
+            }
         }
         if (archiveVid != nullptr)
         {
             ArchVid = archive_write_new();
+            //ArchPic may already be open at this point - on any failure below it must be
+            //freed too, otherwise its open file handle leaks for the rest of the X-Ways
+            //session (setupZipArchives isn't retried, and caseCleanup is never reached
+            //since the caller aborts XT_Prepare on a non-SUCCESS return)
             if (ArchVid == NULL)
+            {
+                if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
                 return ERROR_CREATE;
+            }
             if (archive_write_set_format_zip(ArchVid) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchVid);
+                if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
                 return ERROR_FORMAT;
+            }
             if (archive_write_open_filename(ArchVid, archiveVid) != ARCHIVE_OK)
+            {
+                closeZipArchive(&ArchVid);
+                if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
                 return ERROR_OPEN;
+            }
         }
     }
     return SUCCESS;
@@ -223,6 +250,35 @@ int closeZipArchive(struct archive** archFile)
 }
 
 /**
+ * @brief Frees and nulls the shared archive object that a short/failed write left in an
+ *        indeterminate state.
+ *
+ * libarchive requires archive_write_free() after a write error - the entry's declared
+ * size (set up front via archive_entry_set_size) no longer matches the bytes actually
+ * written, so the zip stream can't be trusted for any further entries. Nulling the
+ * relevant global here makes selectArchiveObject() return NULL afterwards, so later
+ * writeArchiveFile/writeJSONFile calls fail fast with ERROR_WRITE instead of silently
+ * corrupting more entries into the same archive.
+ *
+ * @param picFile True if the failed write was for a picture, false for video.
+ */
+void invalidateArchiveObject(bool picFile)
+{
+    if (ArchAll != nullptr)
+    {
+        closeZipArchive(&ArchAll);
+    }
+    else if (picFile)
+    {
+        if (ArchPic != nullptr) { closeZipArchive(&ArchPic); }
+    }
+    else
+    {
+        if (ArchVid != nullptr) { closeZipArchive(&ArchVid); }
+    }
+}
+
+/**
  * @brief Generates the in-archive file path for a file based on its MD5 filename.
  *
  * Builds a two-level folder hierarchy using the first four characters of the
@@ -290,6 +346,8 @@ struct archive* selectArchiveObject(bool picFile)
 int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
 {
     struct archive *outa = selectArchiveObject(picFile);
+    if (outa == nullptr)
+        return ERROR_WRITE;
     struct archive_entry *entry;
     size_t bytesRead=0;
 
@@ -314,6 +372,9 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
             fclose(inputFile);
             closeZipArchiveEntry(&outa, entry);
             delete[] buffer;
+            //the entry's declared size no longer matches what was actually written -
+            //the archive object can't be trusted for any further entries
+            invalidateArchiveObject(picFile);
             return ERROR_WRITE;
         }
     }
@@ -322,6 +383,7 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
         fclose(inputFile);
         closeZipArchiveEntry(&outa, entry);
         delete[] buffer;
+        invalidateArchiveObject(picFile);
         return ERROR_READ;
     }
     fclose(inputFile);
@@ -351,8 +413,15 @@ int writeJSONFile(const char* inFilePath, const char* filename, bool picFile)
 int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,HANDLE hdlCurrVol)
 {
     EnterCriticalSection(&archiveLock);
-    char* filePath = generateCompressedPath(fileName);
     struct archive *outa = selectArchiveObject(picFile);
+    if (outa == nullptr)
+    {
+        //a previous write on this archive failed and invalidated it - fail fast rather than
+        //dereferencing a freed archive object
+        LeaveCriticalSection(&archiveLock);
+        return ERROR_WRITE;
+    }
+    char* filePath = generateCompressedPath(fileName);
     bool fileFound = false;
     std::wstring wFileName(fileName);
     std::string hashValue(wFileName.begin(), wFileName.end());
@@ -405,6 +474,9 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
             XWF_Close(hItem);
             delete[] buffer;
             closeZipArchiveEntry(&outa, entry);
+            //entry's declared size (fileSize) no longer matches what was actually written -
+            //the archive object can't be trusted for any further entries
+            invalidateArchiveObject(picFile);
             LeaveCriticalSection(&archiveLock);
             delete[] filePath;
             return ERROR_WRITE;
@@ -415,6 +487,7 @@ int writeArchiveFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize
             XWF_Close(hItem);
             delete[] buffer;
             closeZipArchiveEntry(&outa, entry);
+            invalidateArchiveObject(picFile);
             LeaveCriticalSection(&archiveLock);
             delete[] filePath;
             return ERROR_WRITE;

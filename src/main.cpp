@@ -360,12 +360,10 @@ LONG DLL_EXPORT XT_Finalize(HANDLE hVolume, HANDLE hEvidence, DWORD nOpType,void
 
 LONG DLL_EXPORT XT_Done(void* lpReserved)
 {
-    //check if process was exited
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function Start");}
-    if (extractInfo.processStart == FALSE)
-    {
-        return 0;
-    }
+    //caseCleanup must run even if the user closed the options dialog without clicking Start
+    //(or firstRunSetup failed) - it's what resets firstTime and frees extractInfo.nameList, and
+    //is written defensively (NULL-checked) so it's safe to call on a run that never fully started
     int retVal = caseCleanup();
     errorReport();
     if (extractInfo.debugSet){debugWriteDetails("XT_Done Function End");}
@@ -771,15 +769,22 @@ int getCommandLineOptions()
 {
     if (extractInfo.debugSet){debugWriteDetails(0, L"getCommandLineOptions Start");}
     int numArgv;
-    //get commandline options and change to lower case
-    LPWSTR cmdLine = GetCommandLineW();
-    int cmdLineLen = wcslen(cmdLine);
+    //get commandline options and change to lower case - GetCommandLineW() returns a pointer to
+    //the process's own command-line string (documented as such by Microsoft), not a caller-owned
+    //buffer, so it must be copied before being lowercased in place; mutating it directly would
+    //permanently corrupt it for any other in-process code (X-Ways itself, other X-Tensions) that
+    //calls GetCommandLineW() later in the session
+    LPWSTR origCmdLine = GetCommandLineW();
+    int cmdLineLen = wcslen(origCmdLine);
+    wchar_t* cmdLine = new wchar_t[cmdLineLen + 1];
+    wcscpy(cmdLine, origCmdLine);
     for (int j = 0;j<cmdLineLen;j++)
     {
         cmdLine[j]=towlower(cmdLine[j]);
     }
     //split options into delimited sets
     LPWSTR* argv = CommandLineToArgvW(cmdLine,&numArgv);
+    delete[] cmdLine;
     if (argv == NULL)
     {
         XWF_OutputMessage(L"CommandLineToArgvW Failed\n",0);
@@ -1486,11 +1491,16 @@ LONG mainItemProcess(LONG nItemID, int picture, INT64 fileSize)
         }
         if (extractInfo.VICSCompressed)
         {//create compressed file here
+            int archiveResult;
             if (picture ==1){
-                writeArchiveFile(nItemID,true,currHash.MD5,fileSize, hdlCurrVol);
+                archiveResult = writeArchiveFile(nItemID,true,currHash.MD5,fileSize, hdlCurrVol);
             }
             else{
-                writeArchiveFile(nItemID,false,currHash.MD5,fileSize, hdlCurrVol);
+                archiveResult = writeArchiveFile(nItemID,false,currHash.MD5,fileSize, hdlCurrVol);
+            }
+            if (archiveResult == ERROR_WRITE)
+            {
+                errorRaised(nItemID,REPORT_FILESIZE_MISMATCH);
             }
         }
     }

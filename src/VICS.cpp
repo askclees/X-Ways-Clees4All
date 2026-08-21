@@ -328,12 +328,12 @@ void deallocateMediaFileRecord(VICSMediaFile &record)
  */
 void freeVicsCaseData()
 {
-    if (vCaseData.CaseNumber != nullptr)    { delete[] vCaseData.CaseNumber; }
-    if (vCaseData.ContactEmail != nullptr)  { delete[] vCaseData.ContactEmail; }
-    if (vCaseData.ContactName != nullptr)   { delete[] vCaseData.ContactName; }
-    if (vCaseData.ContactOrg != nullptr)    { delete[] vCaseData.ContactOrg; }
-    if (vCaseData.ContactPhone != nullptr)  { delete[] vCaseData.ContactPhone; }
-    if (vCaseData.ContactTitle != nullptr)  { delete[] vCaseData.ContactTitle; }
+    if (vCaseData.CaseNumber != nullptr)    { delete[] vCaseData.CaseNumber;   vCaseData.CaseNumber = nullptr; }
+    if (vCaseData.ContactEmail != nullptr)  { delete[] vCaseData.ContactEmail; vCaseData.ContactEmail = nullptr; }
+    if (vCaseData.ContactName != nullptr)   { delete[] vCaseData.ContactName;  vCaseData.ContactName = nullptr; }
+    if (vCaseData.ContactOrg != nullptr)    { delete[] vCaseData.ContactOrg;   vCaseData.ContactOrg = nullptr; }
+    if (vCaseData.ContactPhone != nullptr)  { delete[] vCaseData.ContactPhone; vCaseData.ContactPhone = nullptr; }
+    if (vCaseData.ContactTitle != nullptr)  { delete[] vCaseData.ContactTitle; vCaseData.ContactTitle = nullptr; }
 }
 
 /**
@@ -662,10 +662,11 @@ void extractVICSMediaSQL(VICSMedia &recMedia,sqlite3_stmt* statement)
     recMedia.DateUpdated = tmpFileTime;
     recMedia.timeZone = sqlite3_column_int64(statement,13);
     CheckSize = sqlite3_column_bytes16(statement,14);
-    if (CheckSize == 0) { recMedia.PrecatSource = NULL; }
+    if (CheckSize == 0) { recMedia.PrecatSource = NULL; recMedia.IsPreCat = FALSE; }
     else {
             recMedia.PrecatSource = new wchar_t[CheckSize + 2];
             wcscpy(recMedia.PrecatSource, (wchar_t*)sqlite3_column_text16(statement,14));
+            recMedia.IsPreCat = TRUE;
         }
     recMedia.IsSuspected = sqlite3_column_int64(statement,15);
     CheckSize = sqlite3_column_bytes16(statement,16);

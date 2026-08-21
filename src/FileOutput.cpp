@@ -296,7 +296,7 @@ int writeOutputFile(LONG nItemID,bool picFile,wchar_t* fileName, INT64 fileSize,
     char outputPath[2048];
     FILE* outputFile;
     generateFilePath(&outputPath[0],2048, fileName, picFile);
-    if (ifFileExists(outputPath))
+    if (!extractOpt.overwriteFiles && ifFileExists(outputPath))
     {
         //no need to re-write file
         //1.41 check filesize first
