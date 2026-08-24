@@ -6,7 +6,7 @@ This guide walks through preparing a case, running the Clees4All (C4All) X-Tensi
 
 - [Compatibility](#compatibility)
 - [1. Preparing the case in RVS](#1-preparing-the-case-in-rvs)
-- [2. Installing the file type signatures](#2-installing-the-file-type-signatures)
+- [2. Carving file signatures (optional)](#2-carving-file-signatures-optional)
 - [3. Loading the X-Tension](#3-loading-the-x-tension)
 - [4. X-Tension options](#4-x-tension-options)
 - [5. Running the X-Tension](#5-running-the-x-tension)
@@ -33,7 +33,7 @@ Clees4All is designed to run as its own RVS pass, **after** an initial RVS pass 
 
 A good baseline set of RVS options for the first pass:
 
-- **File header signature search** — carves picture/movie/other files. Requires the C4All file type signatures (see [§2](#2-installing-the-file-type-signatures)).
+- **File header signature search** — carves picture/movie/other files from unallocated space and other locations X-Ways wouldn't otherwise parse. The C4All file-signature set (see [§2](#2-carving-file-signatures-optional)) makes it quick to select a good range of picture/video/compound types for this in one go, but any signature set works — the X-Tension itself doesn't care which one was used.
 - **Compute hash with MD5/SHA1** — set the primary hash to MD5 and secondary to SHA1. MD5 is mandatory; the X-Tension will refuse to run without it. Make sure the "Condition" box is left **unticked**, otherwise large files will be skipped and won't be hashed or exported.
 - **Match hash values against hash database** — used with NSRL or a similar known-file database. It's recommended you have a "known good" hash set (categorised as irrelevant) to cut down the number of irrelevant images exported and reduce processing time.
 - **Verify file types** — required so the X-Tension can tell pictures and videos apart from everything else.
@@ -46,13 +46,29 @@ A good baseline set of RVS options for the first pass:
 
 Additional options (encryption tests, document identification, etc.) can be enabled without affecting the X-Tension.
 
-When prompted, select the hash databases to match against, then the File Header Search window will appear — see [§2](#2-installing-the-file-type-signatures) if the `C4All Pictures Version 1.1` signature set isn't listed. Note that any live file X-Ways considers a Picture or Video will be exported by the X-Tension; the signature sets are for carving additional (deleted/unallocated) instances. Add extra file types to the signature sets if a specific case needs them.
+A baseline RVS configuration matching the list above:
 
-## 2. Installing the file type signatures
+![Refine Volume Snapshot options dialog with the recommended baseline ticked](images/rvs-baseline-options.png)
 
-The X-Tension relies on a companion file type signature set — **not** anything from a third party — to drive the RVS carving step, containing the `C4All Pictures`, `C4All Videos`, and `C4All Compound` groups. It's distributed alongside the compiled X-Tension in the project's [releases](../../../releases) rather than kept in this repository.
+When prompted, select the hash databases to match against:
 
-Import it once via X-Ways' File Header Signature Search editor. If you don't see `C4All Pictures Version 1.1` (or later) listed when configuring the file header signature search, download it from the release and import it before continuing.
+![Select Hash Sets for Matching dialog, showing NSRL hash sets](images/hash-set-selection.png)
+
+For **Picture analysis and processing**, enable PhotoDNA hash computation:
+
+![Picture analysis and processing dialog with Compute PhotoDNA hash values ticked](images/picture-analysis-photodna.png)
+
+Then the File Header Search window will appear — see [§2](#2-carving-file-signatures-optional) if the `C4All Pictures Version 1.1` signature set isn't listed. Note that any live file X-Ways considers a Picture or Video will be exported by the X-Tension; the signature sets are for carving additional (deleted/unallocated) instances. Add extra file types to the signature sets if a specific case needs them.
+
+## 2. Carving file signatures (optional)
+
+The project distributes a predefined file-signature set — **not** anything from a third party — for X-Ways' File Header Signature Search, grouped as `C4All Pictures`, `C4All Videos`, and `C4All Compound`. Each group bundles a good range of common picture, video, and compressed/document file signatures, so ticking one entry carves for all of them at once instead of selecting each signature individually. It's available from the project's [releases](../../../releases) rather than kept in this repository.
+
+This is purely a carving convenience for the initial RVS pass — the X-Tension itself doesn't read or depend on this signature set in any way. It relies entirely on X-Ways' own file type verification (the **Verify file types** RVS option) to identify which items are pictures and videos, regardless of which signature set was used to carve them. Use whatever signatures suit the case; the C4All set is just a quick starting point.
+
+Import it once via X-Ways' File Header Signature Search editor. If you don't see `C4All Pictures Version 1.1` (or later) listed when configuring the file header signature search, download it from the release and import it before continuing. Once imported, just tick the top-level entry for each group you want to carve for:
+
+![File Header Search dialog with C4All Pictures, Videos, and Compound signature groups ticked](images/file-header-search-c4all-signatures.png)
 
 ## 3. Loading the X-Tension
 
