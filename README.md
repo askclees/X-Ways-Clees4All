@@ -28,12 +28,13 @@ Full step-by-step usage instructions, including screenshots of every dialog, are
 
 - X-Ways Forensics 19.2 or later (some features require newer versions — see [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for the version matrix)
 - Windows 7 or later, 64-bit
-- The custom C4All file-type signature definitions, imported into X-Ways for the file header signature search step — bundled with the [releases](../../releases) rather than kept in this repo
 - Griffeye Analyze with command-line case creation support, only if automatic Griffeye case creation is used
+
+Also bundled with the [releases](../../releases): a predefined C4All Pictures/Videos/Compound file-signature set for X-Ways' File Header Signature Search, letting you tick one entry per group to carve for all of the covered types at once instead of picking signatures individually. It's a carving convenience, not something the X-Tension itself reads or requires — X-Ways' own file type verification is what the X-Tension relies on to tell pictures and videos apart.
 
 ## Getting started
 
-1. Import the C4All file-type signatures (from the [release](../../releases) download) into X-Ways Forensics (File Header Signatures editor).
+1. (Optional) Import the C4All file-type signature set from the [release](../../releases) download into X-Ways Forensics (File Header Signatures editor), for convenient bulk carving of picture/video/compound types.
 2. Add `XT_Clees4All_<version>.dll` to X-Ways as an X-Tension (Options > Run X-Tensions).
 3. Run RVS on your evidence with the file header signature search, hashing, and file type verification enabled, then run RVS again with the Clees4All X-Tension ticked.
 
