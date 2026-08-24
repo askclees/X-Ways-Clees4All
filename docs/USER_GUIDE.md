@@ -50,9 +50,9 @@ When prompted, select the hash databases to match against, then the File Header 
 
 ## 2. Installing the file type signatures
 
-The X-Tension relies on a companion file type signature set — **not** anything from a third party — to drive the RVS carving step: [`resources/File-Type-Signatures-C4All-1.1.txt`](../resources/File-Type-Signatures-C4All-1.1.txt), containing the `C4All Pictures`, `C4All Videos`, and `C4All Compound` groups.
+The X-Tension relies on a companion file type signature set — **not** anything from a third party — to drive the RVS carving step, containing the `C4All Pictures`, `C4All Videos`, and `C4All Compound` groups. It's distributed alongside the compiled X-Tension in the project's [releases](../../../releases) rather than kept in this repository.
 
-Import it once via X-Ways' File Header Signature Search editor. If you don't see `C4All Pictures Version 1.1` (or later) listed when configuring the file header signature search, import the file before continuing.
+Import it once via X-Ways' File Header Signature Search editor. If you don't see `C4All Pictures Version 1.1` (or later) listed when configuring the file header signature search, download it from the release and import it before continuing.
 
 ## 3. Loading the X-Tension
 
