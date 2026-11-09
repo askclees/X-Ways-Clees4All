@@ -381,7 +381,7 @@ void checkParentObjectsSelected(sqlite3* sqlDB)
             if (rc == SQLITE_ROW)
             {
                 //check if parent is selected
-                DWORD parentId = sqlite3_column_int(statement,0);
+                DWORD parentId = (DWORD)sqlite3_column_int64(statement,0);
                 BOOL check = checkParentSelected(sqlDB,parentId);
                 if (!check)
                 {
@@ -496,10 +496,10 @@ int insertEvObjRecord(sqlite3* sqlDB, EvidenceProps &record)
         XWF_OutputMessage(L"Error preparing statement to insert evidence object record",0);
         return -1;
     }
-    rc = sqlite3_bind_int(statement,1,record.ID);
+    rc = sqlite3_bind_int64(statement,1,(sqlite3_int64)record.ID);
     if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,2,record.Name,-1,SQLITE_STATIC);
     if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,3,record.SourceID,-1,SQLITE_STATIC);
-    if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,4,record.parentID);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,4,(sqlite3_int64)record.parentID);
     if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,5,record.fileID);
     if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,6,record.selected);
     if (rc != SQLITE_OK)
@@ -715,7 +715,7 @@ ObjectNames* retrieveEvidenceNames(sqlite3* sqlDB,int *retCounter)
                     //more rows than the earlier count query reported; stop rather than overflow retArray
                     break;
                 }
-                retArray[recCount].objectID = sqlite3_column_int(statement,0);
+                retArray[recCount].objectID = (DWORD)sqlite3_column_int64(statement,0);
                 wcsncpy(retArray[recCount].actualName, (wchar_t*)sqlite3_column_text16(statement, 1), 1023);
                 retArray[recCount].actualName[1023] = L'\0';
                 wcsncpy(retArray[recCount].prefName, (wchar_t*)sqlite3_column_text16(statement, 2), 1023);
@@ -755,7 +755,7 @@ int updateEvidenceNames(sqlite3* sqlDB,ObjectNames* listEvObj, int noObjs)
             sqlite3_stmt *statement;
             int rc = sqlite3_prepare16_v2(sqlDB,sqlQuery,-1,&statement,NULL);
             if (rc == SQLITE_OK) rc = sqlite3_bind_text16(statement,1,listEvObj[i].prefName,-1,SQLITE_STATIC);
-            if (rc == SQLITE_OK) rc = sqlite3_bind_int(statement,2,listEvObj[i].objectID);
+            if (rc == SQLITE_OK) rc = sqlite3_bind_int64(statement,2,(sqlite3_int64)listEvObj[i].objectID);
             if (rc == SQLITE_OK)
             {
                 rc = sqlite3_step(statement);
